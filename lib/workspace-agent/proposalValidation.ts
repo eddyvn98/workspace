@@ -1,3 +1,4 @@
+import { COLLECTION_COMMANDS } from "./collectionActionSchema";
 import { validateWorkspaceRuntimeAction, validateWorkspaceRuntimeTableTarget } from "./actionSchema";
 import { WORKSPACE_RUNTIME_MAX_ACTIONS, type WorkspaceJson, type WorkspaceModelProposal } from "./contracts";
 
@@ -25,7 +26,7 @@ export function parseWorkspaceModelProposal(answer: string, board?: WorkspaceJso
   for (const action of actions) {
     const issue = validateWorkspaceRuntimeAction(action);
     if (issue) throw new Error(issue);
-    const targetIssue = board ? validateWorkspaceRuntimeTableTarget(action, board) : null;
+    const targetIssue = board && !COLLECTION_COMMANDS.has(String(action.type)) ? validateWorkspaceRuntimeTableTarget(action, board) : null;
     if (targetIssue) throw new Error(targetIssue);
   }
   if (actions.length > 1 && actions.some((action) => action.type === "undo" || action.type === "redo")) {
