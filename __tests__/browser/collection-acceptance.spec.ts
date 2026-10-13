@@ -160,7 +160,7 @@ test("Kanban dnd-kit drag changes persisted status, respects read-only mode", as
   await block.getByRole("button", { name: "Kanban", exact: true }).click();
   const card = block.getByTestId("collection-kanban-card").first();
   await expect(card).toBeVisible();
-  const toDo = block.getByTestId("collection-kanban-column").filter({ hasText: "To do" });
+  const toDo = block.getByTestId("collection-kanban-column").and(block.locator('[data-status="To do"]'));
   if (page.viewportSize()!.width < 600) {
     // Touch-sized screens retain an accessible select alternative to drag.
     await block.getByRole("combobox", { name: "Status for Drag test record" }).selectOption("To do");
@@ -179,7 +179,7 @@ test("Kanban dnd-kit drag changes persisted status, respects read-only mode", as
   await page.reload();
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   const reopened = page.getByTestId("collection-block");
-  await expect(reopened.getByTestId("collection-kanban-column").filter({ hasText: "To do" })
+  await expect(reopened.getByTestId("collection-kanban-column").and(reopened.locator('[data-status="To do"]'))
     .getByText("Drag test record").first()).toBeVisible();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
   await expect(reopened.getByRole("button", { name: "Drag Drag test record" })).toBeDisabled();
