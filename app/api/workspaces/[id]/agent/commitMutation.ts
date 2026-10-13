@@ -12,7 +12,7 @@ import { agentMutationReceipt, list, type JsonMap } from "./routeHelpers";
 import { receiptNotes } from "./receiptNotes";
 import { lockActiveWorkspaceTurn, WorkspaceTurnNotActiveError } from "@/lib/workspace-agent/turnStore";
 
-type AppliedAction = { type: string; ids: string[]; changed: boolean; reason?: string; notes?: string[] };
+type AppliedAction = { type: string; ids: string[]; changed: boolean; reason?: string; notes?: string[]; targets?: { blockId: string; recordId?: string; fieldId?: string; viewId?: string } };
 
 export async function replayCommand(key: CommandReceiptKey | null): Promise<NextResponse | null> {
   if (!key) return null;
