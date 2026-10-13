@@ -84,7 +84,9 @@ export const viewFilters = (view: CollectionView) => view.filters ?? (view.filte
 export const viewSorts = (view: CollectionView) => view.sorts ?? (view.sort ? [view.sort] : []);
 /** New arrays override old scalar configs, including intentionally empty arrays. */
 export function visibleRecords(data: CollectionBlockPayload, view: CollectionView, search = ""): CollectionRecord[] {
-  const filters = viewFilters(view);
+  // An unfinished filter row has no effect until its value is entered.
+  // Keep it in the saved view so users can complete it after reload.
+  const filters = viewFilters(view).filter((filter) => filter.value.trim().length > 0);
   const sorts = viewSorts(view);
   let rows = data.records.filter((r) => filters.every((filter) => r.values[filter.fieldId] === filter.value)
     && (!search || Object.values(r.values).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))));
