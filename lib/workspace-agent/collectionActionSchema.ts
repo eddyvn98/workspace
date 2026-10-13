@@ -11,6 +11,10 @@ const filter: PropertySchema = { type: "object", nullable: true, additionalPrope
 const sort: PropertySchema = { type: "object", nullable: true, additionalProperties: false,
   required: ["fieldId", "direction"], properties: { fieldId: id, direction: { type: "string", enum: ["asc", "desc"] } } };
 
+const filters: PropertySchema = { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false,
+  required: ["fieldId", "value"], properties: { fieldId: id, value: { type: "string", maxLength: 2000 } } } };
+const sorts: PropertySchema = { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false,
+  required: ["fieldId", "direction"], properties: { fieldId: id, direction: { type: "string", enum: ["asc", "desc"] } } } };
 function define(name: string, required: string[], properties: Record<string, PropertySchema> = {}): RuntimeActionSchema {
   return { type: "object", additionalProperties: false, required: ["type", "blockId", ...required],
     properties: { type: { type: "string", const: name }, blockId: id, ...properties } };
@@ -33,7 +37,7 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
     viewId: id, name: word, kind: viewKind }),
   configure_collection_view: define("configure_collection_view", [], {
     viewId: id, viewName: word, name: word, active: { type: "boolean" }, groupFieldId: { ...id, nullable: true },
-    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort }),
+    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort, filters, sorts }),
   remove_collection_view: define("remove_collection_view", [], { viewId: id, viewName: word }),
   convert_table_to_collection: define("convert_table_to_collection", []),
 };

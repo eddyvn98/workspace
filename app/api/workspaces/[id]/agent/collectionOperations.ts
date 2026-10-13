@@ -68,9 +68,13 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     next = { ...data, views: [...data.views, view] };
   } else if (type === "configure_collection_view") {
     const patch: Partial<CollectionView> = {};
-    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort"] as const) {
+    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts"] as const) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) Object.assign(patch, { [key]: raw[key] ?? undefined });
     }
+    if ("filters" in patch) patch.filter = undefined;
+    if ("sorts" in patch) patch.sort = undefined;
+    if ("filter" in patch) patch.filters = undefined;
+    if ("sort" in patch) patch.sorts = undefined;
     next = updateView(data, viewId, patch);
     if (prop(raw, "active") === true) next = { ...next, activeViewId: viewId };
   } else if (type === "remove_collection_view") {
