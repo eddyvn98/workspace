@@ -205,7 +205,8 @@ test("Calendar month/week/day navigation and date persistence", async ({ page })
   await block.getByLabel("Start", { exact: true }).first().fill("2026-10-13");
   await block.getByRole("button", { name: "Calendar", exact: true }).click();
   await block.getByRole("button", { name: "Settings" }).click();
-  await expect(block.getByLabel("Date", { exact: true }).locator("option:checked")).toHaveText("Start");
+  await expect.poll(() => block.getByRole("combobox", { name: "Date", exact: true })
+    .evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.text)).toBe("Start");
   await expect(block.getByLabel("End", { exact: true })).toHaveCount(0);
   const calendar = block.getByTestId("collection-calendar");
   await calendar.getByLabel("Calendar selected day").fill("2026-10-13");
