@@ -75,7 +75,7 @@ export function CollectionSurface({ data, onChange, readOnly }: Props) {
       {view.kind === "kanban" && <CollectionKanbanView data={data} rows={rows} group={group} titleField={titleField} groupOptions={groupOptions} readOnly={readOnly} onChange={onChange} patch={patch} />}
       {view.kind === "gallery" && <CollectionGalleryView data={data} rows={rows} titleField={titleField} readOnly={readOnly} patch={patch} />}
       {view.kind === "calendar" && <CalendarView month={month} setMonth={setMonth} rows={rows} data={data} field={date} readOnly={readOnly} patch={patch} />}
-      {view.kind === "timeline" && <TimelineView rows={rows} data={data} start={date} end={end} readOnly={readOnly} patch={patch} />}
+      {view.kind === "timeline" && <TimelineView rows={rows} data={data} start={date} end={end} readOnly={readOnly} patch={patch} onChange={onChange} />}
       {view.kind === "mindmap" && <MindMapView rows={rows} data={data} readOnly={readOnly} onChange={onChange} />}
       {!rows.length && <div className="p-4 text-center text-xs text-slate-400">No matching records. Add one to get started.</div>}
     </div>
