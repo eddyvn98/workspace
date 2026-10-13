@@ -1,4 +1,28 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+// Prevent a silent "Preparing browser test..." shell from being counted as
+// a persistence bug. Fail explicitly for uncaught client errors / failed RSC.
+// Hooks survive page.reload() and apply to both mobile and desktop projects.
+const browserErrors = new WeakMap<Page, string[]>();
+test.beforeEach(async ({ page }) => {
+  const errors: string[] = [];
+  browserErrors.set(page, errors);
+  page.on("pageerror", (error) => errors.push("uncaught: " + error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydration|failed to fetch rsc|chunkloaderror/i.test(message.text())) {
+      errors.push("console: " + message.text());
+    }
+  });
+  page.on("requestfailed", (request) => {
+    if (/[?&]_rsc=/.test(request.url())) {
+      errors.push("RSC request failed: " + request.url() + " " + request.failure()?.errorText);
+    }
+  });
+});
+test.afterEach(async ({ page }) => {
+  expect(browserErrors.get(page) ?? [], "No hydration, JS exception or failed RSC request").toEqual([]);
+});
+
 
 test("create, edit, switch saved view, reload, edit in read-only mode denied", async ({ page }) => {
   await page.goto("/collection-acceptance");
@@ -11,7 +35,9 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   await container.getByRole("textbox", { name: "Name" }).first().fill("Persisted acceptance record");
   await container.getByRole("button", { name: "Kanban", exact: true }).click();
   await expect(container.getByText("Persisted acceptance record").first()).toBeVisible();
-  await page.reload();
+  const reloadResponse = await page.reload();
+  expect(reloadResponse?.status(), "Reload must return a successful document").toBe(200);
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   const reopened = page.getByTestId("collection-block");
   await expect(reopened).toBeVisible();
   await expect(reopened.getByText("Persisted acceptance record").first()).toBeVisible();
@@ -20,7 +46,9 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   await expect(reopened.getByRole("button", { name: "+ Record" })).toBeDisabled();
   await reopened.getByRole("button", { name: "Table", exact: true }).click();
   await expect(reopened.getByRole("textbox", { name: "Name" }).first()).toBeDisabled();
-  await page.reload();
+  const secondReload = await page.reload();
+  expect(secondReload?.status()).toBe(200);
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   await expect(page.getByTestId("collection-block").getByRole("button", { name: "Kanban", exact: true })).toHaveClass(/border-blue-500/);
 });
 
@@ -35,7 +63,9 @@ test("convert table without mutating source, edit and delete a record", async ({
   await expect(page.getByTestId("table-source")).toContainText("Original row");
   await container.getByRole("button", { name: "Delete Changed in Collection" }).click();
   await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
-  await page.reload();
+  const reloadResponse = await page.reload();
+  expect(reloadResponse?.status()).toBe(200);
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   await expect(page.getByTestId("collection-block").getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
 });
 

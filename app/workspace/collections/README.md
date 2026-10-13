@@ -54,3 +54,10 @@ Local feedback on commit `5f9bc81`: `pnpm exec tsc --noEmit` passed; two CSV Vit
 An intermittent dev-only `Hydration failed` overlay was observed under `<Workspace><ProtectedRoute>`. The dynamic client check for server-only `WORKSPACE_DEV_USER_EMAIL` could disagree between SSR and browser. The workspace route now evaluates a non-secret boolean on the server and passes it as an explicit prop to the client route and ProtectedRoute, so the initial decision is the same on both sides. **This is a suspected cause and a targeted fix, not a verified elimination**. Confirm after local reload with console open and no hydration errors; report stack if it persists.
 
 `BlockFrame.tsx` was previously 413+ lines. Connector geometry and document/slides auto-fit moved to `useBlockFrameGeometry.ts`, and frame styles moved to `blockFrameStyle.ts`; the original frame is now under 300 lines. No behavior change intended.
+
+
+## Deterministic browser acceptance runner
+
+The previous Playwright setup ran `next dev` with two workers (desktop and mobile). During concurrent reload Next Fast Refresh rebuilt modules and occasionally failed to fetch the RSC payload; the fixture remained at the server-rendered `Preparing browser test…` shell because React never hydrated. Running the mobile test alone passed, supporting a dev/HMR race rather than proven data loss. The remedy is to **build once and start immutable Next production mode**, retaining **2 workers** to detect any real concurrency bugs. The opt-in `/collection-acceptance` page is forced dynamic so `COLLECTION_BROWSER_ACCEPTANCE=true` is evaluated at request time, not frozen during build. Reusing an existing dev server is disabled. Tests now assert HTTP 200, hydrated fixture readiness, record values after reload, and absence of runtime hydration/RSC failures.
+
+Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.config.ts`. The webServer uses `pnpm exec next start -p 3137` with an isolated port. Stop any existing server on port 3137 before running. Browser fixture verifies real components and `localStorage`, **not authenticated Postgres or a deployed WebSocket room**.
