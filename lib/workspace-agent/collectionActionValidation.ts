@@ -1,6 +1,7 @@
 import type { WorkspaceJson } from "./contracts";
 import { COLLECTION_COMMANDS } from "./collectionActionSchema";
 import type { CollectionBlockPayload, CollectionField, CollectionFieldType } from "@/app/workspace/collections/model";
+import { isValidFilterOperator, validOperator } from "@/app/workspace/collections/collectionFilters";
 
 const obj = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -44,7 +45,8 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
   if (type === "update_collection_field" && !["name", "fieldType", "options"].some((key) => key in action)) return "No Collection field changes specified.";
-  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts"].some((key) => key in action)) return "No Collection view changes specified.";
+  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic"].some((key) => key in action)) return "No Collection view changes specified.";
+  if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
   return null;
 }
@@ -102,6 +104,7 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
       const id = action[key];
       if (id !== undefined && id !== null && !data.fields.some((f) => f.id === id && f.type === expectedType)) return `${key} must identify an existing ${expectedType} field.`;
     }
+    if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
     for (const key of ["filter", "sort", "filters", "sorts"] as const) {
       const items = key.endsWith("s") ? (action[key] ?? []) : action[key] == null ? [] : [action[key]];
       if (!Array.isArray(items) || items.length > 20) return `${key} requires at most 20 conditions.`;
@@ -110,11 +113,15 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
         const config = obj(raw);
         const fieldId = config?.fieldId;
         if (typeof fieldId !== "string" || !data.fields.some((f) => f.id === fieldId)) return `${key}.fieldId must identify an existing field.`;
-        if (used.has(fieldId)) return `Duplicate ${key}.fieldId is not supported.`;
+        if (used.has(fieldId) && (key === "sort" || key === "sorts")) return `Duplicate ${key}.fieldId is not supported.`;
         used.add(fieldId);
         if (key === "filter" || key === "filters") {
           const field = data.fields.find((f) => f.id === fieldId)!;
-          if (typeof config!.value !== "string" || !validValue(field, config!.value)) return "Invalid Collection filter value.";
+          const operator = config!.operator ?? "eq";
+          if (!validOperator(operator) || !isValidFilterOperator(field.type, operator)) return "Invalid Collection filter operator for field type.";
+          const typed = ["eq", "neq", "gt", "gte", "lt", "lte"].includes(operator);
+          if (typeof config!.value !== "string" || config!.value.length > 2000 ||
+            (typed && !validValue(field, config!.value))) return "Invalid Collection filter value."; 
         } else if (config!.direction !== "asc" && config!.direction !== "desc") return "Invalid Collection sort direction.";
       }
     }

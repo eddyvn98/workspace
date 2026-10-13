@@ -1,43 +1,61 @@
 "use client";
 import React from "react";
+import { FILTER_OPERATORS, isUnaryFilter, type FilterOperator } from "../collections/collectionFilters";
 import { viewFilters, viewSorts, type CollectionField, type CollectionView } from "../collections/model";
 import { btnClass, inputClass } from "./CollectionFieldEditor";
 
-interface Props {
-  view: CollectionView;
-  fields: CollectionField[];
-  readOnly: boolean;
-  onChange: (patch: Partial<CollectionView>) => void;
-}
+interface Props { view: CollectionView; fields: CollectionField[]; readOnly: boolean;
+  onChange: (patch: Partial<CollectionView>) => void; }
+const operatorLabel: Record<FilterOperator, string> = {
+  eq: "Equals", neq: "Not equal", contains: "Contains", not_contains: "Does not contain",
+  gt: "Greater than", gte: "Greater or equal", lt: "Less than", lte: "Less or equal",
+  empty: "Is empty", not_empty: "Is not empty",
+};
 export function CollectionViewConditions({ view, fields, readOnly, onChange }: Props) {
   const filters = viewFilters(view);
   const sorts = viewSorts(view);
   const setFilters = (next: typeof filters) => onChange({ filters: next, filter: undefined });
   const setSorts = (next: typeof sorts) => onChange({ sorts: next, sort: undefined });
-  const availableFilter = fields.find(field => !filters.some(item => item.fieldId === field.id));
   const availableSort = fields.find(field => !sorts.some(item => item.fieldId === field.id));
   return <div className="space-y-2" data-testid="collection-view-conditions">
     <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <strong>Filters (match all)</strong>
-        <button className={btnClass} disabled={readOnly || !availableFilter || filters.length >= 20}
-          onClick={() => availableFilter && setFilters([...filters, { fieldId: availableFilter.id, value: "" }])}>+ Filter</button>
-      </div>
-      {filters.map((entry, index) => <div className="flex flex-wrap items-center gap-1" key={index}>
-        <select aria-label={"Filter field " + (index + 1)} className={inputClass} value={entry.fieldId}
-          disabled={readOnly} onChange={e => {
-            const next = filters.map((item, i) => i === index ? { fieldId: e.target.value, value: "" } : item);
-            if (new Set(next.map(item => item.fieldId)).size === next.length) setFilters(next);
-          }}>
-          {fields.map(field => <option key={field.id} value={field.id}>{field.name}</option>)}
+      <div className="flex flex-wrap items-center gap-2">
+        <strong>Filters</strong>
+        <select aria-label="Filter logic" className={inputClass} disabled={readOnly}
+          value={view.filterLogic ?? "and"}
+          onChange={event => onChange({ filterLogic: event.target.value as "and" | "or" })}>
+          <option value="and">Match all (AND)</option><option value="or">Match any (OR)</option>
         </select>
-        <input aria-label={"Filter value " + (index + 1)} className={inputClass} placeholder="Enter value to apply filter"
-          disabled={readOnly} value={entry.value} onChange={e => setFilters(filters.map((item, i) =>
-            i === index ? { ...item, value: e.target.value } : item))} />
-        {!entry.value.trim() && <span className="text-slate-500" role="status">Inactive until value is entered</span>}
-        <button aria-label={"Remove filter " + (index + 1)} className={btnClass} disabled={readOnly}
-          onClick={() => setFilters(filters.filter((_, i) => i !== index))}>×</button>
-      </div>)}
+        <button className={btnClass} disabled={readOnly || !fields.length || filters.length >= 20}
+          onClick={() => fields.length && setFilters([...filters, { fieldId: fields[0].id, value: "", operator: "eq" }])}>+ Filter</button>
+      </div>
+      {filters.map((entry, index) => {
+        const operator = entry.operator ?? "eq";
+        const field = fields.find(item => item.id === entry.fieldId);
+        const allowed = FILTER_OPERATORS.filter(op => !field || ["eq", "neq", "empty", "not_empty"].includes(op)
+          || (["gt", "gte", "lt", "lte"].includes(op) ? ["number", "date"].includes(field.type)
+            : ["text", "select", "url", "image"].includes(field.type)));
+        return <div key={index} className="flex flex-wrap items-center gap-1">
+          <select aria-label={"Filter field " + (index + 1)} className={inputClass}
+            value={entry.fieldId} disabled={readOnly} onChange={event => setFilters(filters.map((item, i) =>
+              i === index ? { fieldId: event.target.value, value: "", operator: "eq" } : item))}>
+            {fields.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <select aria-label={"Filter operator " + (index + 1)} className={inputClass}
+            disabled={readOnly} value={operator} onChange={event => setFilters(filters.map((item, i) =>
+              i === index ? { ...item, operator: event.target.value as FilterOperator } : item))}>
+            {allowed.map(op => <option key={op} value={op}>{operatorLabel[op]}</option>)}
+          </select>
+          <input aria-label={"Filter value " + (index + 1)} className={inputClass}
+            placeholder="Enter value to apply filter" disabled={readOnly || isUnaryFilter(operator)}
+            value={entry.value} onChange={event => setFilters(filters.map((item, i) =>
+              i === index ? { ...item, value: event.target.value } : item))} />
+          {!isUnaryFilter(operator) && !entry.value.trim() &&
+            <span className="text-slate-500" role="status">Inactive until value is entered</span>}
+          <button className={btnClass} aria-label={"Remove filter " + (index + 1)} disabled={readOnly}
+            onClick={() => setFilters(filters.filter((_, i) => i !== index))}>×</button>
+        </div>;
+      })}
     </div>
     <div className="space-y-1">
       <div className="flex items-center gap-2">
@@ -48,15 +66,15 @@ export function CollectionViewConditions({ view, fields, readOnly, onChange }: P
       {sorts.map((entry, index) => <div className="flex flex-wrap items-center gap-1" key={index}>
         <span>{index + 1}.</span>
         <select aria-label={"Sort field " + (index + 1)} className={inputClass} value={entry.fieldId}
-          disabled={readOnly} onChange={e => {
-            const next = sorts.map((item, i) => i === index ? { ...item, fieldId: e.target.value } : item);
+          disabled={readOnly} onChange={event => {
+            const next = sorts.map((item, i) => i === index ? { ...item, fieldId: event.target.value } : item);
             if (new Set(next.map(item => item.fieldId)).size === next.length) setSorts(next);
           }}>
           {fields.map(field => <option key={field.id} value={field.id}>{field.name}</option>)}
         </select>
-        <select aria-label={"Sort direction " + (index + 1)} className={inputClass} value={entry.direction}
-          disabled={readOnly} onChange={e => setSorts(sorts.map((item, i) => i === index ?
-            { ...item, direction: e.target.value as "asc" | "desc" } : item))}>
+        <select aria-label={"Sort direction " + (index + 1)} className={inputClass}
+          disabled={readOnly} value={entry.direction} onChange={event => setSorts(sorts.map((item, i) =>
+            i === index ? { ...item, direction: event.target.value as "asc" | "desc" } : item))}>
           <option value="asc">Ascending</option><option value="desc">Descending</option>
         </select>
         <button aria-label={"Move sort up " + (index + 1)} className={btnClass}

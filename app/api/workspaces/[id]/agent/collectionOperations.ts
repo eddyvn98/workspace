@@ -68,7 +68,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     next = { ...data, views: [...data.views, view] };
   } else if (type === "configure_collection_view") {
     const patch: Partial<CollectionView> = {};
-    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts"] as const) {
+    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic"] as const) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) Object.assign(patch, { [key]: raw[key] ?? undefined });
     }
     // Test the submitted keys, not the patch keys mutated above: otherwise
