@@ -103,7 +103,7 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
       if (id !== undefined && id !== null && !data.fields.some((f) => f.id === id && f.type === expectedType)) return `${key} must identify an existing ${expectedType} field.`;
     }
     for (const key of ["filter", "sort", "filters", "sorts"] as const) {
-      const items = key.endsWith("s") ? action[key] : action[key] == null ? [] : [action[key]];
+      const items = key.endsWith("s") ? (action[key] ?? []) : action[key] == null ? [] : [action[key]];
       if (!Array.isArray(items) || items.length > 20) return `${key} requires at most 20 conditions.`;
       const used = new Set<string>();
       for (const raw of items) {
