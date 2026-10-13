@@ -158,3 +158,42 @@ Run the focused Workspace command/Collection tests, registry/source parity,
 `pnpm exec tsc --noEmit`, build and browser tests. CLI, unit tests or a Dify
 HTTP 200 alone do not close AI acceptance; require AI chat → persisted receipt
 → database reload → correct UI render.
+
+## Issue #5 follow-up (post-merge, 2026-10-13)
+
+PR #4 is on `main` at `574a826`. Chrome/Dify/local DB acceptance
+confirmed individual Collection CRUD, stable-ID mutations and persistence.
+It did **not** confirm name-only deletion or dependent multi-action requests.
+
+Code-level causes verified on that main:
+- Collection mutation schemas require field/view/record stable IDs and do not
+  expose named target references. Snapshot target-validation occurs before
+  executing the whole proposed batch, so a record referencing a field created
+  earlier in that same batch is rejected prematurely.
+- The Workspace agent endpoint deliberately rejects batches mixing Collection
+  reads with edits. A failed search and a successful delete may therefore
+  yield partial status without undoing the already persisted delete receipt.
+
+Issue #5 implementation contract:
+- Field/view target aliases `fieldName` / `viewName` and record target alias
+  `recordName` resolve only on a unique normalized exact name in the
+  currently loaded Collection. Existing stable IDs remain preferred. Record
+  names refer to the primary field value. Duplicate names produce concrete
+  candidate IDs; missing names produce a targeted error. No fuzzy matching
+  or arbitrary first-result target is allowed.
+- Collection field names in record `values` are resolved to stable field IDs
+  before Workspace validation/execution. Validation for a dependent action
+  occurs against state after earlier actions, not solely the initial snapshot.
+  A failed edit batch is still atomic: no draft state is committed.
+- Mixed read/write proposals run in ordered phases with distinct request IDs,
+  revisions and receipts. Earlier committed phases remain committed if later
+  phases fail; remaining phases must be identified as not executed.
+- Workspace retains command registry, authentication, validation, executor,
+  persistence/revisions and receipts. Dify supplies only model proposals and
+  conversation/usage logging.
+
+This follow-up's unit tests are not a replacement for real browser acceptance.
+Re-test unique-name field/view removal; ambiguous names; field→record→view
+creation; delete followed by search failure; reload PostgreSQL persistence,
+receipt consistency, actor permissions, Dify logs, retries and concurrent edits.
+Do not describe local/Dify/live browser acceptance as passed without running it.
