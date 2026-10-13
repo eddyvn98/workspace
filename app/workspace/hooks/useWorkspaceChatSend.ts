@@ -219,6 +219,9 @@ export function useWorkspaceChatSend({
           ? parsedDifyAnswer.content
           : [parsedDifyAnswer.content, versionSnapshotReceipt].filter(Boolean).join("\n\n");
       }
+      const verifiedRecordIds = runtime && !turn.claimedMutationWithoutPersistence
+        ? parsedDifyAnswer.verifiedRecordIds
+        : undefined;
       setMessages((prev) => prev.map((message) => message.id === assistantId
         ? {
             ...message,
@@ -230,6 +233,7 @@ export function useWorkspaceChatSend({
             focusBlockIds: turn.focusBlockIds,
             appliedSummaries: turn.appliedSummaries,
             unresolvedSummaries: turn.unresolvedSummaries,
+            ...(verifiedRecordIds?.length ? { verifiedRecordIds } : {}),
             references: turn.references,
           }
         : message));
@@ -244,6 +248,7 @@ export function useWorkspaceChatSend({
             focusBlockIds: turn.focusBlockIds,
             appliedSummaries: turn.appliedSummaries,
             unresolvedSummaries: turn.unresolvedSummaries,
+            ...(verifiedRecordIds?.length ? { verifiedRecordIds } : {}),
             references: turn.references,
           },
         ];
