@@ -48,14 +48,20 @@ export function verifiedCollectionReadAnswer(readResults: WorkspaceJson[], query
         if (!label) continue; // Unknown field IDs must not be mislabeled or exposed.
         values[label] = String(value ?? "").slice(0, 160);
       }
+      // Formula/lookup projections are computed by Workspace, so they are labelled separately.
+      const computed: WorkspaceJson = {};
+      for (const [fieldId, value] of Object.entries(object(row.computedValues)).slice(0, 8)) {
+        const label = names.get(fieldId);
+        if (label) computed[label] = String(value ?? "").slice(0, 160);
+      }
       const stableId = typeof row.id === "string" && row.id.trim() ? row.id : null;
-      return { id: stableId, values };
+      return { id: stableId, values, computed };
     });
     const reference = typeof item.query === "string" ? item.query.slice(0, 200) : "";
     const dedupeKey = JSON.stringify([type, item.blockId, reference, sample, records.length]);
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    const rows = sample.map((row) => `Record ID: ${row.id ?? "(missing stable ID)"}; Fields: ${JSON.stringify(row.values)}`).join("; ");
+    const rows = sample.map((row) => `Record ID: ${row.id ?? "(missing stable ID)"}; Fields: ${JSON.stringify(row.values)}${Object.keys(row.computed).length ? `; Computed: ${JSON.stringify(row.computed)}` : ""}`).join("; ");
     const description = `${type}${reference ? ` (${JSON.stringify(reference)})` : ""}: ${records.length} record(s) returned; ${rows || "no records"}`;
     summaries.push(description.slice(0, 1700));
   }
