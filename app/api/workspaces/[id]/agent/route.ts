@@ -1,4 +1,5 @@
 import { handleCollectionRead } from "./collectionRead";
+import { resolveCollectionTargets } from "@/lib/workspace-agent/collectionTargetResolution";
 import { handleCanvasRead } from "./canvasRead";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -152,7 +153,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           connectors: state.connectors,
           title: state.title,
         });
-        const result = applyAgentAction(state, planned);
+        const resolved = resolveCollectionTargets(planned, { blocks: state.blocks });
+        const effective = resolved.action;
+        const result = resolved.error
+          ? { ids: [], operation: String(planned.type ?? ""), reason: resolved.error }
+          : applyAgentAction(state, effective);
         if (planned.type === "update_map_style" && result.geometryChanged && result.ids[0]) {
           mapsToKeepClear.add(result.ids[0]);
           mapsToReflow.set(result.ids[0], planned);
@@ -174,10 +179,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         // below, instead of cloning/stringifying the board for every action.
         const changed = paletteApplied || result.ids.length > 0;
         const isCollection = String(planned.type ?? "").includes("collection");
-        const collectionTargets = isCollection ? { blockId: String(planned.blockId ?? ""),
-          ...(typeof planned.recordId === "string" ? { recordId: planned.recordId } : {}),
-          ...(typeof planned.fieldId === "string" ? { fieldId: planned.fieldId } : {}),
-          ...(typeof planned.viewId === "string" ? { viewId: planned.viewId } : {}) } : undefined;
+        const collectionTargets = isCollection ? { blockId: String(effective.blockId ?? ""),
+          ...(typeof effective.recordId === "string" ? { recordId: effective.recordId } : {}),
+          ...(typeof effective.fieldId === "string" ? { fieldId: effective.fieldId } : {}),
+          ...(typeof effective.viewId === "string" ? { viewId: effective.viewId } : {}) } : undefined;
         appliedActions.push({ type: String(planned.type ?? ""), ids: result.ids, changed, ...(collectionTargets ? { targets: collectionTargets } : {}), ...(result.reason ? { reason: result.reason } : {}), ...(result.summary ? { summary: result.summary.slice(0, 240) } : {}), ...(result.notes?.length ? { notes: result.notes } : {}) });
         if (result.operation) editOperation = `ai.${result.operation}`;
       }
