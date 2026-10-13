@@ -4,6 +4,8 @@ import { applyCollectionAction } from "@/app/api/workspaces/[id]/agent/collectio
 import { resolveCollectionTargets } from "@/lib/workspace-agent/collectionTargetResolution";
 import { parseWorkspaceModelProposal } from "@/lib/workspace-agent/proposalValidation";
 import { runWorkspaceAgentTurn } from "@/lib/workspace-agent/runtime";
+import { summarizeCollection } from "@/lib/workspace-agent/collectionContext";
+import { safeWorkspaceAssistantContent } from "@/app/workspace/utils/workspaceChatVisibleContent";
 import { parseDifyAgentAnswer } from "@/app/workspace/utils/workspaceDifyAgentResponse";
 import { consumeWorkspaceChatResponse } from "@/app/workspace/utils/workspaceChatStream";
 import type { WorkspaceJson, WorkspaceRuntimeRequest } from "@/lib/workspace-agent/contracts";
@@ -99,12 +101,18 @@ describe("Collection AI issue #5 regressions", () => {
 
   it("surfaces a verified search after a saved delete through the final stream when Dify later emits no actions", async () => {
     const { state, data } = fixture();
-    const primary = data.fields[0].id;
-    const searchResult = {
-      blockId: "c1", collectionTitle: "Smoke", fields: data.fields,
-      records: [{ id: "remaining-r", values: { [primary]: "AI collection parity smoke" } }],
-      recordCount: 1,
-    };
+    const stableRecordId = "c16bd548-b6f0-4e4b-a182-7b7a5f69696c";
+    const otherRecordId = "ba26a49d-3872-4ae4-94ae-332a07fbca24";
+    data.records.push({
+      id: stableRecordId,
+      values: {
+        [data.fields[0].id]: "AI collection parity smoke",
+        [data.fields[1].id]: "Done",
+        [data.fields[4].id]: "temporary local AI validation row",
+      },
+    }, { id: otherRecordId, values: { [data.fields[0].id]: "Unrelated" } });
+    // Match the actual Workspace collectionRead.ts executor payload, not a UI approximation.
+    const searchResult = { blockId: "c1", ...summarizeCollection(data, 16, "AI collection parity smoke") };
     let revision = 1;
     const proposals = [
       { done: false, message: "Deleting and searching", actions: [
@@ -152,19 +160,37 @@ describe("Collection AI issue #5 regressions", () => {
     expect(turn.answer).toContain("search_collection_records");
     expect(turn.answer).toContain("AI collection parity smoke");
     expect(turn.answer).toContain("Workspace-verified Collection read result");
+    expect(turn.answer).toContain(stableRecordId);
+    expect(turn.answer).toContain('"Name":"AI collection parity smoke"');
+    expect(turn.answer).toContain('"Status":"Done"');
+    expect(turn.answer).toContain('"Description":"temporary local AI validation row"');
+    expect(turn.answer).not.toContain(otherRecordId);
+    expect(turn.verifiedRecordIds).toEqual([stableRecordId]);
     expect(turn.appliedSummaries).toHaveLength(1);
     const answer = JSON.stringify({
       answer: turn.answer,
       focusBlockIds: turn.focusBlockIds,
       appliedSummaries: turn.appliedSummaries,
       unresolvedSummaries: turn.unresolvedSummaries,
+      verifiedRecordIds: turn.verifiedRecordIds,
     });
     const event = { event: "workflow_finished", conversation_id: turn.conversationId, data: { outputs: { answer } } };
     const stream = new Response(`data: ${JSON.stringify(event)}\n\ndata: [DONE]\n\n`,
       { headers: { "content-type": "text/event-stream" } });
     const parsed = parseDifyAgentAnswer((await consumeWorkspaceChatResponse(stream, () => {})).answer);
     expect(parsed.content).toContain("search_collection_records");
-    expect(parsed.content).toContain("remaining-r");
+    expect(parsed.verifiedRecordIds).toEqual([stableRecordId]);
+    // The assistant bubble's UUID scrubber previously turned ID/value keys into empty strings.
+    const visible = safeWorkspaceAssistantContent(parsed.content, false, parsed.verifiedRecordIds);
+    expect(visible).toContain(`Record ID: ${stableRecordId}`);
+    expect(visible).toContain('"Name":"AI collection parity smoke"');
+    expect(visible).toContain('"Status":"Done"');
+    expect(visible).toContain('"Description":"temporary local AI validation row"');
+    expect(visible).not.toContain(otherRecordId);
+    expect(visible).not.toContain('"id":""');
+    expect(safeWorkspaceAssistantContent(parsed.content)).not.toContain(stableRecordId);
+    const leakedId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    expect(safeWorkspaceAssistantContent(`Record ID: ${leakedId}`, false, parsed.verifiedRecordIds)).not.toContain(leakedId);
     expect(parsed.appliedSummaries).toHaveLength(1);
   });
 
