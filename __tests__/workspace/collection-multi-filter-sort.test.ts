@@ -57,7 +57,8 @@ describe("Collection multiple filters/sorts compatibility", () => {
     expect(validateCollectionTarget(resolved.action, state as never)).toBeNull();
     const applied = applyCollectionAction({ ...state, blockOrder: [], connectors: {}, title: "board" } as never, resolved.action);
     expect(applied?.ids, applied?.reason).toEqual(["c1"]);
-    expect(state.blocks.c1.data.views[0].filters?.[0].fieldId).toBeUndefined();
+    expect(state.blocks.c1.data.views[0].filters?.[0].fieldId).toBe(data.fields[1].id);
+    expect(state.blocks.c1.data.views[0].sorts?.[0].fieldId).toBe(data.fields[0].id);
   });
   it("rejects missing field IDs and duplicate conditions before mutation", () => {
     const data = fixture();
