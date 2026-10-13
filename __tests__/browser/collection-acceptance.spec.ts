@@ -88,3 +88,37 @@ test("fullscreen canvas-portal works at desktop and mobile viewport", async ({ p
   await exit.click();
   await expect(page.getByTestId("collection-block").getByRole("button", { name: "Expand" })).toBeVisible();
 });
+
+test("Table multi-filter and multi-sort survive reload while legacy views remain usable", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  await page.getByRole("button", { name: "Table conversion controls" }).click();
+  await page.getByRole("button", { name: "To Collection" }).click();
+  const table = page.getByTestId("collection-block");
+  await expect(table.getByTestId("collection-tanstack-table")).toBeVisible();
+  await table.getByRole("button", { name: "Settings" }).click();
+  await table.getByRole("button", { name: "+ Filter" }).click();
+  await table.getByRole("combobox", { name: "Filter field 1" }).selectOption({ label: "Status" });
+  await table.getByRole("textbox", { name: "Filter value 1" }).fill("Done");
+  await expect(table.getByRole("textbox", { name: "Name" })).toHaveCount(1);
+  await expect(table.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
+  await table.getByRole("button", { name: "+ Filter" }).click();
+  await table.getByRole("textbox", { name: "Filter value 2" }).fill("Other row");
+  await expect(table.getByRole("textbox", { name: "Name" })).toHaveCount(1);
+  await table.getByRole("button", { name: "+ Sort" }).click();
+  await table.getByRole("combobox", { name: "Sort field 1" }).selectOption({ label: "Status" });
+  await table.getByRole("button", { name: "+ Sort" }).click();
+  await table.getByRole("combobox", { name: "Sort field 2" }).selectOption({ label: "Name" });
+  await expect(table.getByRole("combobox", { name: "Sort field 2" })).toHaveValue(
+    await table.getByRole("combobox", { name: "Sort field 2" }).inputValue());
+  await page.reload();
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  const reopened = page.getByTestId("collection-block");
+  await reopened.getByRole("button", { name: "Settings" }).click();
+  await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("Done");
+  await expect(reopened.getByRole("textbox", { name: "Filter value 2" })).toHaveValue("Other row");
+  await expect(reopened.getByRole("combobox", { name: "Sort field 2" })).toBeVisible();
+  await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await expect(reopened.getByRole("button", { name: "+ Filter" })).toBeDisabled();
+  await expect(reopened.getByRole("button", { name: "Sort Name" })).toBeDisabled();
+});
