@@ -10,6 +10,14 @@ const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url
 const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap"]);
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 
+/** Collection cells persist strings, but a model may emit JSON numbers or booleans. */
+export function normalizeCollectionValue(value: unknown): string | null {
+  if (typeof value === "string") return value.length <= 2000 ? value : null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return String(value);
+  return null;
+}
+
 function validValue(field: CollectionField, value: string): boolean {
   if (value.length > 2000) return false;
   if (!value) return true;
@@ -39,8 +47,8 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("values" in action) {
     const values = obj(action.values);
     if (!values || Object.keys(values).length < 1 || Object.keys(values).length > 100
-      || Object.entries(values).some(([id, value]) => reserved.has(id) || !str(id) || id.length > 128 || typeof value !== "string" || value.length > 2000)) {
-      return `${type}.values must contain 1–100 fieldId:string pairs.`;
+      || Object.entries(values).some(([id, value]) => reserved.has(id) || !str(id) || id.length > 128 || normalizeCollectionValue(value) === null)) {
+      return `${type}.values must contain 1–100 field IDs with strings, finite numbers or booleans (max 2000 characters each).`;
     }
   }
   if ("options" in action && !validOptions(action.options)) return `${type}.options must contain distinct non-empty strings.`;
