@@ -76,6 +76,24 @@ describe("Collection AI command contracts", () => {
     expect(read.records[0].computedValues).toEqual({ [total]: "30" });
     expect(data.records[0].values[total]).toBeUndefined();
   });
+  it("returns human-readable executor-confirmed summaries", () => {
+    const { data, state } = setup();
+    data.records.push({ id: "r1", values: { [data.fields[0].id]: "Task C" } });
+    const updated = applyCollectionAction(state as never, {
+      type: "update_collection_record", blockId: "c1", recordId: "r1", values: { [data.fields[1].id]: "Done" },
+    });
+    expect(updated?.summary).toContain('Task C');
+    expect(updated?.summary).toContain('Status = "Done"');
+    const added = applyCollectionAction(state as never, {
+      type: "add_collection_field", blockId: "c1", fieldId: "stable-custom-id", name: "Priority", fieldType: "text",
+    });
+    expect(added?.summary).toContain('Priority');
+    expect(added?.summary).not.toContain('stable-custom-id');
+    const view = applyCollectionAction(state as never, {
+      type: "configure_collection_view", blockId: "c1", viewId: data.views[0].id, name: "Backlog",
+    });
+    expect(view?.summary).toContain('Backlog');
+  });
   it("refuses ambiguous/unknown IDs and retains view identity", () => {
     const { data, state } = setup();
     const rename = { type: "update_collection_field", blockId: "c1", fieldId: data.fields[1].id, name: data.fields[0].name };
