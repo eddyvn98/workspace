@@ -100,7 +100,6 @@ export async function runWorkspaceAgentTurn(
   let totalActions = 0;
   let phase = "snapshot";
   const startedAt = Date.now();
-
   const ensureActive = async () => {
     if (input.signal.aborted || await dependencies.isCancelled?.()) throw new Error("Workspace runtime was cancelled.");
   };
@@ -116,7 +115,6 @@ export async function runWorkspaceAgentTurn(
       });
     }
   };
-
   try {
     for (let round = 1; round <= WORKSPACE_RUNTIME_MAX_ROUNDS; round += 1) {
       await ensureActive();
@@ -176,12 +174,10 @@ export async function runWorkspaceAgentTurn(
           return result(input, conversationId, rounds, "partial", partialAnswer(0, input.query, receipts), receipts, unresolved);
         }
       }
-
       const unconfirmed = actionsToExecute.filter((action) => workspaceActionNeedsConfirmation(action, input.query, input.context ?? ""));
       if (unconfirmed.length) {
         return result(input, conversationId, rounds, "completed", summarizeConfirmationRequest(unconfirmed, input.query), receipts, unresolved);
       }
-
       const groups: WorkspaceJson[][] = [];
       for (const action of actionsToExecute) {
         const previous = groups[groups.length - 1];
@@ -231,7 +227,12 @@ export async function runWorkspaceAgentTurn(
         });
         if (!committed || groupResults.some((entry) => entry.changed !== true && !WORKSPACE_READ_ONLY_COMMANDS.has(String(entry.type)))) {
           const remaining = groups.slice(groupIndex + 1).flat();
-          for (const pending of remaining) unresolved.push(`${String(pending.type)}: not run because an earlier group failed.`);
+          for (const pending of remaining) {
+            const actionType = String(pending.type);
+            const reason = "Not run because an earlier action group failed.";
+            unresolved.push(`${actionType}: ${reason}`);
+            receipts.push({ requestId: `${input.turnId}:${round * 100 + groupIndex + 1}`, actionType, targetIds: [], persisted: false, revisionBefore: currentRevision, revisionAfter: null, reason });
+          }
           break;
         }
         if (revisionAfter !== null) currentRevision = revisionAfter;
