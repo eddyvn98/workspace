@@ -1,3 +1,4 @@
+import { validateCollectionTarget } from "./collectionActionValidation";
 import type { WorkspaceJson } from "./contracts";
 import { validateWorkspaceRuntimeVisualAction, WORKSPACE_RUNTIME_VISUAL_ACTION_SCHEMAS } from "./visualActionSchema";
 import { WORKSPACE_COMMAND_NAMES } from "@/lib/workspace-command-registry";
@@ -233,6 +234,8 @@ function isBoundedJson(value: unknown, depth = 0): boolean {
 export function validateWorkspaceRuntimeTableTarget(action: WorkspaceJson, board: WorkspaceJson): string | null {
   const blocks = isRecord(board.blocks) ? board.blocks : {};
   const type = typeof action.type === "string" ? action.type : "";
+  const collectionIssue = validateCollectionTarget(action, board);
+  if (collectionIssue) return collectionIssue;
   const richContentIssue = validateRuntimeRichContentTarget(action, blocks);
   if (richContentIssue) return richContentIssue;
   if (["add_child", "add_sibling", "delete_node", "duplicate_node", "move_node", "attach_to_parent"].includes(type)) {

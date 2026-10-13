@@ -1,3 +1,4 @@
+import { handleCollectionRead } from "./collectionRead";
 import { handleCanvasRead } from "./canvasRead";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -88,6 +89,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (boardResponse) return boardResponse;
   const fileReadResponse = await handleFileReadActions(board, email, plannedActions);
   if (fileReadResponse) return fileReadResponse;
+  const collectionReadResponse = handleCollectionRead(board, plannedActions);
+  if (collectionReadResponse) return collectionReadResponse;
 
   // Operations mutate entities in place, so diffs and history need detached before-images.
   const boardBlocksBefore = structuredClone(board.blocks);

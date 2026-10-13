@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "commands": [
     {
       "name": "add_table_sheet",
@@ -665,6 +665,78 @@
       "name": "connect_image_flow",
       "category": "image_flow",
       "target": "two",
+      "mutation": true
+    },
+    {
+      "name": "read_collection",
+      "category": "collection",
+      "target": "one",
+      "mutation": false
+    },
+    {
+      "name": "search_collection_records",
+      "category": "collection",
+      "target": "one",
+      "mutation": false
+    },
+    {
+      "name": "create_collection_record",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_collection_record",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_collection_record",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "add_collection_field",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_collection_field",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "remove_collection_field",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "add_collection_view",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "configure_collection_view",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "remove_collection_view",
+      "category": "collection",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "convert_table_to_collection",
+      "category": "collection",
+      "target": "one",
       "mutation": true
     }
   ]
