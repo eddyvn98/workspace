@@ -11,7 +11,7 @@ export default defineConfig({
     { name: "mobile-chromium", use: { ...devices["iPhone 13"], browserName: "chromium" } },
   ],
   webServer: {
-    command: "pnpm dev -- -p 3137",
+    command: "pnpm dev -p 3137",
     url: "http://127.0.0.1:3137/collection-acceptance",
     timeout: 180_000,
     reuseExistingServer: !process.env.CI,

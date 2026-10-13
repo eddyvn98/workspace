@@ -38,7 +38,7 @@ export function fromTableBlock(block: CanvasBlock<"table">): CollectionBlockPayl
   };
 }
 export function importCollectionCsv(text: string): CollectionBlockPayload {
-  const parsed = Papa.parse<string[]>(text.replace(/^\uFEFF/, ""), { skipEmptyLines: "greedy" });
+  const parsed = Papa.parse<string[]>(text.replace(/^\uFEFF/, ""), { delimiter: ",", skipEmptyLines: "greedy" });
   if (parsed.errors.length) throw new Error("Invalid CSV: " + parsed.errors[0].message);
   const rows = (parsed.data ?? []).slice(0, 5001);
   if (!rows.length || !rows[0].length) throw new Error("CSV is empty");

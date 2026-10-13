@@ -50,7 +50,9 @@ describe("Workspace universal collections", () => {
   it("imports and exports CSV with quotes, commas and newlines", () => {
     const data = importCollectionCsv('"Name","Note"\n"Hello, world","line 1\nline 2"');
     expect(data.records[0].values[data.fields[0].id]).toBe("Hello, world");
-    expect(importCollectionCsv(exportCollectionCsv(data)).records[0].values).toEqual(data.records[0].values);
+    const importedAgain = importCollectionCsv(exportCollectionCsv(data));
+    expect(importedAgain.fields.map((f) => importedAgain.records[0].values[f.id])).toEqual(
+      data.fields.map((f) => data.records[0].values[f.id]));
   });
 
   it("guards JSON payloads and spreadsheet formula injection", () => {

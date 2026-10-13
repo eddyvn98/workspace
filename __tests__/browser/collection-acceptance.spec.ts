@@ -38,3 +38,23 @@ test("convert table without mutating source, edit and delete a record", async ({
   await page.reload();
   await expect(page.getByTestId("collection-block").getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
 });
+
+test("fullscreen canvas-portal works at desktop and mobile viewport", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Expand" }).click();
+  const exit = page.getByRole("button", { name: "Exit full screen" });
+  await expect(exit).toBeVisible();
+  const dimensions = await page.evaluate(() => {
+    const editor = document.querySelector("div.fixed.inset-0") as HTMLElement | null;
+    if (!editor) return null;
+    const rect = editor.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, screenWidth: innerWidth, screenHeight: innerHeight };
+  });
+  expect(dimensions).not.toBeNull();
+  expect(dimensions!.width).toBeGreaterThanOrEqual(dimensions!.screenWidth - 2);
+  expect(dimensions!.height).toBeGreaterThanOrEqual(dimensions!.screenHeight - 2);
+  await exit.click();
+  await expect(page.getByTestId("collection-block").getByRole("button", { name: "Expand" })).toBeVisible();
+});
