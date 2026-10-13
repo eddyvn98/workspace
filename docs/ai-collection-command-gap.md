@@ -247,3 +247,31 @@ three different fields, stable UUID roundtrip through SSE and the visible
 content sanitizer, filtering of other UUIDs, and existing partial-failure
 semantics. **The combined browser scenario remains unverified on this latest
 commit** until the reviewer re-runs it with local Dify/Postgres/Mongo.
+
+### Issue #5 follow-up: confirmed deletion label and one-record partial status
+
+Live Chrome verification on a previous PR commit confirmed the actual Collection
+delete and subsequent search were consistent with PostgreSQL, but a record
+deleted by name displayed `delete_collection_record ()`. The server mutation
+receipt used a UUID target, and the ordinary chat content scrubber stripped
+that UUID from the human-visible text. For a successful Collection record
+deletion, the Workspace executor now derives a bounded label from the record's
+**persisted pre-deletion primary field** and returns that in its action summary.
+The runtime prefers this executor-confirmed deletion summary over a generic
+changed-block summary. Mutation authorization, target resolution, transaction,
+revision and receipt storage remain unchanged.
+
+A separate single-record create produced a partial warning during live use,
+although the record persisted. Source inspection found no automatically
+generated empty executor phase for a single action. The exact trigger in that
+Dify turn is not established without its safe status/receipt sequence; failed
+later actions, cancellation or a model-step failure must still report partial.
+A repeated `create_collection_record` proposal with the same stable
+`blockId + recordId` is now replay-suppressed **within the turn** only after
+its first confirmed persist. Regression tests cover a done=true one-action
+create, a done=false repeated create, and a name-only delete through the final
+SSE-to-UI content path. This does not turn unconfirmed actions into successes.
+
+Acceptance still requires reviewer Chrome retest on the latest PR HEAD and,
+if a spurious partial recurs, sanitized action types, revision outcomes and
+unresolved reason (not raw prompts, account identifiers or credentials).
