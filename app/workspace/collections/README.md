@@ -45,3 +45,12 @@ The Playwright fixture route `/collection-acceptance` is only enabled with `COLL
 7. Repeat on a board with ordinary Doc, Spreadsheet, Mind Map and Shapes to catch regressions.
 
 Do not mark Issue #2 complete or merge PR #1 before **actual local CI and authenticated staging evidence** are reviewed.
+
+
+## Post-local-CI follow-up
+
+Local feedback on commit `5f9bc81`: `pnpm exec tsc --noEmit` passed; two CSV Vitest assertions failed and the Playwright devServer command parsed `-p` as a project path. These were fixed in commit `a4fa938`: explicit CSV comma delimiter, compare round-trip values instead of regenerated field IDs, and `pnpm dev -p 3137`.
+
+An intermittent dev-only `Hydration failed` overlay was observed under `<Workspace><ProtectedRoute>`. The dynamic client check for server-only `WORKSPACE_DEV_USER_EMAIL` could disagree between SSR and browser. The workspace route now evaluates a non-secret boolean on the server and passes it as an explicit prop to the client route and ProtectedRoute, so the initial decision is the same on both sides. **This is a suspected cause and a targeted fix, not a verified elimination**. Confirm after local reload with console open and no hydration errors; report stack if it persists.
+
+`BlockFrame.tsx` was previously 413+ lines. Connector geometry and document/slides auto-fit moved to `useBlockFrameGeometry.ts`, and frame styles moved to `blockFrameStyle.ts`; the original frame is now under 300 lines. No behavior change intended.

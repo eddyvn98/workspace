@@ -1,24 +1,7 @@
-"use client";
+import WorkspaceClientPage from "./WorkspaceClientPage";
 
-import { Suspense } from "react";
-import ProtectedRoute from "@/components/features/auth/protected-route";
-import WorkspacePage from "@/app/workspace/components/WorkspacePage";
-import { useToolLayoutSlots } from "@/hooks/use-tool-layout-slots";
-import { WorkspaceBoardSidebar } from "@/app/workspace/components/WorkspaceBoardSidebar";
-import { WorkspaceLegacyMigrationGate } from "@/app/workspace/components/WorkspaceLegacyMigrationGate";
-import { WorkspacePerfDebug } from "@/app/workspace/components/WorkspacePerfDebug";
-
+/** The auth bypass decision must match server HTML and client hydration. */
 export default function Workspace() {
-  useToolLayoutSlots({ showHistory: false, aside: <WorkspaceBoardSidebar />, hideTopAsideToggle: true });
-
-  return (
-    <ProtectedRoute>
-      <Suspense fallback={null}>
-        <WorkspaceLegacyMigrationGate>
-          <WorkspacePerfDebug />
-          <WorkspacePage />
-        </WorkspaceLegacyMigrationGate>
-      </Suspense>
-    </ProtectedRoute>
-  );
+  const devBypass = process.env.NODE_ENV !== "production" && Boolean(process.env.WORKSPACE_DEV_USER_EMAIL);
+  return <WorkspaceClientPage devBypass={devBypass} />;
 }
