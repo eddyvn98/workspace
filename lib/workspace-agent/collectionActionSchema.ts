@@ -22,19 +22,19 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
   search_collection_records: define("search_collection_records", ["query"], {
     query: { type: "string", minLength: 1, maxLength: 200 }, viewId: id, limit: { type: "integer", minimum: 1, maximum: 30 } }),
   create_collection_record: define("create_collection_record", ["recordId", "values"], { recordId: id, values }),
-  update_collection_record: define("update_collection_record", ["recordId", "values"], { recordId: id, values }),
-  delete_collection_record: define("delete_collection_record", ["recordId"], { recordId: id }),
+  update_collection_record: define("update_collection_record", ["values"], { recordId: id, recordName: word, values }),
+  delete_collection_record: define("delete_collection_record", [], { recordId: id, recordName: word }),
   add_collection_field: define("add_collection_field", ["fieldId", "name", "fieldType"], {
     fieldId: id, name: word, fieldType, options }),
-  update_collection_field: define("update_collection_field", ["fieldId"], {
-    fieldId: id, name: word, fieldType, options }),
-  remove_collection_field: define("remove_collection_field", ["fieldId"], { fieldId: id }),
+  update_collection_field: define("update_collection_field", [], {
+    fieldId: id, fieldName: word, name: word, fieldType, options }),
+  remove_collection_field: define("remove_collection_field", [], { fieldId: id, fieldName: word }),
   add_collection_view: define("add_collection_view", ["viewId", "name", "kind"], {
     viewId: id, name: word, kind: viewKind }),
-  configure_collection_view: define("configure_collection_view", ["viewId"], {
-    viewId: id, name: word, active: { type: "boolean" }, groupFieldId: { ...id, nullable: true },
+  configure_collection_view: define("configure_collection_view", [], {
+    viewId: id, viewName: word, name: word, active: { type: "boolean" }, groupFieldId: { ...id, nullable: true },
     dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort }),
-  remove_collection_view: define("remove_collection_view", ["viewId"], { viewId: id }),
+  remove_collection_view: define("remove_collection_view", [], { viewId: id, viewName: word }),
   convert_table_to_collection: define("convert_table_to_collection", []),
 };
 

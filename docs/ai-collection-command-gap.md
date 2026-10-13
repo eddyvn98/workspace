@@ -158,3 +158,120 @@ Run the focused Workspace command/Collection tests, registry/source parity,
 `pnpm exec tsc --noEmit`, build and browser tests. CLI, unit tests or a Dify
 HTTP 200 alone do not close AI acceptance; require AI chat → persisted receipt
 → database reload → correct UI render.
+
+## Issue #5 follow-up (post-merge, 2026-10-13)
+
+PR #4 is on `main` at `574a826`. Chrome/Dify/local DB acceptance
+confirmed individual Collection CRUD, stable-ID mutations and persistence.
+It did **not** confirm name-only deletion or dependent multi-action requests.
+
+Code-level causes verified on that main:
+- Collection mutation schemas require field/view/record stable IDs and do not
+  expose named target references. Snapshot target-validation occurs before
+  executing the whole proposed batch, so a record referencing a field created
+  earlier in that same batch is rejected prematurely.
+- The Workspace agent endpoint deliberately rejects batches mixing Collection
+  reads with edits. A failed search and a successful delete may therefore
+  yield partial status without undoing the already persisted delete receipt.
+
+Issue #5 implementation contract:
+- Field/view target aliases `fieldName` / `viewName` and record target alias
+  `recordName` resolve only on a unique normalized exact name in the
+  currently loaded Collection. Existing stable IDs remain preferred. Record
+  names refer to the primary field value. Duplicate names produce concrete
+  candidate IDs; missing names produce a targeted error. No fuzzy matching
+  or arbitrary first-result target is allowed.
+- Collection field names in record `values` are resolved to stable field IDs
+  before Workspace validation/execution. Validation for a dependent action
+  occurs against state after earlier actions, not solely the initial snapshot.
+  A failed edit batch is still atomic: no draft state is committed.
+- Mixed read/write proposals run in ordered phases with distinct request IDs,
+  revisions and receipts. Earlier committed phases remain committed if later
+  phases fail; remaining phases must be identified as not executed.
+- Workspace retains command registry, authentication, validation, executor,
+  persistence/revisions and receipts. Dify supplies only model proposals and
+  conversation/usage logging.
+
+This follow-up's unit tests are not a replacement for real browser acceptance.
+Re-test unique-name field/view removal; ambiguous names; field→record→view
+creation; delete followed by search failure; reload PostgreSQL persistence,
+receipt consistency, actor permissions, Dify logs, retries and concurrent edits.
+Do not describe local/Dify/live browser acceptance as passed without running it.
+
+### Issue #5 follow-up: confirmed read results in combined turns
+
+After PR #6 focused CI and Chrome's field→record→view/name-resolution cases
+passed, a combined delete+search browser request exposed only the delete
+save receipt. The local Dify-history inspection confirmed the model proposed
+both delete and search, then search again, and finally no actions. The runtime
+previously retained successful `workspaceReadResults` between rounds but
+`completedAnswer` on a final empty proposal discarded them. A successful
+read also has `persisted:false`, correctly excluding it from mutation
+receipts, so the UI had no other visible search result.
+
+The runtime now composes a separate **Workspace-verified read result**
+from executor-returned Collection records (bounded samples and stable IDs),
+alongside any persisted mutation summary. The SSE answer envelope and
+client answer parser preserve that text. Read-only actions remain
+non-mutating and are not represented as saved edits; failed reads remain
+partial with an unresolved action receipt. Multiple read actions in one
+phase use their corresponding indexed result, rather than duplicating the
+first/combined result. A repeated identical read is de-duplicated only in
+the final display, not skipped in the executor.
+
+The combined Chrome/Dify/Postgres/Mongo scenario is **still unverified after
+this change**; run it again and inspect the displayed search result and
+read-versus-write receipts before describing end-to-end acceptance as green.
+
+### Issue #5 follow-up: Collection read field labels and stable row IDs
+
+Chrome retest on `c5fdf37` confirmed read results survive the final model
+round but showed empty row IDs and empty field keys. The Collection executor
+already returns `result.records[].id`, `result.records[].values[fieldId]`,
+and `result.fields[] = {id, name, type}` from `summarizeCollection`.
+The runtime initially printed the raw ID-keyed JSON; the shared assistant
+content sanitizer intentionally strips UUIDs, including IDs embedded as JSON
+keys, corrupting that displayed output.
+
+Verified read summaries now map each value's field ID to its **server-provided
+field name**, render each record's stable ID separately as `Record ID`, and
+include a bounded sample of multiple fields. The runtime passes an allowlist
+of record IDs obtained only from confirmed Workspace read responses; the UI
+sanitizer preserves only those IDs in the `Record ID:` display context.
+All other raw UUID stripping remains unchanged; model text does not authorize
+an allowlist in legacy Dify mode. This is display metadata, not new mutation
+authority, and is retained in the saved chat message.
+
+Focused tests now exercise the actual `summarizeCollection` payload with
+three different fields, stable UUID roundtrip through SSE and the visible
+content sanitizer, filtering of other UUIDs, and existing partial-failure
+semantics. **The combined browser scenario remains unverified on this latest
+commit** until the reviewer re-runs it with local Dify/Postgres/Mongo.
+
+### Issue #5 follow-up: confirmed deletion label and one-record partial status
+
+Live Chrome verification on a previous PR commit confirmed the actual Collection
+delete and subsequent search were consistent with PostgreSQL, but a record
+deleted by name displayed `delete_collection_record ()`. The server mutation
+receipt used a UUID target, and the ordinary chat content scrubber stripped
+that UUID from the human-visible text. For a successful Collection record
+deletion, the Workspace executor now derives a bounded label from the record's
+**persisted pre-deletion primary field** and returns that in its action summary.
+The runtime prefers this executor-confirmed deletion summary over a generic
+changed-block summary. Mutation authorization, target resolution, transaction,
+revision and receipt storage remain unchanged.
+
+A separate single-record create produced a partial warning during live use,
+although the record persisted. Source inspection found no automatically
+generated empty executor phase for a single action. The exact trigger in that
+Dify turn is not established without its safe status/receipt sequence; failed
+later actions, cancellation or a model-step failure must still report partial.
+A repeated `create_collection_record` proposal with the same stable
+`blockId + recordId` is now replay-suppressed **within the turn** only after
+its first confirmed persist. Regression tests cover a done=true one-action
+create, a done=false repeated create, and a name-only delete through the final
+SSE-to-UI content path. This does not turn unconfirmed actions into successes.
+
+Acceptance still requires reviewer Chrome retest on the latest PR HEAD and,
+if a spurious partial recurs, sanitized action types, revision outcomes and
+unresolved reason (not raw prompts, account identifiers or credentials).

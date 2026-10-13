@@ -27,6 +27,12 @@ function canonical(value: unknown): unknown {
 
 /** Stable intent key for frame creation, whose executor creates random block IDs. */
 export function workspaceActionReplayKey(action: WorkspaceJson): string | null {
+  if (action.type === "create_collection_record") {
+    const blockId = targetId(action.blockId);
+    const recordId = targetId(action.recordId);
+    // Explicit stable IDs make repeated create proposals idempotent within a turn.
+    return blockId && recordId ? JSON.stringify({ type: action.type, blockId, recordId }) : null;
+  }
   if (action.type === "create_image_flow") {
     const settings = action.settings && typeof action.settings === "object" ? action.settings as WorkspaceJson : {};
     const options = action.options && typeof action.options === "object" ? action.options : {};

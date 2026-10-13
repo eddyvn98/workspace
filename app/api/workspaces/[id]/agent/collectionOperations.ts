@@ -1,5 +1,5 @@
 import { fromTableBlock } from "@/app/workspace/collections/io";
-import { deleteRecord, removeField, removeView, updateField, updateView, type CollectionBlockPayload, type CollectionField, type CollectionView } from "@/app/workspace/collections/model";
+import { deleteRecord, recordTitle, removeField, removeView, updateField, updateView, type CollectionBlockPayload, type CollectionField, type CollectionView } from "@/app/workspace/collections/model";
 import type { CanvasBlock } from "@/app/workspace/types/block";
 import { validateCollectionAction, validateCollectionTarget } from "@/lib/workspace-agent/collectionActionValidation";
 import { COLLECTION_COMMANDS, COLLECTION_READ_COMMANDS } from "@/lib/workspace-agent/collectionActionSchema";
@@ -36,12 +36,19 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   const fieldId = str(prop(raw, "fieldId"));
   const viewId = str(prop(raw, "viewId"));
   let next = data;
+  let confirmedSummary: string | undefined;
   if (type === "create_collection_record") {
     next = { ...data, records: [...data.records, { id: recordId, values: prop(raw, "values") as Record<string, string> }] };
   } else if (type === "update_collection_record") {
     const values = prop(raw, "values") as Record<string, string>;
     next = { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, ...values } } : r) };
   } else if (type === "delete_collection_record") {
+    const recordToDelete = data.records.find((item) => item.id === recordId);
+    if (recordToDelete) {
+      const title = recordTitle(data, recordToDelete).trim().replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 160);
+      // The label comes from the pre-delete persisted record, never the model claim.
+      if (title && title !== "Untitled") confirmedSummary = `deleted Collection record ${JSON.stringify(title)}`;
+    }
     next = deleteRecord(data, recordId);
   } else if (type === "add_collection_field") {
     const typeValue = str(prop(raw, "fieldType")) as CollectionField["type"];
@@ -72,5 +79,5 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   if (JSON.stringify(next) === JSON.stringify(data)) return rejected("Collection command made no changes.");
   block.data = next as unknown as JsonMap;
   block.updatedAt = now();
-  return { ids: [blockId], operation: type, summary: `${type} (${recordId || fieldId || viewId || blockId})` };
+  return { ids: [blockId], operation: type, summary: confirmedSummary ?? `${type} (${recordId || fieldId || viewId || blockId})` };
 }

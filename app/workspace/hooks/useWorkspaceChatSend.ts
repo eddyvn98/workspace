@@ -31,7 +31,6 @@ class WorkspaceBoardNotPersistedError extends Error {
     this.name = "WorkspaceBoardNotPersistedError";
   }
 }
-
 type WorkspaceChatSendOptions = {
   setMessages: Dispatch<SetStateAction<WorkspaceChatMessage[]>>;
   setIsSending: Dispatch<SetStateAction<boolean>>;
@@ -41,7 +40,6 @@ type WorkspaceChatSendOptions = {
   conversationIdRef: MutableRefObject<string | null>;
   upsertSession: (conversationId: string, title: string, messages?: WorkspaceChatMessage[]) => Promise<unknown>;
 };
-
 export function useWorkspaceChatSend({
   setMessages,
   setIsSending,
@@ -60,7 +58,6 @@ export function useWorkspaceChatSend({
     const trimmed = query.trim();
     const files = opts?.attachedFiles ?? [];
     if (!trimmed && files.length === 0) return;
-
     const userDisplayContent = trimmed || `Analyzed ${files.length} attached file(s): ${files.map((f) => f.name).join(", ")}`;
     const selectionPrompt = opts?.contextPrompt ?? "";
     const assistantId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_ws_ai`;
@@ -76,7 +73,6 @@ export function useWorkspaceChatSend({
       { id: assistantId, role: "assistant", content: "", isLoading: true },
     ]);
     setIsSending(true);
-
     const controller = new AbortController();
     activeControllerRef.current = controller;
     const runtime = isWorkspaceRuntimePilot() && files.length === 0;
@@ -96,7 +92,6 @@ export function useWorkspaceChatSend({
       }));
     const selectedModel = useMessageStore.getState().selectedModel;
     const boardId = useWorkspaceStore.getState().boardId;
-
     let boardBefore: Awaited<ReturnType<typeof fetchRemoteBoard>> = null;
     try {
       const didFlush = boardId ? await flushWorkspacePendingSave(boardId) : true;
@@ -121,7 +116,6 @@ export function useWorkspaceChatSend({
             useWorkspaceStore.getState().currentUserEmail,
           )
         : null;
-
       const knowledge = boardId && shouldFetchKnowledgeContext(userDisplayContent)
         ? await fetchWorkspaceKnowledgeContext(boardId, userDisplayContent)
         : null;
@@ -161,7 +155,6 @@ export function useWorkspaceChatSend({
         conversationIdRef.current = conversationId;
         void upsertSession(conversationId, userDisplayContent);
       }
-
       const parsedDifyAnswer = await verifyWorkspaceExportAnswer(parseDifyAgentAnswer(fullText), userDisplayContent, boardId);
       const waitOptions = { expectChange: hasUnpersistedMutationClaim(parsedDifyAnswer, userDisplayContent, false) };
       const isStructuredDifyResponse = isStructuredDifyAnswer(fullText);
@@ -219,6 +212,9 @@ export function useWorkspaceChatSend({
           ? parsedDifyAnswer.content
           : [parsedDifyAnswer.content, versionSnapshotReceipt].filter(Boolean).join("\n\n");
       }
+      const verifiedRecordIds = runtime && !turn.claimedMutationWithoutPersistence
+        ? parsedDifyAnswer.verifiedRecordIds
+        : undefined;
       setMessages((prev) => prev.map((message) => message.id === assistantId
         ? {
             ...message,
@@ -230,6 +226,7 @@ export function useWorkspaceChatSend({
             focusBlockIds: turn.focusBlockIds,
             appliedSummaries: turn.appliedSummaries,
             unresolvedSummaries: turn.unresolvedSummaries,
+            ...(verifiedRecordIds?.length ? { verifiedRecordIds } : {}),
             references: turn.references,
           }
         : message));
@@ -244,6 +241,7 @@ export function useWorkspaceChatSend({
             focusBlockIds: turn.focusBlockIds,
             appliedSummaries: turn.appliedSummaries,
             unresolvedSummaries: turn.unresolvedSummaries,
+            ...(verifiedRecordIds?.length ? { verifiedRecordIds } : {}),
             references: turn.references,
           },
         ];

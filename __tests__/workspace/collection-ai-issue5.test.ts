@@ -1,0 +1,278 @@
+import { describe, expect, it, vi } from "vitest";
+import { createCollection } from "@/app/workspace/collections/model";
+import { applyCollectionAction } from "@/app/api/workspaces/[id]/agent/collectionOperations";
+import { resolveCollectionTargets } from "@/lib/workspace-agent/collectionTargetResolution";
+import { parseWorkspaceModelProposal } from "@/lib/workspace-agent/proposalValidation";
+import { runWorkspaceAgentTurn } from "@/lib/workspace-agent/runtime";
+import { summarizeCollection } from "@/lib/workspace-agent/collectionContext";
+import { safeWorkspaceAssistantContent } from "@/app/workspace/utils/workspaceChatVisibleContent";
+import { parseDifyAgentAnswer } from "@/app/workspace/utils/workspaceDifyAgentResponse";
+import { consumeWorkspaceChatResponse } from "@/app/workspace/utils/workspaceChatStream";
+import { workspaceReceiptRequestRounds } from "@/lib/workspace-agent/turnStore";
+import type { WorkspaceJson, WorkspaceRuntimeRequest } from "@/lib/workspace-agent/contracts";
+
+function fixture() {
+  const data = createCollection();
+  const state = { blocks: { c1: { id: "c1", type: "collection", data } }, blockOrder: ["c1"], connectors: {}, title: "Board" };
+  return { data, state };
+}
+const asBoard = (state: unknown) => state as WorkspaceJson;
+describe("Collection AI issue #5 regressions", () => {
+  it("resolves a unique field and view name to persisted IDs before removal", () => {
+    const { data, state } = fixture();
+    const fieldId = "temp-field";
+    const viewId = "temp-view";
+    data.fields.push({ id: fieldId, name: "Smoke Marker", type: "text" });
+    data.views.push({ id: viewId, name: "Smoke Table", kind: "table" });
+    for (const [type, key, name, expected] of [
+      ["remove_collection_field", "fieldName", "Smoke Marker", fieldId],
+      ["remove_collection_view", "viewName", "Smoke Table", viewId],
+    ]) {
+      const raw = { type, blockId: "c1", [key]: name };
+      const resolved = resolveCollectionTargets(raw, asBoard(state));
+      expect(resolved.error).toBeUndefined();
+      expect(resolved.action[type === "remove_collection_field" ? "fieldId" : "viewId"]).toBe(expected);
+      expect(applyCollectionAction(state as never, resolved.action)?.ids).toEqual(["c1"]);
+    }
+    expect(state.blocks.c1.data.fields.some((item) => item.id === fieldId)).toBe(false);
+    expect(state.blocks.c1.data.views.some((item) => item.id === viewId)).toBe(false);
+  });
+
+  it("rejects duplicate names with concrete IDs without mutating", () => {
+    const { data, state } = fixture();
+    data.views.push({ id: "v2", name: "Duplicate", kind: "table" }, { id: "v3", name: "Duplicate", kind: "kanban" });
+    const before = JSON.stringify(state.blocks.c1.data);
+    const resolved = resolveCollectionTargets({ type: "remove_collection_view", blockId: "c1", viewName: "Duplicate" }, asBoard(state));
+    expect(resolved.error).toContain("v2");
+    expect(resolved.error).toContain("v3");
+    expect(JSON.stringify(state.blocks.c1.data)).toBe(before);
+  });
+
+  it("validates dependent field > record > view against sequential state", () => {
+    const { state } = fixture();
+    const commands = [
+      { type: "add_collection_field", blockId: "c1", fieldId: "custom-f", name: "Issue Marker", fieldType: "text" },
+      { type: "create_collection_record", blockId: "c1", recordId: "custom-r", values: { "Issue Marker": "present" } },
+      { type: "add_collection_view", blockId: "c1", viewId: "custom-v", name: "Issue View", kind: "table" },
+    ];
+    const proposal = parseWorkspaceModelProposal(JSON.stringify({ done: true, message: "", actions: commands }), asBoard(state));
+    for (const raw of proposal.actions) {
+      const resolved = resolveCollectionTargets(raw, asBoard(state));
+      expect(resolved.error).toBeUndefined();
+      expect(applyCollectionAction(state as never, resolved.action)?.ids).toEqual(["c1"]);
+    }
+    expect(state.blocks.c1.data.records.find((item) => item.id === "custom-r")?.values["custom-f"]).toBe("present");
+    expect(state.blocks.c1.data.views.some((item) => item.id === "custom-v")).toBe(true);
+  });
+
+  it("does not mutate state when a later dependent target is missing", () => {
+    const { state } = fixture();
+    const original = JSON.stringify(state);
+    const missing = resolveCollectionTargets({ type: "delete_collection_record", blockId: "c1", recordName: "Missing" }, asBoard(state));
+    expect(missing.error).toContain("No Collection record");
+    expect(JSON.stringify(state)).toBe(original);
+  });
+
+  it("records a saved delete even if a subsequent search fails, and skips later actions", async () => {
+    const { state } = fixture();
+    const snapshot = { revision: 1, ...state };
+    const input: WorkspaceRuntimeRequest = {
+      boardId: "b1", turnId: "turn5", query: "Delete and then search", modelSelector: "model",
+      authorization: "Bearer key", workspaceUserToken: "token", canMutate: true,
+      signal: new AbortController().signal,
+    };
+    const modelProvider = { propose: vi.fn().mockResolvedValue({
+      answer: JSON.stringify({ done: true, message: "", actions: [
+        { type: "delete_collection_record", blockId: "c1", recordId: "r1" },
+        { type: "search_collection_records", blockId: "c1", query: "r1" },
+      ] }),
+      conversationId: "provider-c",
+    }) };
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ httpStatus: 200, body: { success: true, revision: 2, actions: [{ type: "delete_collection_record", ids: ["c1"], changed: true }] } })
+      .mockResolvedValueOnce({ httpStatus: 422, body: { success: false, error: "Search failed", revision: 2, actions: [{ type: "search_collection_records", ids: [], changed: false }] } });
+    const result = await runWorkspaceAgentTurn(input, { readSnapshot: async () => snapshot as never, modelProvider, execute });
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][3]).toBe(1);
+    expect(execute.mock.calls[1][3]).toBe(2);
+    expect(execute.mock.calls.map((args) => args[2])).toEqual([1, 101]);
+    expect(result.receipts.map((item) => item.requestId)).toEqual(["turn5:1", "turn5:101"]);
+    expect(result.status).toBe("partial");
+    expect(result.receipts.map((item) => item.persisted)).toEqual([true, false]);
+    expect(result.receipts[0].revisionAfter).toBe(2);
+  });
+
+  it("surfaces a verified search after a saved delete through the final stream when Dify later emits no actions", async () => {
+    const { state, data } = fixture();
+    const stableRecordId = "c16bd548-b6f0-4e4b-a182-7b7a5f69696c";
+    const otherRecordId = "ba26a49d-3872-4ae4-94ae-332a07fbca24";
+    data.records.push({
+      id: stableRecordId,
+      values: {
+        [data.fields[0].id]: "AI collection parity smoke",
+        [data.fields[1].id]: "Done",
+        [data.fields[4].id]: "temporary local AI validation row",
+      },
+    }, { id: otherRecordId, values: { [data.fields[0].id]: "Unrelated" } });
+    // Match the actual Workspace collectionRead.ts executor payload, not a UI approximation.
+    const searchResult = { blockId: "c1", ...summarizeCollection(data, 16, "AI collection parity smoke") };
+    let revision = 1;
+    const proposals = [
+      { done: false, message: "Deleting and searching", actions: [
+        { type: "delete_collection_record", blockId: "c1", recordId: "deleted-r" },
+        { type: "search_collection_records", blockId: "c1", query: "AI collection parity smoke" },
+      ] },
+      { done: false, message: "Checking search", actions: [
+        { type: "search_collection_records", blockId: "c1", query: "AI collection parity smoke" },
+      ] },
+      { done: true, message: "Done", actions: [] },
+    ];
+    const execute = vi.fn(async (_input: WorkspaceRuntimeRequest, _turnId: string, _step: number, baseRevision: number, actions: WorkspaceJson[]) => {
+      expect(baseRevision).toBe(revision);
+      if (actions[0].type === "delete_collection_record") {
+        revision += 1;
+        return { httpStatus: 200, body: { success: true, revision, actions: [
+          { type: "delete_collection_record", ids: ["c1"], changed: true, summary: "deleted-r" },
+        ] } };
+      }
+      return { httpStatus: 200, body: { success: true, revision, actions: [
+        { type: "search_collection_records", ids: ["c1"], changed: false },
+      ], result: searchResult } };
+    });
+    const input: WorkspaceRuntimeRequest = {
+      boardId: "b1", turnId: "turn-read-followup", query: "Delete record then search for AI collection parity smoke",
+      modelSelector: "model", authorization: "Bearer key", workspaceUserToken: "token",
+      canMutate: true, signal: new AbortController().signal,
+    };
+    const turn = await runWorkspaceAgentTurn(input, {
+      readSnapshot: async () => ({ revision, ...state }) as never,
+      modelProvider: { propose: async ({ round }) => ({
+        answer: JSON.stringify(proposals[round - 1]), conversationId: "provider-c",
+      }) },
+      execute,
+    });
+    expect(turn.status).toBe("completed");
+    expect(turn.rounds).toBe(3);
+    expect(execute).toHaveBeenCalledTimes(3);
+    expect(execute.mock.calls.map((args) => args[2])).toEqual([1, 101, 2]);
+    expect(turn.receipts.map((receipt) => receipt.requestId)).toEqual(["turn-read-followup:1", "turn-read-followup:101", "turn-read-followup:2"]);
+    expect(turn.receipts.map((receipt) => [receipt.actionType, receipt.persisted])).toEqual([
+      ["delete_collection_record", true],
+      ["search_collection_records", false],
+      ["search_collection_records", false],
+    ]);
+    expect(turn.unresolvedSummaries).toEqual([]);
+    expect(turn.answer).toContain("search_collection_records");
+    expect(turn.answer).toContain("AI collection parity smoke");
+    expect(turn.answer).toContain("Workspace-verified Collection read result");
+    expect(turn.answer).toContain(stableRecordId);
+    expect(turn.answer).toContain('"Name":"AI collection parity smoke"');
+    expect(turn.answer).toContain('"Status":"Done"');
+    expect(turn.answer).toContain('"Description":"temporary local AI validation row"');
+    expect(turn.answer).not.toContain(otherRecordId);
+    expect(turn.verifiedRecordIds).toEqual([stableRecordId]);
+    expect(turn.appliedSummaries).toHaveLength(1);
+    const answer = JSON.stringify({
+      answer: turn.answer,
+      focusBlockIds: turn.focusBlockIds,
+      appliedSummaries: turn.appliedSummaries,
+      unresolvedSummaries: turn.unresolvedSummaries,
+      verifiedRecordIds: turn.verifiedRecordIds,
+    });
+    const event = { event: "workflow_finished", conversation_id: turn.conversationId, data: { outputs: { answer } } };
+    const stream = new Response(`data: ${JSON.stringify(event)}\n\ndata: [DONE]\n\n`,
+      { headers: { "content-type": "text/event-stream" } });
+    const parsed = parseDifyAgentAnswer((await consumeWorkspaceChatResponse(stream, () => {})).answer);
+    expect(parsed.content).toContain("search_collection_records");
+    expect(parsed.verifiedRecordIds).toEqual([stableRecordId]);
+    // The assistant bubble's UUID scrubber previously turned ID/value keys into empty strings.
+    const visible = safeWorkspaceAssistantContent(parsed.content, false, parsed.verifiedRecordIds);
+    expect(visible).toContain(`Record ID: ${stableRecordId}`);
+    expect(visible).toContain('"Name":"AI collection parity smoke"');
+    expect(visible).toContain('"Status":"Done"');
+    expect(visible).toContain('"Description":"temporary local AI validation row"');
+    expect(visible).not.toContain(otherRecordId);
+    expect(visible).not.toContain('"id":""');
+    expect(safeWorkspaceAssistantContent(parsed.content)).not.toContain(stableRecordId);
+    const leakedId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    expect(safeWorkspaceAssistantContent(`Record ID: ${leakedId}`, false, parsed.verifiedRecordIds)).not.toContain(leakedId);
+    expect(parsed.appliedSummaries).toHaveLength(1);
+  });
+
+  it("reports a failed read phase as partial and never fabricates a successful read receipt", async () => {
+    const { state } = fixture();
+    const input: WorkspaceRuntimeRequest = {
+      boardId: "b1", turnId: "turn-search-fails", query: "Delete record, then search",
+      modelSelector: "model", authorization: "Bearer key", workspaceUserToken: "token",
+      canMutate: true, signal: new AbortController().signal,
+    };
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ httpStatus: 200, body: { success: true, revision: 4, actions: [
+        { type: "delete_collection_record", ids: ["c1"], changed: true, summary: "deleted" },
+      ] } })
+      .mockResolvedValueOnce({ httpStatus: 422, body: { success: false, revision: 4, error: "Search failed",
+        actions: [{ type: "search_collection_records", ids: [], changed: false }] } });
+    const turn = await runWorkspaceAgentTurn(input, {
+      readSnapshot: async () => ({ revision: 3, ...state }) as never,
+      modelProvider: { propose: async () => ({
+        answer: JSON.stringify({ done: true, message: "All done", actions: [
+          { type: "delete_collection_record", blockId: "c1", recordId: "r" },
+          { type: "search_collection_records", blockId: "c1", query: "remaining" },
+        ] }), conversationId: "provider-c",
+      }) },
+      execute,
+    });
+    expect(turn.status).toBe("partial");
+    expect(turn.receipts.map((r) => r.persisted)).toEqual([true, false]);
+    expect(turn.receipts[1].reason).toMatch(/Search failed/);
+    expect(turn.unresolvedSummaries.join(" ")).toContain("search_collection_records");
+    expect(turn.answer).not.toContain("Workspace-verified Collection read result");
+  });
+
+  it("keeps legacy phase request IDs and recovers distinct later phase keys", () => {
+    const ids = workspaceReceiptRequestRounds("turn-phase");
+    expect(ids).toHaveLength(60);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("turn-phase:1");
+    expect(ids).toContain("turn-phase:2");
+    expect(ids).toContain("turn-phase:101");
+    expect(ids).toContain("turn-phase:201");
+    expect(ids).not.toContain("turn-phase:100");
+  });
+
+  it("never runs a read phase after durable cancellation during its progress event", async () => {
+    const { state } = fixture();
+    let cancelled = false;
+    let executingEvents = 0;
+    const execute = vi.fn().mockResolvedValue({
+      httpStatus: 200, body: { success: true, revision: 2,
+        actions: [{ type: "delete_collection_record", ids: ["c1"], changed: true, summary: "deleted" }] },
+    });
+    const input: WorkspaceRuntimeRequest = {
+      boardId: "b1", turnId: "turn-cancel-between", query: "Delete then search",
+      modelSelector: "model", authorization: "Bearer test", workspaceUserToken: "test",
+      canMutate: true, signal: new AbortController().signal,
+    };
+    const turn = await runWorkspaceAgentTurn(input, {
+      readSnapshot: async () => ({ revision: 1, ...state }) as never,
+      modelProvider: { propose: async () => ({
+        answer: JSON.stringify({ done: true, message: "", actions: [
+          { type: "delete_collection_record", blockId: "c1", recordId: "delete-me" },
+          { type: "search_collection_records", blockId: "c1", query: "remaining" },
+        ] }), conversationId: null,
+      }) },
+      execute,
+      isCancelled: async () => cancelled,
+      onProgress: async (event) => {
+        if (event.phase === "executing" && ++executingEvents === 2) {
+          await Promise.resolve();
+          cancelled = true;
+        }
+      },
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(turn.status).toBe("partial");
+    expect(turn.receipts).toMatchObject([{ actionType: "delete_collection_record", persisted: true }]);
+    expect(turn.unresolvedSummaries.join(" ")).toContain("cancelled");
+  });
+});

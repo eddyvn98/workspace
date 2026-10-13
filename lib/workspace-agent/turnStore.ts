@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { WORKSPACE_RUNTIME_DEADLINE_MS, type WorkspaceJson } from "./contracts";
+import { WORKSPACE_RUNTIME_DEADLINE_MS, WORKSPACE_RUNTIME_MAX_ACTIONS, WORKSPACE_RUNTIME_MAX_ROUNDS, type WorkspaceJson } from "./contracts";
 
 export type WorkspaceAgentTurnStart =
   | { kind: "started" }
@@ -26,6 +26,22 @@ export class WorkspaceTurnNotActiveError extends Error {
 
 const STALE_TURN_GRACE_MS = 15_000;
 
+// First phase uses 1..MAX_ROUNDS; later phases retain their distinct numeric IDs.
+export function workspaceReceiptRequestRounds(turnId: string): string[] {
+  return Array.from({ length: WORKSPACE_RUNTIME_MAX_ROUNDS }, (_, index) => `${turnId}:${index + 1}`).concat(
+    Array.from({ length: WORKSPACE_RUNTIME_MAX_ROUNDS * (WORKSPACE_RUNTIME_MAX_ACTIONS - 1) }, (_, index) => {
+      const round = Math.floor(index / (WORKSPACE_RUNTIME_MAX_ACTIONS - 1)) + 1;
+      const phase = index % (WORKSPACE_RUNTIME_MAX_ACTIONS - 1) + 1;
+      return `${turnId}:${round * 100 + phase}`;
+    }),
+  );
+}
+
+function logicalRound(requestId: string): number {
+  const suffix = Number(requestId.slice(requestId.lastIndexOf(":") + 1));
+  return suffix >= 100 ? Math.floor(suffix / 100) : suffix;
+}
+
 type StoredCommandReceipt = {
   request_id: string;
   response: WorkspaceJson;
@@ -33,7 +49,7 @@ type StoredCommandReceipt = {
 
 function recoverInterruptedResponse(key: TurnKey, receipts: StoredCommandReceipt[]): WorkspaceJson {
   const runtimeReceipts = receipts.flatMap(({ request_id, response }) => {
-    const round = Number(request_id.slice(key.turnId.length + 1));
+    const round = logicalRound(request_id);
     if (!Array.isArray(response.actions)) return [];
     return response.actions.flatMap((value) => {
       if (!value || typeof value !== "object" || Array.isArray(value)) return [];
@@ -62,7 +78,7 @@ function recoverInterruptedResponse(key: TurnKey, receipts: StoredCommandReceipt
     answer: JSON.stringify({ answer: answerText, focusBlockIds: [], appliedSummaries, unresolvedSummaries }),
     turnId: key.turnId,
     conversationId: null,
-    rounds: receipts.reduce((max, receipt) => Math.max(max, Number(receipt.request_id.slice(key.turnId.length + 1)) || 0), 0),
+    rounds: receipts.reduce((max, receipt) => Math.max(max, logicalRound(receipt.request_id) || 0), 0),
     status: "partial",
     receipts: runtimeReceipts,
     appliedSummaries,
@@ -128,7 +144,7 @@ export async function beginWorkspaceTurn(
     const staleAfterMs = WORKSPACE_RUNTIME_DEADLINE_MS + STALE_TURN_GRACE_MS;
     if (Date.now() - row.updated_at.getTime() <= staleAfterMs) return { kind: "running" };
 
-    const requestIds = Array.from({ length: 5 }, (_, index) => `${key.turnId}:${index + 1}`);
+    const requestIds = workspaceReceiptRequestRounds(key.turnId);
     const savedReceipts = await tx.$queryRaw<StoredCommandReceipt[]>`
       SELECT request_id, response FROM workspace_command_receipts
       WHERE board_id = ${key.boardId} AND actor_email = ${key.actorEmail}

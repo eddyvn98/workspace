@@ -36,9 +36,17 @@ const BARE_UUID = new RegExp(UUID_TOKEN, "gi");
 const BRACKETED_UUID = new RegExp(`\\s*\\[(?:\\s*${UUID_TOKEN}\\s*(?:[,;]\\s*${UUID_TOKEN}\\s*)*)\\]\\s*`, "gi");
 const INTERNAL_ID_FIELD = /["']?\b(?:blockId|resourceId)["']?\s*[:=]\s*["']?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}["']?\s*,?\s*/gi;
 
-function stripInternalReferences(value: string): string {
+const VERIFIED_ROW_UUID = /\bRecord ID:\s+([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\b/gi;
+function stripInternalReferences(value: string, verifiedRecordIds: readonly string[] = []): string {
+  const allowed = new Set(verifiedRecordIds.slice(0, 30).map((id) => id.toLowerCase()));
+  const verified: string[] = [];
+  const protectedRows = value.replace(VERIFIED_ROW_UUID, (whole, id: string) => {
+    if (!allowed.has(id.toLowerCase())) return whole;
+    const index = verified.push(id) - 1;
+    return `Record ID: __WORKSPACE_VERIFIED_ROW_${index}__`;
+  });
   const links: string[] = [];
-  const protectedValue = value.replace(/\]\((<?(?:https?:\/\/|\/(?!\/))[^\s)]+>?)\)/gi, (_match, target: string) => {
+  const protectedValue = protectedRows.replace(/\]\((<?(?:https?:\/\/|\/(?!\/))[^\s)]+>?)\)/gi, (_match, target: string) => {
     const index = links.push(target) - 1;
     return `](__WORKSPACE_LINK_TARGET_${index}__)`;
   });
@@ -56,7 +64,8 @@ function stripInternalReferences(value: string): string {
     .replace(/\bexplicit relationship\b/gi, "direct relationship")
     .replace(/\bpath root\b/gi, "path from the root")
     .replace(/\bVirtual Root\b/g, "the whole canvas")
-    .replace(/__WORKSPACE_LINK_TARGET_(\d+)__/g, (match, index: string) => links[Number(index)] ?? match);
+    .replace(/__WORKSPACE_LINK_TARGET_(\d+)__/g, (match, index: string) => links[Number(index)] ?? match)
+    .replace(/__WORKSPACE_VERIFIED_ROW_(\d+)__/g, (match, index: string) => verified[Number(index)] ?? match);
 }
 
 /** Removes a model's <think> reasoning, including an unterminated trailing
@@ -86,10 +95,10 @@ export function normalizeQuotedDiagnosticFields(value: string): string {
   );
 }
 
-export function safeWorkspaceAssistantContent(content: string, isStreaming = false): string {
+export function safeWorkspaceAssistantContent(content: string, isStreaming = false, verifiedRecordIds: readonly string[] = []): string {
   const sanitized = stripKnownInternalParagraphs(
     stripInternalReferences(
-      normalizeQuotedDiagnosticFields(stripDisplayCodeFences(stripActionFences(stripThinkingBlocks(content)))),
+      normalizeQuotedDiagnosticFields(stripDisplayCodeFences(stripActionFences(stripThinkingBlocks(content)))), verifiedRecordIds,
     ),
   ).trim();
   if (!sanitized) return isStreaming ? "" : WORKSPACE_SAFE_FALLBACK;

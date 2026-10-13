@@ -10,6 +10,8 @@ on:
       - 'lib/workspace-command-*.ts'
       - 'config/workspace-command-registry.json'
       - '__tests__/workspace/collection-ai-commands.test.ts'
+      - '__tests__/workspace/collection-ai-issue5.test.ts'
+      - '__tests__/workspace/collection-ai-receipt-followup.test.ts'
       - '__tests__/workspace/chat-sessions-routes.test.ts'
       - 'app/api/chat-sessions/**'
       - 'services/mongodb/chatSessions.repo.ts'
@@ -20,6 +22,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 9.10.0
@@ -31,7 +35,32 @@ jobs:
       - run: pnpm prisma:generate
         env:
           DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
-      - run: pnpm exec vitest run __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/chat-sessions-routes.test.ts __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/workspace-agent-capability-selection.test.ts __tests__/workspace/agent-action-schema-coverage.test.ts
+      - run: pnpm exec vitest run __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-ai-issue5.test.ts __tests__/workspace/collection-ai-receipt-followup.test.ts __tests__/workspace/workspace-agent-progress.test.ts __tests__/workspace/workspace-agent-runtime.test.ts __tests__/workspace/chat-sessions-routes.test.ts __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/workspace-agent-capability-selection.test.ts __tests__/workspace/agent-action-schema-coverage.test.ts
+      # The main branch has existing failures. Compare *all* Workspace tests
+      # by individual test name, never blanket-ignore a failed suite.
+      - name: Compare full Workspace Vitest suite with main
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+          MONGODB_URI: mongodb://localhost:27017/workspace
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/workspace-main" origin/main
+          pnpm --dir "$RUNNER_TEMP/workspace-main" install --frozen-lockfile
+          pnpm --dir "$RUNNER_TEMP/workspace-main" prisma:generate
+          set +e
+          pnpm exec vitest run __tests__/workspace --reporter=json --outputFile="$RUNNER_TEMP/workspace-head.json" > "$RUNNER_TEMP/workspace-head.log" 2>&1
+          pnpm --dir "$RUNNER_TEMP/workspace-main" exec vitest run __tests__/workspace --reporter=json --outputFile="$RUNNER_TEMP/workspace-main.json" > "$RUNNER_TEMP/workspace-main.log" 2>&1
+          set -e
+          if [ ! -s "$RUNNER_TEMP/workspace-head.json" ]; then
+            tail -n 70 "$RUNNER_TEMP/workspace-head.log"
+            exit 1
+          fi
+          if [ ! -s "$RUNNER_TEMP/workspace-main.json" ]; then
+            tail -n 70 "$RUNNER_TEMP/workspace-main.log"
+            exit 1
+          fi
+          node scripts/compare-workspace-vitest.mjs "$RUNNER_TEMP/workspace-head.json" "$RUNNER_TEMP/workspace-main.json"
       - run: pnpm exec tsc --noEmit
       - run: pnpm build
         env:

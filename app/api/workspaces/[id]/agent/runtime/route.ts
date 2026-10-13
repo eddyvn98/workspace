@@ -81,6 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       focusBlockIds: turn.focusBlockIds,
       appliedSummaries: turn.appliedSummaries,
       unresolvedSummaries: turn.unresolvedSummaries,
+      verifiedRecordIds: turn.verifiedRecordIds ?? [],
     });
     const response = { ...turn, answer };
     if (!await completeWorkspaceTurn(turnKey, response)) {
