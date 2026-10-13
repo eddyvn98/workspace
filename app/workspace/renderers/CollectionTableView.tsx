@@ -1,6 +1,6 @@
 "use client";
-import React, { useMemo } from "react";
-import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable,
+import React, { useMemo, useRef } from "react";
+import { flexRender, getCoreRowModel, useReactTable,
   type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { deleteRecord, recordTitle, viewSorts, type CollectionBlockPayload,
   type CollectionField, type CollectionRecord, type CollectionView } from "../collections/model";
@@ -11,16 +11,28 @@ interface Props {
   readOnly: boolean; onChange: (next: CollectionBlockPayload) => void;
   patch: (record: CollectionRecord, field: CollectionField, value: string) => void;
 }
+const getRecordId = (row: CollectionRecord) => row.id;
+
 export function CollectionTableView({ data, view, rows, readOnly, onChange, patch }: Props) {
-  const sorting: SortingState = viewSorts(view).map(s => ({ id: s.fieldId, desc: s.direction === "desc" }));
+  // Keep the cell renderer identity stable while edits update Collection data.
+  // Calling the latest patch via a ref avoids unmounting the focused input.
+  const patchRef = useRef(patch);
+  patchRef.current = patch;
+  // Stable controlled state: one sorting array per saved View configuration.
+  const sorting = useMemo<SortingState>(() => viewSorts(view).map(s =>
+    ({ id: s.fieldId, desc: s.direction === "desc" })), [view]);
   const columns = useMemo<ColumnDef<CollectionRecord>[]>(() => data.fields.map(field => ({
     id: field.id, accessorFn: record => record.values[field.id] ?? "", header: () => field.name,
     sortingFn: field.type === "number" ? "basic" : "alphanumeric",
     cell: ctx => <FieldEditor field={field} value={ctx.row.original.values[field.id] ?? ""}
-      readOnly={readOnly} onSet={value => patch(ctx.row.original, field, value)} />,
-  })), [data.fields, readOnly, patch]);
+      readOnly={readOnly} onSet={value => patchRef.current(ctx.row.original, field, value)} />,
+  })), [data.fields, readOnly]);
   const table = useReactTable({
-    data: rows, columns, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(),
+    data: rows, columns, getRowId: getRecordId,
+    getCoreRowModel: getCoreRowModel(),
+    // visibleRecords already applies all saved sorts. Do not sort twice or
+    // auto-reset table state in response to a controlled input keystroke.
+    manualSorting: true, autoResetAll: false,
     state: { sorting }, enableMultiSort: true,
     onSortingChange: update => {
       if (readOnly) return;
