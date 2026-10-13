@@ -71,7 +71,7 @@ export function CollectionSurface({ data, onChange, readOnly }: Props) {
       </div>
     </div>}
     <div className="min-h-0 flex-1 overflow-auto p-2">
-      {view.kind === "table" && <CollectionTableView data={data} view={view} rows={visibleRecords(data, { ...view, sorts: [], sort: undefined }, search)} readOnly={readOnly} onChange={onChange} patch={patch} />}
+      {view.kind === "table" && <CollectionTableView data={data} view={view} rows={rows} readOnly={readOnly} onChange={onChange} patch={patch} />}
       {view.kind === "kanban" && <CollectionKanbanView data={data} rows={rows} group={group} titleField={titleField} groupOptions={groupOptions} readOnly={readOnly} onChange={onChange} patch={patch} />}
       {view.kind === "gallery" && <CollectionGalleryView data={data} rows={rows} titleField={titleField} readOnly={readOnly} patch={patch} />}
       {view.kind === "calendar" && <CalendarView month={month} setMonth={setMonth} rows={rows} data={data} field={date} readOnly={readOnly} patch={patch} />}

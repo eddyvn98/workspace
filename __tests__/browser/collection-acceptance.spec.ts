@@ -33,6 +33,7 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   await expect(container).toBeVisible();
   await container.getByRole("button", { name: "+ Record" }).click();
   await container.getByRole("textbox", { name: "Name" }).first().fill("Persisted acceptance record");
+  await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Persisted acceptance record");
   await container.getByRole("button", { name: "Kanban", exact: true }).click();
   await expect(container.getByText("Persisted acceptance record").first()).toBeVisible();
   const reloadResponse = await page.reload();
@@ -59,7 +60,12 @@ test("convert table without mutating source, edit and delete a record", async ({
   const container = page.getByTestId("collection-block");
   await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Original row");
   await expect(page.getByTestId("table-source")).toContainText("Original row");
+  const firstRowId = await container.locator("tr[data-record-id]").first().getAttribute("data-record-id");
   await container.getByRole("textbox", { name: "Name" }).first().fill("Changed in Collection");
+  // A frozen main thread prevents the following assertions from completing.
+  await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Changed in Collection");
+  await expect(container.locator("tr[data-record-id]").first()).toHaveAttribute("data-record-id", firstRowId!);
+  expect(await page.evaluate(() => document.readyState)).toBe("complete");
   await expect(page.getByTestId("table-source")).toContainText("Original row");
   await container.getByRole("button", { name: "Delete Changed in Collection" }).click();
   await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
@@ -100,6 +106,7 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await table.getByRole("button", { name: "+ Filter" }).click();
   await table.getByRole("combobox", { name: "Filter field 1" }).selectOption({ label: "Status" });
   await table.getByRole("textbox", { name: "Filter value 1" }).fill("done");
+  expect(await page.evaluate(() => document.readyState)).toBe("complete");
   await expect(table.getByRole("textbox", { name: "Name" })).toHaveCount(1);
   await expect(table.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
   await table.getByRole("button", { name: "+ Filter" }).click();
