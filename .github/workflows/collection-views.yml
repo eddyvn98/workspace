@@ -12,6 +12,7 @@ on:
       - '__tests__/workspace/collection-views.test.ts'
       - '__tests__/workspace/collection-conflicts.test.ts'
       - '__tests__/workspace/collection-multi-filter-sort.test.ts'
+      - '__tests__/workspace/collection-kanban-dnd.test.ts'
       - '__tests__/browser/collection-acceptance.spec.ts'
       - 'playwright.collection.config.ts'
       - 'app/collection-acceptance/**'
@@ -36,7 +37,7 @@ jobs:
       - run: pnpm prisma:generate
         env:
           DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
-      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/collection-multi-filter-sort.test.ts __tests__/workspace/collection-ai-commands.test.ts
+      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/collection-multi-filter-sort.test.ts __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-kanban-dnd.test.ts
       - run: pnpm exec tsc --noEmit
       - run: pnpm build
         env:

@@ -1,11 +1,76 @@
 "use client";
 import React from "react";
-import { addRecord, recordTitle, setRecordValue, type CollectionBlockPayload, type CollectionField, type CollectionRecord } from "../collections/model";
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, TouchSensor,
+  useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { dropCollectionCard } from "./collectionKanbanDrop";
+import { addRecord, recordTitle,
+  type CollectionBlockPayload, type CollectionField, type CollectionRecord } from "../collections/model";
 import { btnClass, inputClass, FieldEditor } from "./CollectionFieldEditor";
+
 interface Props { data: CollectionBlockPayload; rows: CollectionRecord[]; group?: CollectionField;
   titleField?: CollectionField; groupOptions: string[]; readOnly: boolean;
   onChange: (next: CollectionBlockPayload) => void;
   patch: (record: CollectionRecord, field: CollectionField, value: string) => void; }
-export function CollectionKanbanView({ data, rows, group, titleField, groupOptions, readOnly, onChange, patch }: Props) {
-  return <div className="flex h-full min-w-max gap-3">{["", ...groupOptions].map((status) => <div key={status} className="w-52 shrink-0 rounded-lg bg-slate-100 p-2 dark:bg-slate-900" onDragOver={(e) => { if (!readOnly) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/collection-record"); if (group && data.records.some((r) => r.id === id)) onChange(setRecordValue(data, id, group.id, status)); }}><div className="mb-2 text-xs font-semibold">{status || "Unassigned"} · {rows.filter((r) => (r.values[group?.id ?? ""] ?? "") === status).length}</div>{rows.filter((r) => (r.values[group?.id ?? ""] ?? "") === status).map((r) => <div key={r.id} draggable={!readOnly} onDragStart={(e) => e.dataTransfer.setData("text/collection-record", r.id)} className="mb-2 rounded border bg-white p-2 text-xs shadow-sm dark:bg-slate-800"><div className="mb-2 font-semibold">{recordTitle(data, r)}</div>{titleField && <FieldEditor field={titleField} value={r.values[titleField.id] ?? ""} readOnly={readOnly} onSet={(v) => patch(r, titleField, v)} />}{group && <select className={inputClass + " mt-1 w-full"} disabled={readOnly} value={r.values[group.id] ?? ""} onChange={(e) => patch(r, group, e.target.value)}><option value="">Unassigned</option>{groupOptions.map((o) => <option key={o}>{o}</option>)}</select>}</div>)}<button className={btnClass} disabled={readOnly} onClick={() => onChange(addRecord(data, group ? { [group.id]: status } : {}))}>+ Card</button></div>)}</div>;
+const columnId = (status: string) => "collection-column:" + status;
+
+function Card({ data, record, titleField, group, groupOptions, readOnly, patch }: {
+  data: CollectionBlockPayload; record: CollectionRecord; titleField?: CollectionField;
+  group?: CollectionField; groupOptions: string[]; readOnly: boolean;
+  patch: Props["patch"];
+}) {
+  const drag = useDraggable({ id: record.id, disabled: readOnly || !group });
+  return <div ref={drag.setNodeRef} className="mb-2 rounded border bg-white p-2 text-xs shadow-sm dark:bg-slate-800"
+    data-testid="collection-kanban-card" data-record-id={record.id}
+    style={{ transform: CSS.Translate.toString(drag.transform), opacity: drag.isDragging ? 0.55 : 1 }}>
+    <div className="mb-2 flex items-center gap-1">
+      <button type="button" aria-label={"Drag " + recordTitle(data, record)} className={btnClass}
+        disabled={readOnly || !group} {...drag.attributes} {...drag.listeners}>⠿</button>
+      <strong>{recordTitle(data, record)}</strong>
+    </div>
+    {titleField && <FieldEditor field={titleField} value={record.values[titleField.id] ?? ""}
+      readOnly={readOnly} onSet={value => patch(record, titleField, value)} />}
+    {group && <select className={inputClass + " mt-1 w-full"} disabled={readOnly}
+      aria-label={"Status for " + recordTitle(data, record)} value={record.values[group.id] ?? ""}
+      onChange={e => patch(record, group, e.target.value)}>
+      <option value="">Unassigned</option>{groupOptions.map(option => <option key={option} value={option}>{option}</option>)}
+    </select>}
+  </div>;
+}
+
+function Column({ status, rows, data, group, titleField, groupOptions, readOnly, onChange, patch }: Props & { status: string }) {
+  const drop = useDroppable({ id: columnId(status), disabled: readOnly || !group });
+  const cards = rows.filter(record => (record.values[group?.id ?? ""] ?? "") === status);
+  return <div ref={drop.setNodeRef} data-testid="collection-kanban-column" data-status={status}
+    className={"w-52 shrink-0 rounded-lg bg-slate-100 p-2 dark:bg-slate-900 " +
+      (drop.isOver ? "ring-2 ring-blue-500" : "")}>
+    <div className="mb-2 text-xs font-semibold">{status || "Unassigned"} · {cards.length}</div>
+    {cards.map(record => <Card key={record.id} data={data} record={record}
+      titleField={titleField} group={group} groupOptions={groupOptions}
+      readOnly={readOnly} patch={patch} />)}
+    <button className={btnClass} disabled={readOnly}
+      onClick={() => onChange(addRecord(data, group ? { [group.id]: status } : {}))}>+ Card</button>
+  </div>;
+}
+
+export function CollectionKanbanView(props: Props) {
+  const { data, rows, group, groupOptions, readOnly, onChange } = props;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(KeyboardSensor),
+  );
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (readOnly || !group || !over) return;
+    const target = groupOptions.concat("").find(status => columnId(status) === over.id);
+    const record = data.records.find(item => item.id === active.id);
+    if (target === undefined || !record) return;
+    const next = dropCollectionCard(data, record.id, group.id, target, readOnly);
+    if (next !== data) onChange(next);
+  };
+  return <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <div className="flex h-full min-w-max gap-3" data-testid="collection-kanban">
+      {["", ...groupOptions].map(status => <Column key={status} {...props} status={status} />)}
+    </div>
+  </DndContext>;
 }

@@ -157,3 +157,41 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("Done");
   await expect(reopened.getByRole("textbox", { name: "Filter value 2" })).toHaveValue("Other row");
 });
+
+test("Kanban dnd-kit drag changes persisted status, respects read-only mode", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  const block = page.getByTestId("collection-block");
+  await block.getByRole("button", { name: "+ Record" }).click();
+  await block.getByRole("textbox", { name: "Name" }).first().fill("Drag test record");
+  await block.getByRole("button", { name: "Kanban", exact: true }).click();
+  const card = block.getByTestId("collection-kanban-card").first();
+  await expect(card).toBeVisible();
+  const toDo = block.getByTestId("collection-kanban-column").filter({ hasText: "To do" });
+  if (page.viewportSize()!.width < 600) {
+    // Touch-sized screens retain an accessible select alternative to drag.
+    await block.getByRole("combobox", { name: "Status for Drag test record" }).selectOption("To do");
+  } else {
+    const handle = block.getByRole("button", { name: "Drag Drag test record" });
+    const from = await handle.boundingBox();
+    const to = await toDo.boundingBox();
+    expect(from).not.toBeNull();
+    expect(to).not.toBeNull();
+    await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 15 });
+    await page.mouse.up();
+  }
+  await expect(toDo.getByText("Drag test record").first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  const reopened = page.getByTestId("collection-block");
+  await expect(reopened.getByTestId("collection-kanban-column").filter({ hasText: "To do" })
+    .getByText("Drag test record").first()).toBeVisible();
+  await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await expect(reopened.getByRole("button", { name: "Drag Drag test record" })).toBeDisabled();
+  await expect(reopened.getByRole("combobox", { name: "Status for Drag test record" })).toBeDisabled();
+});
+
