@@ -18,7 +18,7 @@ import { parseWorkspaceModelProposal } from "./proposalValidation";
 import { executeWorkspaceActions, readWorkspaceSnapshot, type WorkspaceExecutorResult } from "./workspaceExecutor";
 import { workspaceActionReceiptSummary } from "./receiptSummaries";
 import { partialAnswer } from "./partialAnswer";
-import { completedWorkspaceAnswer } from "./runtimeReadAnswer";
+import { completedWorkspaceAnswer, verifiedCollectionRecordIds } from "./runtimeReadAnswer";
 import { hasPlainMutationClaim, isCanvasMutationRequest } from "@/app/workspace/utils/workspaceDifyAgentResponse";
 import { getWorkspaceResponseLanguageInstruction } from "@/app/workspace/utils/workspaceChatRequest";
 
@@ -67,10 +67,11 @@ function result(
   answer: string,
   receipts: WorkspaceRuntimeReceipt[],
   unresolvedSummaries: string[],
+  readResults: WorkspaceJson[],
 ): WorkspaceRuntimeResult {
   const appliedSummaries = receipts.filter((item) => item.persisted && item.summary).map((item) => item.summary!);
   const focusBlockIds = [...new Set(receipts.filter((item) => item.persisted && !NON_BLOCK_TARGET_ACTIONS.has(item.actionType)).flatMap((item) => item.targetIds).filter((id) => id !== "board"))];
-  return { answer, turnId: input.turnId, conversationId, rounds, status, receipts, appliedSummaries, unresolvedSummaries, focusBlockIds };
+  return { answer, turnId: input.turnId, conversationId, rounds, status, receipts, appliedSummaries, unresolvedSummaries, focusBlockIds, verifiedRecordIds: verifiedCollectionRecordIds(readResults) };
 }
 
 export async function runWorkspaceAgentTurn(
@@ -141,18 +142,18 @@ export async function runWorkspaceAgentTurn(
         const answer = status === "completed"
           ? completedWorkspaceAnswer(receipts, "Workspace changes were saved.", input.query, readResults)
           : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts);
-        return result(input, conversationId, rounds, status, answer, receipts, unresolved);
+        return result(input, conversationId, rounds, status, answer, receipts, unresolved, readResults);
       }
       if (proposal.actions.length === 0) {
-        if (unresolved.length) return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
+        if (unresolved.length) return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved, readResults);
         if (receipts.some((item) => item.persisted) || readResults.some((item) => ["read_collection", "search_collection_records"].includes(String(item.actionType)))) {
-          return result(input, conversationId, rounds, "completed", completedWorkspaceAnswer(receipts, "Workspace changes were saved.", input.query, readResults), receipts, unresolved);
+          return result(input, conversationId, rounds, "completed", completedWorkspaceAnswer(receipts, "Workspace changes were saved.", input.query, readResults), receipts, unresolved, readResults);
         }
         if (isCanvasMutationRequest(input.query) && hasPlainMutationClaim(proposal.message)) {
           unresolved.push("The model reported a change without a persisted action receipt.");
-          return result(input, conversationId, rounds, "partial", partialAnswer(0, input.query, receipts), receipts, unresolved);
+          return result(input, conversationId, rounds, "partial", partialAnswer(0, input.query, receipts), receipts, unresolved, readResults);
         }
-        return result(input, conversationId, rounds, "completed", proposal.message || "Done.", receipts, unresolved);
+        return result(input, conversationId, rounds, "completed", proposal.message || "Done.", receipts, unresolved, readResults);
       }
       totalActions += actionsToExecute.length;
       if (totalActions > WORKSPACE_RUNTIME_MAX_ACTIONS) throw new Error("Workspace runtime action limit reached.");
@@ -160,12 +161,12 @@ export async function runWorkspaceAgentTurn(
         const readsOnly = proposal.actions.every((action) => WORKSPACE_READ_ONLY_COMMANDS.has(String(action.type)));
         if (!readsOnly) {
           unresolved.push("This user can view the board but does not have permission to change it.");
-          return result(input, conversationId, rounds, "partial", partialAnswer(0, input.query, receipts), receipts, unresolved);
+          return result(input, conversationId, rounds, "partial", partialAnswer(0, input.query, receipts), receipts, unresolved, readResults);
         }
       }
       const unconfirmed = actionsToExecute.filter((action) => workspaceActionNeedsConfirmation(action, input.query, input.context ?? ""));
       if (unconfirmed.length) {
-        return result(input, conversationId, rounds, "completed", summarizeConfirmationRequest(unconfirmed, input.query), receipts, unresolved);
+        return result(input, conversationId, rounds, "completed", summarizeConfirmationRequest(unconfirmed, input.query), receipts, unresolved, readResults);
       }
       const groups: WorkspaceJson[][] = [];
       for (const action of actionsToExecute) {
@@ -248,7 +249,7 @@ export async function runWorkspaceAgentTurn(
       await ensureActive();
       if (!committed) {
         if (unresolved.length === 0) unresolved.push("The executor did not confirm that the batch was saved.");
-        return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
+        return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved, readResults);
       }
       const historyTransition = actionsToExecute.some((action) => action.type === "undo" || action.type === "redo");
       if (proposal.done || historyTransition) {
@@ -259,14 +260,14 @@ export async function runWorkspaceAgentTurn(
           const answer = status === "completed"
             ? hasCollectionRead ? completedWorkspaceAnswer(receipts, proposal.message, input.query, readResults) : JSON.stringify(readResults).slice(0, 8000)
             : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts);
-          return result(input, conversationId, rounds, status, answer, receipts, unresolved);
+          return result(input, conversationId, rounds, status, answer, receipts, unresolved, readResults);
         }
         const status = unresolved.length ? "partial" : "completed";
-        return result(input, conversationId, rounds, status, status === "completed" ? completedWorkspaceAnswer(receipts, proposal.message, input.query, readResults) : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
+        return result(input, conversationId, rounds, status, status === "completed" ? completedWorkspaceAnswer(receipts, proposal.message, input.query, readResults) : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved, readResults);
       }
     }
     unresolved.push("The runtime reached its round limit before confirming the full request.");
-    return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
+    return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved, readResults);
   } catch (error) {
     const cancelled = input.signal.aborted || (error instanceof Error && error.message === "Workspace runtime was cancelled.");
     const safeErrorMessage = error instanceof Error ? error.message : "";
@@ -294,6 +295,6 @@ export async function runWorkspaceAgentTurn(
       ? "The turn was cancelled; no further actions were run. Check confirmed receipts before retrying."
       : "The turn stopped before all proposed work could be confirmed. Check the board before retrying.");
     const status = cancelled || receipts.some((item) => item.persisted) ? "partial" : "failed";
-    return result(input, conversationId, rounds, status, partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
+    return result(input, conversationId, rounds, status, partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved, readResults);
   }
 }
