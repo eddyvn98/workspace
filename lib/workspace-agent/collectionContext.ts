@@ -25,7 +25,11 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
     recordCount: data.records.length,
     records: rows.map((row) => ({ id: row.id, parentId: row.parentId,
       values: Object.fromEntries(Object.entries(row.values)
-        .filter(([id]) => fieldIds.has(id)).map(([id, value]) => [id, value.slice(0, 400)])) })),
+        .filter(([id]) => fieldIds.has(id)).map(([id, value]) => [id, value.slice(0, 400)])),
+      computedValues: Object.fromEntries(data.fields
+        .filter((field) => field.type === "formula" || field.type === "lookup")
+        .map((field) => [field.id, (row.values[field.id] ?? "").slice(0, 400)])),
+    })),
     recordsTruncated: data.records.length > rows.length,
   };
 }
