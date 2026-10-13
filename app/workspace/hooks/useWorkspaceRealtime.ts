@@ -70,6 +70,9 @@ export interface WorkspaceRealtime {
 
 export function useWorkspaceRealtime(boardId: string, enabled = true): WorkspaceRealtime {
   const remoteBoardId = useWorkspaceRemoteBoardId(boardId);
+  // Collection records require REST CAS + per-record 3-way merge. The current
+  // room protocol stores whole blocks and can lose concurrent record writes.
+  const hasCollection = useWorkspaceStore((state) => Object.values(state.blocks).some((b) => b.type === "collection"));
   const [live, setLive] = useState(false);
   const [peers, setPeers] = useState<WorkspacePeer[]>([]);
   const handleRef = useRef<WorkspaceLiveHandle | null>(null);
@@ -77,7 +80,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   const flushRealtimePendingSave = useWorkspaceRealtimePublisher(boardId, remoteBoardId, handleRef);
 
   useEffect(() => {
-    if (!enabled || !remoteBoardId) return;
+    if (!enabled || !remoteBoardId || hasCollection) return;
     let cancelled = false;
 
     void (async () => {
@@ -115,6 +118,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
         },
         onBoard: (board) => {
           const current = useWorkspaceStore.getState();
+          if (Object.values(current.blocks).some((b) => b.type === "collection")) return;
           if (board.revision !== undefined && board.revision < (getKnownRevision(remoteBoardId) ?? -1)) return;
           // A newly-connected Yjs room can briefly announce its empty
           // initial document before REST hydration has finished. Do not let
@@ -218,7 +222,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
       setWorkspaceRealtimeLive(null);
       setPeers([]);
     };
-  }, [enabled, remoteBoardId, flushRealtimePendingSave]);
+  }, [enabled, hasCollection, remoteBoardId, flushRealtimePendingSave]);
 
   // Broadcasts what this person is looking at. Subscribed rather than polled,
   // and de-duplicated inside the handle, so a selection that did not move

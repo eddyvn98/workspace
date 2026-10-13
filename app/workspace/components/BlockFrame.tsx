@@ -5,7 +5,8 @@ import { resolveTransform, type CanvasBlock, type Transform } from "../types/blo
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { blockRendererRegistry } from "../renderers/registry";
 import { FallbackBlock } from "../renderers/FallbackBlock";
-import { anchorRegistry } from "../connectors/anchorRegistry";
+import { useBlockFrameGeometry, useBlockFrameAnchors } from "../hooks/useBlockFrameGeometry";
+import { getBlockFrameStyle } from "../utils/blockFrameStyle";
 import { useBlockDrag } from "../hooks/useBlockDrag";
 import { useBlockResize } from "../hooks/useBlockResize";
 import { useConnectorDrag } from "../hooks/useConnectorDrag";
@@ -40,7 +41,6 @@ const BlockFrameComponent: React.FC<BlockFrameProps> = ({ block, boardId, isVers
 
   const selectedBlockIds = useWorkspaceStore((state) => state.selectedBlockIds);
   const updateBlock = useWorkspaceStore((state) => state.updateBlock);
-  const updateBlockTransform = useWorkspaceStore((state) => state.updateBlockTransform);
   const isReadOnly = useWorkspaceStore((state) => state.isReadOnly);
   const effectiveReadOnly = isReadOnly || isVersionPreview;
   const isCommentMode = useWorkspaceStore((state) => state.isCommentMode);
@@ -139,45 +139,7 @@ const BlockFrameComponent: React.FC<BlockFrameProps> = ({ block, boardId, isVers
     [block.data, block.id, effectiveReadOnly, isLocked, updateBlock]
   );
 
-  // Connectors anchor to canvas coordinates, so the registry needs the live
-  // transform (including the resize/drag previews that never reach the store)
-  // without re-registering on every pointer move — a ref read lazily inside
-  // getWorldRect stays current while the registration itself stays stable.
-  const worldRectRef = useRef(transform);
-  worldRectRef.current = transform;
-
-  useEffect(() => {
-    const unregister = anchorRegistry.register(block.id, {
-      getRect: () => rootRef.current?.getBoundingClientRect() ?? null,
-      getWorldRect: () => {
-        const current = worldRectRef.current;
-        return new DOMRect(current.x, current.y, current.w, current.h);
-      },
-    });
-
-    const element = rootRef.current;
-    let observer: ResizeObserver | null = null;
-
-    if (element && typeof ResizeObserver !== "undefined") {
-      observer = new ResizeObserver(() => {
-        anchorRegistry.refresh(block.id);
-      });
-      observer.observe(element);
-    }
-
-    return () => {
-      observer?.disconnect();
-      if (typeof unregister === "function") {
-        unregister();
-      }
-    };
-  }, [block.id]);
-
-  // A preview transform lives in local state, so nothing in the store tells
-  // the connector layer to redraw — notify the registry ourselves.
-  useEffect(() => {
-    anchorRegistry.refresh(block.id);
-  }, [block.id, transform.x, transform.y, transform.w, transform.h]);
+  useBlockFrameAnchors(block.id, rootRef, transform);
 
   const Renderer = blockRendererRegistry[block.type] ?? FallbackBlock;
   const isPathBlock = block.type === "path";
@@ -188,56 +150,9 @@ const BlockFrameComponent: React.FC<BlockFrameProps> = ({ block, boardId, isVers
   const isImageFlowNode = block.type === "imageFlow";
   const canRotate = isShapeBlock || isPathBlock || Boolean(block.isFloating);
 
-  // Double-click-to-fit: se grows the frame's height to match its content's
-  // natural (unclipped) height at the current width, ne grows width to match
-  // content that overflows horizontally (e.g. a wide embedded table) at the
-  // current height. Only wired for doc blocks - see BlockFrameOverlays'
-  // per-corner onDoubleClick. `.workspace-doc-rich-editor` is the
-  // overflow:auto content wrapper inside WorkspaceDocRichEditor, so its
-  // scrollHeight/scrollWidth reflect the full content size even while
-  // visually clipped by the frame's current dimensions.
-  const handleAutoFitHeight = useCallback(() => {
-    if (isLocked || effectiveReadOnly) return;
-    const content = rootRef.current?.querySelector(".workspace-doc-rich-editor");
-    if (!content) return;
-    updateBlockTransform(block.id, { h: Math.max(60, content.scrollHeight) }, "override");
-  }, [block.id, effectiveReadOnly, isLocked, updateBlockTransform]);
-
-  const handleAutoFitWidth = useCallback(() => {
-    if (isLocked || effectiveReadOnly) return;
-    const content = rootRef.current?.querySelector(".workspace-doc-rich-editor");
-    if (!content) return;
-    updateBlockTransform(block.id, { w: Math.max(120, content.scrollWidth) }, "override");
-  }, [block.id, effectiveReadOnly, isLocked, updateBlockTransform]);
-
-  useEffect(() => {
-    if (!isSlideDeckBlock || isLocked || effectiveReadOnly) return;
-    const editor = rootRef.current?.querySelector<HTMLElement>(".workspace-doc-rich-editor .ProseMirror");
-    if (!editor) return;
-    let frame = 0;
-    const fitHeight = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const contentHeight = editor.scrollHeight + 120;
-        const height = Math.max(360, Math.min(1600, contentHeight));
-        const wrapper = rootRef.current?.querySelector<HTMLElement>(".workspace-doc-rich-editor");
-        const horizontalOverflow = Math.max(0, editor.scrollWidth - editor.clientWidth, (wrapper?.scrollWidth ?? 0) - (wrapper?.clientWidth ?? 0));
-        const width = Math.max(480, Math.min(1600, transform.w + horizontalOverflow));
-        const patch = {
-          ...(Math.abs(transform.h - height) > 2 ? { h: height } : {}),
-          ...(Math.abs(transform.w - width) > 2 ? { w: width } : {}),
-        };
-        if (Object.keys(patch).length) updateBlockTransform(block.id, patch, "override");
-      });
-    };
-    const observer = new MutationObserver(fitHeight);
-    observer.observe(editor, { childList: true, characterData: true, subtree: true, attributes: true });
-    fitHeight();
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [block.id, effectiveReadOnly, isLocked, isSlideDeckBlock, transform.h, transform.w, updateBlockTransform]);
+  const { handleAutoFitHeight, handleAutoFitWidth } = useBlockFrameGeometry(
+    block.id, rootRef, transform, isSlideDeckBlock, isLocked, effectiveReadOnly,
+  );
 
   return (
     <>
@@ -289,57 +204,16 @@ const BlockFrameComponent: React.FC<BlockFrameProps> = ({ block, boardId, isVers
             setPendingEditBlockId(block.id);
           }
         }}
-        style={{
-          position: "absolute",
-          // A table's own passThroughEmptyCellClicks (a swimlane's lane
-          // grid) means a click on one of its empty cells must reach the
-          // connector layer drawn behind it, not this wrapper - which
-          // otherwise catches every pointer event in the block's box
-          // regardless of what TableBlock does internally, since it sits
-          // outside (and thus behind, in paint order) everything TableBlock
-          // renders. Real interactive parts (header cells, populated cells,
-          // resize/insert handles) explicitly re-enable pointerEvents:"auto"
-          // themselves, which still overrides this per normal CSS
-          // inheritance.
-          pointerEvents: block.type === "table" && (block as CanvasBlock<"table">).data?.passThroughEmptyCellClicks ? "none" : "auto",
-          left: `${transform.x}px`,
-          top: `${transform.y}px`,
-          width: `${transform.w}px`,
-          height: `${transform.h}px`,
-          // A selected/hovered block's quick-add "+" buttons and anchor dots
-          // sit just outside its own box (BlockQuickAddButtons, ANCHOR_POINTS)
-          // — z-index only wins against a lower sibling within the SAME
-          // stacking context, so without this a "+" between two blocks can
-          // render underneath whichever neighbor happens to have a higher
-          // transform.zIndex from creation order. Bringing the active block
-          // to the front fixes that for its own overlay children too.
-          // A `table` is excluded: it can be used as a decorative grid drawn
-          // BEHIND other freeform blocks (a swimlane's lane grid), and its
-          // own resize/insert-row/insert-col handles already render at fixed,
-          // very high z-indexes (TableResizeHandles/TableInsertHandles)
-          // regardless of this wrapper's z-index - so hovering or selecting
-          // the table has no need to jump it above content deliberately
-          // placed on top of it, which is exactly what elevating it to 1000
-          // was doing.
-      // The source handle must stay above the newly-selected block while the
-      // pointer is handed off after a flowchart quick-add. Their opposite
-      // handles can occupy the same screen point; letting the new block win
-      // hit testing would silently re-parent the next click.
-          zIndex: isHistoryOpen ? 2000 : isQuickAddHandoff ? 1100 : isConnectorEndpoint ? 1200 : (isSelected || isHovered) && block.type !== "table" ? 1000 : transform.zIndex,
-          transform: visualTransform,
-          touchAction: "none",
-          userSelect: "none",
-          cursor: isLocked ? "default" : isCommentMode ? "pointer" : activeConnectorTool ? "crosshair" : undefined,
-          opacity: connectorFocusActive && !isConnectorEndpoint ? 0.42 : 1,
-          boxShadow: isConnectorEndpoint
-            ? "0 0 0 3px rgba(37, 99, 235, 0.46), 0 8px 20px rgba(37, 99, 235, 0.18)"
-            : isPulsing ? "0 0 0 3px rgba(37, 99, 235, 0.35)" : undefined,
-          transition: "opacity 160ms ease, box-shadow 180ms ease-out",
-        }}
+        style={getBlockFrameStyle({
+          block, transform, visualTransform, isHistoryOpen, isQuickAddHandoff,
+          isConnectorEndpoint, isSelected, isHovered, isLocked, isCommentMode,
+          activeConnectorTool, connectorFocusActive, isPulsing,
+        })}
       >
         <Renderer
           block={block as never}
           isSelected={isSelected}
+          readOnly={effectiveReadOnly}
           onChange={handleChange}
         />
 

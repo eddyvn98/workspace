@@ -5,6 +5,7 @@ import "./LinkBlock";
 import "./ShapeBlock";
 import "./PathBlock";
 import "./TableBlock";
+import "./CollectionBlock";
 import "./FileBlock";
 import "./SlideDeckBlock";
 import "./ImageFlowBlock.registration";

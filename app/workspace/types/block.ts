@@ -1,4 +1,5 @@
 import type { TableBlockPayload } from "./table";
+import type { CollectionBlockPayload } from "../collections/model";
 import type { SlideDeckPayload } from "./slide";
 import type { ImageFlowBlockData } from "./imageFlow";
 import type { WorkspaceImageData } from "./image";
@@ -152,6 +153,7 @@ export interface BlockDataMap {
   /** See TableBlockPayload (types/table.ts) for the full field-by-field doc -
    *  kept out of this file to stay under the 300-line cap. */
   table: TableBlockPayload;
+  collection: CollectionBlockPayload;
   /** See SlideDeckPayload (types/slide.ts) for the full field-by-field doc. */
   slideDeck: SlideDeckPayload;
   imageFlow: ImageFlowBlockData;
@@ -161,7 +163,7 @@ export type BlockType = keyof BlockDataMap;
 
 /** Content blocks are independent canvas documents, not nodes in a map tree. */
 export function isStandaloneContentBlockType(type: BlockType | undefined): boolean {
-	return type === "doc" || type === "table" || type === "slideDeck" || type === "imageFlow";
+	return type === "doc" || type === "table" || type === "collection" || type === "slideDeck" || type === "imageFlow";
 }
 
 /** Optional visual overrides applied on top of a renderer's default look. */

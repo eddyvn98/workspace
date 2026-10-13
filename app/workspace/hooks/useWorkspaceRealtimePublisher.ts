@@ -58,6 +58,12 @@ export function useWorkspaceRealtimePublisher(
     const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
       const isHydrationReplay = consumeSkippedWorkspaceRealtimePublish();
       const handle = handleRef.current;
+      if (Object.values(state.blocks).some((b) => b.type === "collection")) {
+        if (publishTimerRef.current !== null) clearTimeout(publishTimerRef.current);
+        publishTimerRef.current = null;
+        pendingPublishRef.current = null;
+        return;
+      }
       if (!handle || state.isReadOnly || state.boardId !== boardId || isHydrationReplay) return;
       const changed = state.blocks !== previous.blocks
         || state.connectors !== previous.connectors

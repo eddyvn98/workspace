@@ -7,16 +7,14 @@ import { useEffect, useRef } from "react";
 
 interface ProtectedRouteProps {
 	children: React.ReactNode;
+	/** Stable server-rendered dev bypass, passed through the route boundary. */
+	devBypass?: boolean;
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, devBypass = false }: ProtectedRouteProps) {
 	const { status } = useSession();
 	const router = useRouter();
 
-	const _NODE_ENV_KEY = "NODE" + "_ENV";
-	const devBypass =
-		process.env[_NODE_ENV_KEY] !== "production" &&
-		!!process.env.WORKSPACE_DEV_USER_EMAIL;
 
 	// Once we've rendered the app with an authenticated session, a later
 	// "loading" status only means an in-place session refresh (e.g. a

@@ -1,0 +1,47 @@
+name: Collection views validation
+on:
+  push:
+    branches: [feat/universal-collection-views]
+  pull_request:
+    paths:
+      - 'app/workspace/collections/**'
+      - 'app/workspace/renderers/Collection*.tsx'
+      - 'app/workspace/types/block.ts'
+      - 'app/workspace/components/WorkspaceInsertPanel.tsx'
+      - 'app/workspace/components/WorkspaceTableSelectionToolbar.tsx'
+      - '__tests__/workspace/collection-views.test.ts'
+      - '__tests__/workspace/collection-conflicts.test.ts'
+      - '__tests__/browser/collection-acceptance.spec.ts'
+      - 'playwright.collection.config.ts'
+      - 'app/collection-acceptance/**'
+      - 'app/workspace/utils/mergeBoardConflict.ts'
+      - 'lib/workspace/collectionGuard.ts'
+      - 'app/api/workspaces/[id]/sync-board/route.ts'
+      - '.github/workflows/collection-views.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:generate
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+          MONGODB_URI: mongodb://localhost:27017/workspace
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test -c playwright.collection.config.ts
+        env:
+          CI: 'true'

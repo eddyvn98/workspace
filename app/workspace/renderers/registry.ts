@@ -4,6 +4,7 @@ import type { BlockDataMap, BlockType, CanvasBlock } from "../types/block";
 export interface BlockRendererProps<T extends BlockType = BlockType> {
   block: CanvasBlock<T>;
   isSelected: boolean;
+  readOnly?: boolean;
   onChange: (patch: Partial<BlockDataMap[T]>) => void;
 }
 

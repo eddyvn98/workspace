@@ -1,5 +1,6 @@
 import { normalizeTreeLayoutFields } from "@/app/workspace/utils/normalizeTreeLayoutFields";
 import { boardMetadata } from "@/lib/workspace/boardMetadata";
+import { hasCollectionBlock } from "@/lib/workspace/collectionGuard";
 /**
  * POST /api/workspaces/[id]/sync-board — how a live room's content reaches
  * the database.
@@ -108,6 +109,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   // the service can stop trying rather than retry a write with no target.
   const existing = await prisma.workspaceBoard.findUnique({ where: { id: params.id } });
   if (!existing) return NextResponse.json({ error: "Not found", reason: "gone" }, { status: 404 });
+  // An older live room can remain open when a Collection is introduced.
+  // Refuse whole-block Yjs flushes rather than risk dropping parallel record edits.
+  if (hasCollectionBlock(existing.blocks) || hasCollectionBlock(blocks)) {
+    return NextResponse.json({ error: "Collection boards require revisioned REST writes", reason: "collection_requires_rest" }, { status: 409 });
+  }
 
   // The secret got the request in; it does not decide whose board this is.
   const role = await resolveAccessRole(existing, actorEmail);
