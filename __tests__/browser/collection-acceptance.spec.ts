@@ -135,7 +135,10 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Other row");
   await page.getByRole("checkbox", { name: "Read-only" }).check();
   await expect(reopened.getByRole("button", { name: "+ Filter" })).toBeDisabled();
-  await expect(reopened.getByTestId("collection-tanstack-table").getByRole("button", { name: "Sort Name" })).toBeDisabled();
+  // The Table sort buttons currently use stable field IDs as their aria-labels.
+  // Select by the displayed column header rather than assuming "Sort Name".
+  const nameHeader = reopened.getByTestId("collection-tanstack-table").locator("thead th").filter({ hasText: "Name" });
+  await expect(nameHeader.getByRole("button")).toBeDisabled();
   // Existing Kanban view still reads the same Collection, and switching back
   // must not erase the Table view-specific multi-condition configuration.
   await reopened.getByRole("button", { name: "Kanban", exact: true }).click();
