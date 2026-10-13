@@ -102,7 +102,7 @@ export function workspaceActionReceiptSummary(input: {
   const versionSummary = versionLabel
     ? language === "Vietnamese" ? `Đã lưu phiên bản “${versionLabel}”.` : `Saved a new version “${versionLabel}”.` // vi-allow: localized receipt
     : undefined;
-  const confirmedCollectionDelete = changed && actionType === "delete_collection_record" && typeof actionResult.summary === "string"
+  const confirmedCollectionDelete = changed && actionType.includes("collection") && typeof actionResult.summary === "string"
     ? actionResult.summary.trim().slice(0, 240) : undefined;
   return confirmedCollectionDelete
     ?? (changed ? slideSummary(actionType, action, snapshot) : undefined)
