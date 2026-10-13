@@ -4,8 +4,10 @@ import type { CollectionBlockPayload, CollectionField, CollectionRecord } from "
 export function getCollectionValue(data: CollectionBlockPayload, record: CollectionRecord,
   field: CollectionField): string {
   if (field.type !== "lookup") return record.values[field.id] ?? "";
-  const relation = data.fields.find(item => item.id === field.relationFieldId && item.type === "relation");
-  const source = data.fields.find(item => item.id === field.targetFieldId && item.type !== "lookup");
+  // Resolve the canonical field by stable ID; callers may hold a pre-update field snapshot.
+  const current = data.fields.find(item => item.id === field.id && item.type === "lookup");
+  const relation = data.fields.find(item => item.id === current?.relationFieldId && item.type === "relation");
+  const source = data.fields.find(item => item.id === current?.targetFieldId && item.type !== "lookup" && item.type !== "formula");
   if (!relation || !source) return "";
   const linkedId = record.values[relation.id];
   const target = data.records.find(item => item.id === linkedId);
