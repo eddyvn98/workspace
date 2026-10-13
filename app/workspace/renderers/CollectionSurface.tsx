@@ -1,24 +1,16 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
+import { btnClass, inputClass, FieldEditor } from "./CollectionFieldEditor";
+import { CalendarView } from "./CollectionCalendarView";
+import { TimelineView } from "./CollectionTimelineView";
+import { MindMapView } from "./CollectionMindMapView";
 import { createPortal } from "react-dom";
 import type { CollectionBlockPayload, CollectionField, CollectionRecord, CollectionView } from "../collections/model";
 import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FIELD_TYPES, newId, primaryField, recordTitle, removeField, removeView, selectField, setParent, setRecordValue, updateField, updateView, VIEW_KINDS, visibleRecords } from "../collections/model";
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
 
 interface Props { data: CollectionBlockPayload; onChange: (next: CollectionBlockPayload) => void; readOnly: boolean }
-const inputClass = "rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100";
-const btnClass = "rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-40";
-const dayMs = 86400000;
-const iso = (date: Date) => date.toISOString().slice(0, 10);
-const parseDay = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date + "T12:00:00Z") : null;
-const asDay = (date: string) => { const parsed = parseDay(date); return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null; };
-
-function FieldEditor({ field, value, onSet, readOnly }: { field: CollectionField; value: string; onSet: (value: string) => void; readOnly: boolean }) {
-  if (field.type === "checkbox") return <input aria-label={field.name} type="checkbox" checked={value === "true"} disabled={readOnly} onChange={(e) => onSet(String(e.target.checked))} />;
-  if (field.type === "select") return <select aria-label={field.name} className={inputClass} value={value} disabled={readOnly} onChange={(e) => onSet(e.target.value)}><option value="">Unassigned</option>{(field.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}</select>;
-  return <input aria-label={field.name} className={inputClass + " w-full min-w-20"} value={value} type={field.type === "date" ? "date" : field.type === "number" ? "number" : field.type === "url" ? "url" : "text"} disabled={readOnly} onChange={(e) => onSet(e.target.value)} />;
-}
 
 export function CollectionSurface({ data, onChange, readOnly }: Props) {
   const [search, setSearch] = useState("");
@@ -95,30 +87,4 @@ export function CollectionSurface({ data, onChange, readOnly }: Props) {
     </div>
   </div>;
   return full && typeof document !== "undefined" ? createPortal(content, document.body) : content;
-}
-
-function CalendarView({ month, setMonth, rows, data, field, readOnly, patch }: { month: string; setMonth: (value: string) => void; rows: CollectionRecord[]; data: CollectionBlockPayload; field?: CollectionField; readOnly: boolean; patch: (r: CollectionRecord, f: CollectionField, v: string) => void }) {
-  const [year, m] = month.split("-").map(Number);
-  const first = new Date(Date.UTC(year, m - 1, 1, 12));
-  const offset = (first.getUTCDay() + 6) % 7;
-  const length = new Date(Date.UTC(year, m, 0, 12)).getUTCDate();
-  const days = Array.from({ length: Math.ceil((offset + length) / 7) * 7 }, (_, i) => i - offset + 1);
-  const shift = (n: number) => { const d = new Date(Date.UTC(year, m - 1 + n, 1)); setMonth(iso(d).slice(0, 7)); };
-  return <div className="space-y-2"><div className="flex items-center gap-2"><button className={btnClass} onClick={() => shift(-1)}>←</button><strong>{month}</strong><button className={btnClass} onClick={() => shift(1)}>→</button>{!field && <span className="text-xs text-amber-600">Add a date field to use calendar</span>}</div><div className="grid grid-cols-7 gap-1 text-xs">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((x) => <strong key={x} className="text-center">{x}</strong>)}{days.map((day, i) => { const dateText = year + "-" + String(m).padStart(2, "0") + "-" + String(day).padStart(2, "0"); const matches = rows.filter((r) => field && r.values[field.id] === dateText); return <div key={i} className={"min-h-16 rounded border p-1 dark:border-slate-700 " + (day < 1 || day > length ? "opacity-25" : "")} onDragOver={(e) => { if (!readOnly) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/collection-record"); const record = rows.find((r) => r.id === id); if (record && field && day >= 1 && day <= length) patch(record, field, dateText); }}><span className="text-slate-500">{day >= 1 && day <= length ? day : ""}</span>{matches.map((r) => <div key={r.id} draggable={!readOnly} onDragStart={(e) => e.dataTransfer.setData("text/collection-record", r.id)} className="mt-1 truncate rounded bg-blue-100 p-1 text-blue-900" title={recordTitle(data, r)}>{recordTitle(data, r)}</div>)}</div>; })}</div><div className="text-xs text-slate-500">Drag events to reschedule. Records without a date are available in Table view.</div></div>;
-}
-
-function TimelineView({ rows, data, start, end, readOnly, patch }: { rows: CollectionRecord[]; data: CollectionBlockPayload; start?: CollectionField; end?: CollectionField; readOnly: boolean; patch: (r: CollectionRecord, f: CollectionField, v: string) => void }) {
-  const dated = rows.map((r) => ({ record: r, start: asDay(r.values[start?.id ?? ""] || ""), end: asDay(r.values[end?.id ?? ""] || "") })).filter((v) => v.start);
-  const min = dated.length ? Math.min(...dated.map((v) => v.start!.getTime())) : Date.now();
-  const max = dated.length ? Math.max(...dated.map((v) => (v.end ?? v.start)!.getTime()), min + 7 * dayMs) : min + 7 * dayMs;
-  const span = Math.max(dayMs, max - min + dayMs);
-  return <div className="min-w-[500px] space-y-2 text-xs">{!start && <p className="text-amber-600">Add a date field for timeline.</p>}{dated.map((v) => <div key={v.record.id} className="grid grid-cols-[130px_1fr] items-center gap-2"><span className="truncate" title={recordTitle(data, v.record)}>{recordTitle(data, v.record)}</span><div className="relative h-7 rounded bg-slate-100 dark:bg-slate-800"><div className="absolute top-1 h-5 min-w-2 rounded bg-blue-500" style={{ left: ((v.start!.getTime() - min) / span * 100) + "%", width: (Math.max(dayMs, (v.end ?? v.start)!.getTime() - v.start!.getTime() + dayMs) / span * 100) + "%" }} /></div></div>)}<div className="flex gap-2">{start && <span>Start: {iso(new Date(min))}</span>}<span>End: {iso(new Date(max))}</span></div>{dated.map((v) => <div key={v.record.id + "-edit"} className="flex flex-wrap items-center gap-2 border-t py-1"><span className="w-32 truncate">{recordTitle(data, v.record)}</span>{start && <FieldEditor field={start} value={v.record.values[start.id] || ""} onSet={(x) => patch(v.record, start, x)} readOnly={readOnly} />}{end && <FieldEditor field={end} value={v.record.values[end.id] || ""} onSet={(x) => patch(v.record, end, x)} readOnly={readOnly} />}</div>)}</div>;
-}
-
-function MindMapView({ rows, data, readOnly, onChange }: { rows: CollectionRecord[]; data: CollectionBlockPayload; readOnly: boolean; onChange: (next: CollectionBlockPayload) => void }) {
-  const ids = new Set(rows.map((r) => r.id));
-  const children = new Map<string | null, CollectionRecord[]>();
-  rows.forEach((r) => { const parent = r.parentId && ids.has(r.parentId) ? r.parentId : null; children.set(parent, [...(children.get(parent) ?? []), r]); });
-  const render = (parent: string | null, depth: number, ancestors: Set<string>): React.ReactNode => depth > 40 ? null : (children.get(parent) ?? []).filter((r) => !ancestors.has(r.id)).map((r) => <div key={r.id} className="ml-3 border-l-2 border-slate-200 pl-3 dark:border-slate-700"><div className="my-1 flex flex-wrap items-center gap-2 rounded-lg border bg-white p-2 dark:border-slate-700 dark:bg-slate-900"><strong className="min-w-24 text-xs">{recordTitle(data, r)}</strong><select aria-label={"Parent of " + recordTitle(data, r)} className={inputClass} disabled={readOnly} value={r.parentId && ids.has(r.parentId) ? r.parentId : ""} onChange={(e) => onChange(setParent(data, r.id, e.target.value || null))}><option value="">Root</option>{rows.filter((x) => x.id !== r.id).map((x) => <option key={x.id} value={x.id}>{recordTitle(data, x)}</option>)}</select></div>{render(r.id, depth + 1, new Set([...ancestors, r.id]))}</div>);
-  return <div className="space-y-2"><p className="text-xs text-slate-500">Hierarchy uses record parent relationships. Edit record titles in Table view.</p>{render(null, 0, new Set())}</div>;
 }
