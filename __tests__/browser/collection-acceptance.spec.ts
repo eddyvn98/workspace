@@ -185,3 +185,28 @@ test("Kanban dnd-kit drag changes persisted status, respects read-only mode", as
   await expect(reopened.getByRole("button", { name: "Drag Drag test record" })).toBeDisabled();
   await expect(reopened.getByRole("combobox", { name: "Status for Drag test record" })).toBeDisabled();
 });
+test("Calendar month/week/day navigation and date persistence", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  const block = page.getByTestId("collection-block");
+  await block.getByRole("button", { name: "+ Record" }).click();
+  await block.getByRole("textbox", { name: "Name", exact: true }).fill("Calendar task");
+  await block.getByLabel("Due", { exact: true }).first().fill("2026-10-13");
+  await block.getByRole("button", { name: "Calendar", exact: true }).click();
+  const calendar = block.getByTestId("collection-calendar");
+  await calendar.getByLabel("Calendar selected day").fill("2026-10-13");
+  await expect(calendar.locator('[data-date="2026-10-13"]')).toContainText("Calendar task");
+  await calendar.getByLabel("Calendar mode").selectOption("week");
+  await expect(calendar.locator('[data-date="2026-10-13"]')).toContainText("Calendar task");
+  await calendar.getByLabel("Calendar mode").selectOption("day");
+  await expect(calendar.getByTestId("collection-calendar-day")).toHaveCount(1);
+  await calendar.getByRole("button", { name: "Next calendar period" }).click();
+  await expect(calendar.getByTestId("collection-calendar-period")).toHaveText("2026-10-14");
+  await page.reload();
+  const reopened = page.getByTestId("collection-block");
+  await expect(reopened.getByTestId("collection-calendar").locator('[data-date="2026-10-13"]'))
+    .toContainText("Calendar task");
+  await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await expect(reopened.getByTestId("collection-calendar").getByLabel("Due", { exact: true })).toBeDisabled();
+});
