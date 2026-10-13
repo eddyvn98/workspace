@@ -202,8 +202,11 @@ test("Calendar month/week/day navigation and date persistence", async ({ page })
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "+ Record" }).click();
   await block.getByRole("textbox", { name: "Name", exact: true }).fill("Calendar task");
-  await block.getByLabel("Due", { exact: true }).first().fill("2026-10-13");
+  await block.getByLabel("Start", { exact: true }).first().fill("2026-10-13");
   await block.getByRole("button", { name: "Calendar", exact: true }).click();
+  await block.getByRole("button", { name: "Settings" }).click();
+  await expect(block.getByLabel("Date", { exact: true }).locator("option:checked")).toHaveText("Start");
+  await expect(block.getByLabel("End", { exact: true })).toHaveCount(0);
   const calendar = block.getByTestId("collection-calendar");
   await calendar.getByLabel("Calendar selected day").fill("2026-10-13");
   await expect(calendar.locator('[data-date="2026-10-13"]')).toContainText("Calendar task");
@@ -218,5 +221,5 @@ test("Calendar month/week/day navigation and date persistence", async ({ page })
   await expect(reopened.getByTestId("collection-calendar").locator('[data-date="2026-10-13"]'))
     .toContainText("Calendar task");
   await page.getByRole("checkbox", { name: "Read-only" }).check();
-  await expect(reopened.getByTestId("collection-calendar").getByLabel("Due", { exact: true })).toBeDisabled();
+  await expect(reopened.getByTestId("collection-calendar").getByLabel("Start", { exact: true })).toBeDisabled();
 });

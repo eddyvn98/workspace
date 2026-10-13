@@ -52,14 +52,22 @@ export function createCollection(): CollectionBlockPayload {
   const views = VIEW_KINDS.map((kind) => ({
     id: newId(), kind, name: kind === "mindmap" ? "Mind Map" : kind.charAt(0).toUpperCase() + kind.slice(1),
     ...(kind === "kanban" ? { groupFieldId: fields[1].id } : {}),
-    ...(kind === "calendar" || kind === "timeline" ? { dateFieldId: fields[3].id, endDateFieldId: fields[3].id } : {}),
+    ...(kind === "calendar" || kind === "timeline" ? { dateFieldId: fields[2].id, endDateFieldId: fields[3].id } : {}),
   }));
   return { version: 1, title: "Untitled collection", fields, records: [], views, activeViewId: views[0].id };
 }
 
 export function normalizeCollection(input: CollectionBlockPayload | null | undefined): CollectionBlockPayload {
   if (!input || !Array.isArray(input.fields) || !Array.isArray(input.records) || !Array.isArray(input.views)) return createCollection();
-  const views = input.views.length ? input.views : createCollection().views;
+  const originalViews = input.views.length ? input.views : createCollection().views;
+  const dates = input.fields.filter(field => field.type === "date");
+  // Lazily migrate legacy defaults that pointed both ends at Due.
+  // Never change record IDs, field IDs, or already distinct user choices.
+  const views = originalViews.map(view => {
+    if ((view.kind !== "timeline" && view.kind !== "calendar") || dates.length < 2
+      || view.dateFieldId !== view.endDateFieldId) return view;
+    return { ...view, dateFieldId: dates[0].id, endDateFieldId: dates[1].id };
+  });
   return { ...input, version: 1, title: input.title || "Untitled collection", views, activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
 }
 export function primaryField(data: CollectionBlockPayload): CollectionField | undefined {
@@ -139,10 +147,10 @@ export function updateField(data: CollectionBlockPayload, fieldId: string, patch
 }
 export function addView(data: CollectionBlockPayload, kind: CollectionViewKind): CollectionBlockPayload {
   const field = kind === "kanban" ? data.fields.find((f) => f.type === "select") : undefined;
-  const date = data.fields.find((f) => f.type === "date");
+  const dates = data.fields.filter((f) => f.type === "date");
   const view: CollectionView = { id: newId(), kind, name: kind === "mindmap" ? "Mind Map" : kind.charAt(0).toUpperCase() + kind.slice(1),
     ...(field ? { groupFieldId: field.id } : {}),
-    ...(kind === "calendar" || kind === "timeline" ? { dateFieldId: date?.id, endDateFieldId: date?.id } : {}) };
+    ...(kind === "calendar" || kind === "timeline" ? { dateFieldId: dates[0]?.id, endDateFieldId: dates[1]?.id ?? dates[0]?.id } : {}) };
   return { ...data, views: [...data.views, view], activeViewId: view.id };
 }
 export function removeView(data: CollectionBlockPayload, viewId: string): CollectionBlockPayload {
