@@ -73,7 +73,6 @@ function result(
   const focusBlockIds = [...new Set(receipts.filter((item) => item.persisted && !NON_BLOCK_TARGET_ACTIONS.has(item.actionType)).flatMap((item) => item.targetIds).filter((id) => id !== "board"))];
   return { answer, turnId: input.turnId, conversationId, rounds, status, receipts, appliedSummaries, unresolvedSummaries, focusBlockIds, verifiedRecordIds: verifiedCollectionRecordIds(readResults) };
 }
-
 export async function runWorkspaceAgentTurn(
   input: WorkspaceRuntimeRequest,
   dependencies: Partial<WorkspaceRuntimeDependencies> = {},
