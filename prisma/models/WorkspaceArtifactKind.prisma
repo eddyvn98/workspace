@@ -1,0 +1,7 @@
+enum WorkspaceArtifactKind {
+  /// A rendered PDF standing in for an Office document (docx/xlsx/pptx/…)
+  /// so the same PDF-preview iframe path (FileBlock.tsx) can show it. Not
+  /// used for a version whose own mimeType is already application/pdf or
+  /// image/* — those preview directly, no artifact needed.
+  PDF_PREVIEW
+}

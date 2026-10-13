@@ -1,0 +1,25 @@
+model WorkspaceKnowledgeChunk {
+  id               String                       @id @default(cuid())
+  boardId          String
+  sourceType       WorkspaceKnowledgeSourceType
+  sourceDocumentId String?
+  /// Set for a BLOCK-sourced chunk; null for a DOCUMENT one.
+  blockId          String?
+  content          String                       @db.Text
+  createdAt        DateTime                     @default(now())
+  /// 384-dim vector from all-MiniLM-L6-v2, computed in-process by
+  /// lib/embeddings.ts — no embedding-provider key needed. A plain Float[]
+  /// rather than pgvector, for the same reason legacy chose one: the `vector`
+  /// extension is not installed here, and at a few thousand chunks per board
+  /// similarity in JS is not the bottleneck. Prisma list fields are never
+  /// null, so an empty array means "not embedded yet".
+  embedding        Float[]                      @default([])
+
+  board          WorkspaceBoard           @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  sourceDocument WorkspaceSourceDocument? @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([boardId])
+  /// The block-resync path diffs one board's BLOCK-sourced chunks.
+  @@index([boardId, sourceType])
+  @@map("workspace_knowledge_chunks")
+}

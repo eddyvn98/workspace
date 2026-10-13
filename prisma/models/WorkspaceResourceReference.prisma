@@ -1,0 +1,18 @@
+model WorkspaceResourceReference {
+  id         String   @id @default(cuid())
+  boardId    String
+  blockId    String
+  resourceId String
+  /// Null means "follow latest version"; set means the reference is pinned to
+  /// one immutable version.
+  versionId  String?
+  createdAt  DateTime @default(now())
+
+  board    WorkspaceBoard        @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  resource WorkspaceResource     @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  version  WorkspaceFileVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+
+  @@index([boardId, blockId])
+  @@index([resourceId])
+  @@map("workspace_resource_references")
+}

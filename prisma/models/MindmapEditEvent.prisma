@@ -1,0 +1,31 @@
+model MindmapEditEvent {
+  id           String   @id @default(cuid())
+  mindmapId    String
+  actorEmail   String
+  /// e.g. "yjs.update"/"ai.update" (always present, raw-update fallback),
+  /// or a friendlier structured label when cheaply derivable from the diff:
+  /// "node.add", "node.update", "node.delete", "relationship.add",
+  /// "relationship.delete", "snapshot.restore" (optionally "ai."-prefixed
+  /// for edits applied via the server-side AI/MCP connector) — see
+  /// docker/mindmap-ws/src/server.js's classifyStructuredOpType.
+  opType       String
+  /// Raw Yjs update bytes (or serialized op payload) for replay/audit.
+  payload      Bytes
+  /// Small post-edit node preview keyed by nodeId. This lets the per-node
+  /// history show what each person left behind without decoding raw Yjs bytes.
+  /// Older events may be null because this field was added after the log.
+  nodeVersions Json?
+  /// Node ids touched by this update (best-effort, derived from the same
+  /// diff as opType) — powers the per-node "last edited by/at" hover
+  /// indicator without needing to decode `payload` on every read. Empty for
+  /// updates where no top-level `nodes` map key changed (e.g. a pure title
+  /// rename in `meta`).
+  nodeIds      String[] @default([])
+  createdAt    DateTime @default(now())
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@index([mindmapId, createdAt])
+  @@index([mindmapId, actorEmail])
+  @@map("mindmap_edit_events")
+}

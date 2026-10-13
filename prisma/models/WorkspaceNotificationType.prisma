@@ -1,0 +1,11 @@
+enum WorkspaceNotificationType {
+  NEW_COMMENT
+  /// Somebody replied to the recipient's own comment. Higher signal than
+  /// NEW_COMMENT and sent instead of it, so one reply produces one row per
+  /// person: the parent's author gets REPLY, everyone else NEW_COMMENT.
+  REPLY
+  SHARE_INVITE
+  /// A collaborator voluntarily left the board; recipient is the owner —
+  /// same trigger as MindmapNotificationType.SHARE_LEFT.
+  SHARE_LEFT
+}

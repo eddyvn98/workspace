@@ -1,0 +1,22 @@
+model WorkspaceFileVersion {
+  id             String   @id @default(cuid())
+  resourceId     String
+  /// 1-based, sequential per resource.
+  versionNumber  Int
+  storageKey     String
+  sizeBytes      BigInt
+  /// sha256 hex of the stored bytes.
+  checksum       String
+  mimeType       String
+  /// Lower-cased and CHECK-constrained like every other workspace identity
+  /// column — see 20260904100000_normalize_workspace_emails.
+  createdByEmail String
+  createdAt      DateTime @default(now())
+
+  resource   WorkspaceResource            @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  references WorkspaceResourceReference[]
+  artifacts  WorkspaceArtifact[]
+
+  @@unique([resourceId, versionNumber])
+  @@map("workspace_file_versions")
+}

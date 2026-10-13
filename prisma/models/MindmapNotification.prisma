@@ -1,0 +1,19 @@
+model MindmapNotification {
+  id             String                  @id @default(cuid())
+  mindmapId      String
+  nodeId         String
+  commentId      String
+  type           MindmapNotificationType
+  recipientEmail String
+  actorEmail     String
+  /// Truncated comment body, so the bell panel can render a preview without
+  /// a join back to MindmapComment (which may since have been deleted).
+  bodyPreview    String
+  read           Boolean                 @default(false)
+  createdAt      DateTime                @default(now())
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@index([recipientEmail, read, createdAt])
+  @@map("mindmap_notifications")
+}

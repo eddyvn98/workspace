@@ -1,0 +1,27 @@
+model MindmapKnowledgeChunk {
+  id               String                     @id @default(cuid())
+  mindmapId        String
+  sourceType       MindmapKnowledgeSourceType
+  sourceDocumentId String?
+  nodeId           String?
+  content          String                     @db.Text
+  createdAt        DateTime                   @default(now())
+  // 384-dim embedding from all-MiniLM-L6-v2 via @xenova/transformers — runs
+  // locally, no embedding-provider API key needed. Plain Postgres float array
+  // rather than pgvector: the `vector` extension isn't installed on this
+  // Postgres instance and isn't needed at this data scale (a few thousand
+  // chunks per mindmap at most) — cosine similarity is computed in JS in
+  // lib/mindmap/knowledge-repository.ts searchKnowledgeByEmbedding(). Revisit
+  // pgvector only if a single mindmap's chunk count grows large enough that
+  // brute-force JS similarity becomes the bottleneck. Prisma list fields are
+  // always non-null (default `[]`) — an empty array means "no embedding yet"
+  // and such rows are still valid full-text-only search hits.
+  embedding        Float[]                    @default([])
+
+  mindmap        Mindmap                @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+  sourceDocument MindmapSourceDocument? @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([mindmapId])
+  @@index([mindmapId, sourceType])
+  @@map("mindmap_knowledge_chunks")
+}

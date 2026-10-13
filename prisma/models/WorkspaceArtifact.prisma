@@ -1,0 +1,19 @@
+model WorkspaceArtifact {
+  id         String                  @id @default(cuid())
+  versionId  String
+  kind       WorkspaceArtifactKind
+  status     WorkspaceArtifactStatus
+  /// Set only when status is READY.
+  storageKey String?
+  mimeType   String?
+  /// Set only when status is FAILED — surfaced for operator debugging, never
+  /// shown verbatim to a viewer (see the resources route's error mapping).
+  error      String?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  version WorkspaceFileVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, kind])
+  @@map("workspace_artifacts")
+}

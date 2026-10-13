@@ -1,0 +1,23 @@
+model WorkspaceBoardSnapshot {
+  id      String @id @default(cuid())
+  boardId String
+
+  blocks     Json
+  blockOrder Json
+  connectors Json
+
+  /// Optional human-friendly label for a manual "save version" checkpoint;
+  /// null for autosave-triggered checkpoints.
+  label              String?
+  createdBy          String
+  createdAt          DateTime @default(now())
+  /// Revision carried by a legacy Mindmap snapshot. Workspace history does
+  /// not use it for conflict detection, but retaining it keeps old snapshot
+  /// provenance available for audits and future restore tooling.
+  legacyBaseRevision Int?
+
+  board WorkspaceBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId, createdAt])
+  @@map("workspace_board_snapshots")
+}

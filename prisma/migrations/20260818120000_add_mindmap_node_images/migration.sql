@@ -1,0 +1,1 @@
+ALTER TABLE "mindmap_nodes" ADD COLUMN IF NOT EXISTS "images" JSONB;

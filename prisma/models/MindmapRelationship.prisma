@@ -1,0 +1,16 @@
+model MindmapRelationship {
+  id         String   @id @default(cuid())
+  mindmapId  String
+  fromNodeId String
+  toNodeId   String
+  /// Connector visuals: type, arrowheads, line dash/width/color, labels, etc.
+  /// — see components/features/chat/mindmap/mindmap-types.ts MindmapRelationship.
+  data       Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@index([mindmapId])
+  @@map("mindmap_relationships")
+}

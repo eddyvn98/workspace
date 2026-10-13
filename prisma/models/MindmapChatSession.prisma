@@ -1,0 +1,14 @@
+model MindmapChatSession {
+  id             String   @id @default(cuid())
+  mindmapId      String
+  createdByEmail String
+  title          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  mindmap  Mindmap              @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+  messages MindmapChatMessage[]
+
+  @@index([mindmapId, createdByEmail, updatedAt])
+  @@map("mindmap_chat_sessions")
+}

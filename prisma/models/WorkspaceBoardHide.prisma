@@ -1,0 +1,12 @@
+model WorkspaceBoardHide {
+  id        String   @id @default(cuid())
+  boardId   String
+  userEmail String
+  hiddenAt  DateTime @default(now())
+
+  board WorkspaceBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userEmail])
+  @@index([userEmail, hiddenAt])
+  @@map("workspace_board_hides")
+}

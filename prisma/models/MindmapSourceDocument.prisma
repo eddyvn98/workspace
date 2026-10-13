@@ -1,0 +1,15 @@
+model MindmapSourceDocument {
+  id              String   @id @default(cuid())
+  mindmapId       String
+  filename        String
+  mimeType        String
+  extractedText   String   @db.Text
+  uploadedByEmail String
+  createdAt       DateTime @default(now())
+
+  mindmap Mindmap                 @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+  chunks  MindmapKnowledgeChunk[]
+
+  @@index([mindmapId])
+  @@map("mindmap_source_documents")
+}

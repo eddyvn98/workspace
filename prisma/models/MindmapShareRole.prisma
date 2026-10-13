@@ -1,0 +1,4 @@
+enum MindmapShareRole {
+  VIEWER
+  EDITOR
+}

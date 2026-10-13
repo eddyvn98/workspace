@@ -1,0 +1,10 @@
+enum MindmapNotificationType {
+  MENTION
+  REPLY
+  NEW_COMMENT
+  /// Someone gave you access to a mindmap. Carries no comment, so nodeId and
+  /// commentId are empty strings and bodyPreview holds the map title.
+  SHARE_INVITE
+  /// A collaborator voluntarily left the mindmap; recipient is the owner.
+  SHARE_LEFT
+}

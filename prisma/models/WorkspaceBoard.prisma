@@ -1,0 +1,89 @@
+model WorkspaceBoard {
+  /// Client-generated (crypto.randomUUID()), not server-assigned — matches the
+  /// same id already used for the localStorage-only board so a board created
+  /// before this model existed can be adopted into the DB without remapping.
+  id              String  @id
+  /// Set when this board was created by the one-way Mindmap -> Workspace
+  /// cutover. It is deliberately a soft reference: the legacy tables remain
+  /// the rollback copy and may be retired independently later.
+  sourceMindmapId String? @unique
+  ownerEmail      String
+  title           String
+  /// Bumped on every write; a client sends the revision its local snapshot was
+  /// last saved at, and a stale write is refused with 409 rather than silently
+  /// overwriting newer content — same "why" as Mindmap.revision above, without
+  /// the multi-process realtime-writer complexity.
+  ///
+  /// This comment described the refusal long before anything performed it: the
+  /// column was bumped on every write and never compared, so two people
+  /// editing one board did not conflict — the second save just overwrote the
+  /// first, silently. Enforced now by a compare-and-swap in
+  /// app/api/workspaces/[id]/route.ts PUT.
+  revision        Int     @default(0)
+
+  blocks     Json
+  blockOrder Json
+  connectors Json
+  camera     Json
+  /// Ordered list of saved camera bookmarks (CameraFrame[] — see
+  /// app/workspace/types/camera.ts), each pointing at any region of the
+  /// board regardless of what block types live there. Drives the
+  /// "Presentation" panel/mode: cycling frames pans/zooms the camera instead
+  /// of extracting content into a separate slide, so literally any block can
+  /// be presented. Optional/nullable so existing rows need no backfill.
+  frames     Json?
+
+  /// Map-level layout settings, same "why kept alongside not inside the tree"
+  /// rationale as Mindmap.layoutType above. Persisted server-side so a board
+  /// reopened from a different browser/device (no localStorage cache) or via
+  /// a share link keeps its last-saved layout instead of resetting to the
+  /// hierarchy/right/one-side defaults.
+  treeLayoutDirection         String?
+  treeGrowthMode              String?
+  treeLayoutFamily            String?
+  treeTimelineBranchMode      String?
+  treeTimelineDescendantStyle String?
+  treeCatalogDescendantStyle  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Anonymous, no-login read-only share link — same pattern as
+  /// Mindmap.publicView* above, kept on its own field set (not reused) to
+  /// keep this engine independent. publicShareToken can GET the board
+  /// through app/api/workspaces/public/[token]/route.ts with no auth at all;
+  /// the token itself is the credential.
+  publicShareEnabled   Boolean   @default(false)
+  publicShareToken     String?   @unique
+  publicShareExpiresAt DateTime?
+
+  /// Legacy Mindmap public-link alias kept during the one-way cutover. This
+  /// lets an old /mindmap/view/<token> URL open the same Workspace board.
+  legacyPublicShareEnabled   Boolean   @default(false)
+  legacyPublicShareToken     String?   @unique
+  legacyPublicShareExpiresAt DateTime?
+
+  /// Owner's choice about how much per-block edit history collaborators may
+  /// see — same semantics as Mindmap.shareFullHistory. false (default): a
+  /// collaborator only sees edit events from the moment they were invited,
+  /// so work done before the invite stays private to the owner. true: the
+  /// whole history is shared along with the board.
+  shareFullHistory Boolean @default(false)
+
+  shares             WorkspaceBoardShare[]
+  comments           WorkspaceBoardComment[]
+  notifications      WorkspaceNotification[]
+  presence           WorkspacePresence[]
+  snapshots          WorkspaceBoardSnapshot[]
+  editEvents         WorkspaceBoardEditEvent[]
+  hides              WorkspaceBoardHide[]
+  views              WorkspaceBoardView[]
+  sourceDocuments    WorkspaceSourceDocument[]
+  knowledgeChunks    WorkspaceKnowledgeChunk[]
+  resources          WorkspaceResource[]
+  resourceReferences WorkspaceResourceReference[]
+  chatMigrations     WorkspaceBoardChatMigration[]
+
+  @@index([ownerEmail])
+  @@map("workspace_boards")
+}

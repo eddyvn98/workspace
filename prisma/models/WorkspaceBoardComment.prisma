@@ -1,0 +1,26 @@
+model WorkspaceBoardComment {
+  id          String   @id @default(cuid())
+  boardId     String
+  blockId     String
+  authorEmail String
+  body        String   @db.Text
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  /// Null for a top-level comment; set for a reply. One level deep only —
+  /// a reply's own parentId always points at a top-level comment, never at
+  /// another reply (enforced in the API, not the schema).
+  parentId    String?
+
+  board   WorkspaceBoard          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  parent  WorkspaceBoardComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies WorkspaceBoardComment[] @relation("CommentReplies")
+
+  @@index([boardId, blockId])
+  /// The list route reads a whole board oldest-first; the index above
+  /// serves that filter by prefix but not the ordering, so without this
+  /// every thread fetch sorts.
+  @@index([boardId, createdAt])
+  @@index([parentId])
+  @@map("workspace_board_comments")
+}

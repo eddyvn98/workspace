@@ -1,0 +1,12 @@
+model MindmapSidebarHide {
+  id        String   @id @default(cuid())
+  mindmapId String
+  userEmail String
+  hiddenAt  DateTime @default(now())
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@unique([mindmapId, userEmail])
+  @@index([userEmail, hiddenAt])
+  @@map("mindmap_sidebar_hides")
+}

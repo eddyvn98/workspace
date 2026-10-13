@@ -1,0 +1,1 @@
+ALTER TABLE "mindmap_knowledge_chunks" ADD COLUMN "embedding" DOUBLE PRECISION[] NOT NULL DEFAULT ARRAY[]::DOUBLE PRECISION[];

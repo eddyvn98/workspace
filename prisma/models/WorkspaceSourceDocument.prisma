@@ -1,0 +1,26 @@
+model WorkspaceSourceDocument {
+  id              String   @id @default(cuid())
+  boardId         String
+  filename        String
+  mimeType        String
+  extractedText   String   @db.Text
+  /// Lower-cased and CHECK-constrained like every other workspace identity
+  /// column — see 20260904100000_normalize_workspace_emails.
+  uploadedByEmail String
+  createdAt       DateTime @default(now())
+
+  board    WorkspaceBoard            @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  chunks   WorkspaceKnowledgeChunk[]
+  /// Forward-compat seam for Checkpoint 5 (workspace-resource-roadmap.md): set
+  /// once a later checkpoint starts persisting original bytes alongside the
+  /// extracted text of a newly-uploaded document. Left null for every row
+  /// created before this column existed — nothing backfills it.
+  resource WorkspaceResource?
+
+  /// The list route reads one board's documents newest-first, so the index
+  /// carries createdAt. Legacy indexes mindmapId alone and leaves its own
+  /// ordering unsupported; following the query rather than copying the shape
+  /// is the same correction made for the notification bell.
+  @@index([boardId, createdAt])
+  @@map("workspace_source_documents")
+}

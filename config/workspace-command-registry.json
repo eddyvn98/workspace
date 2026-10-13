@@ -1,0 +1,671 @@
+{
+  "version": 8,
+  "commands": [
+    {
+      "name": "add_table_sheet",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "rename_table_sheet",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_table_sheet",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_table_sheet",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "reorder_table_sheets",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "select_table_sheet",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "rename_topic",
+      "category": "content",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "update_node",
+      "category": "content",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_rich_text",
+      "category": "content",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "update_description",
+      "category": "content",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "update_style",
+      "category": "content",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "update_image",
+      "category": "content",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_icon",
+      "category": "content",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "search_replace",
+      "category": "content",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "rename_board",
+      "category": "content",
+      "target": "root",
+      "mutation": true
+    },
+    {
+      "name": "create_block",
+      "category": "content",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "move_node",
+      "category": "tree",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "attach_to_parent",
+      "category": "tree",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "add_child",
+      "category": "tree",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "add_sibling",
+      "category": "tree",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_node",
+      "category": "tree",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_node",
+      "category": "tree",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_map",
+      "category": "tree",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "copy_branch_to_map",
+      "category": "tree",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "reorder_nodes",
+      "category": "tree",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "replace_children",
+      "category": "tree",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_transform",
+      "category": "layout",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "update_z_order",
+      "category": "layout",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "arrange_selection",
+      "category": "layout",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "connect_nodes",
+      "category": "relationship",
+      "target": "two",
+      "mutation": true
+    },
+    {
+      "name": "update_relationship",
+      "category": "relationship",
+      "target": "two",
+      "mutation": true
+    },
+    {
+      "name": "disconnect_nodes",
+      "category": "relationship",
+      "target": "two",
+      "mutation": true
+    },
+    {
+      "name": "create_map",
+      "category": "map",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "update_map_style",
+      "category": "map",
+      "target": "root",
+      "mutation": true
+    },
+    {
+      "name": "create_flowchart",
+      "category": "diagram",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "extend_flowchart",
+      "category": "diagram",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "create_swimlane",
+      "category": "diagram",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "repair_connector",
+      "category": "relationship",
+      "target": "two",
+      "mutation": true
+    },
+    {
+      "name": "repair_flowchart",
+      "category": "diagram",
+      "target": "two",
+      "mutation": true
+    },
+    {
+      "name": "update_table_cell",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_table_cells",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "insert_table_row",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "insert_table_column",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_table_row",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_table_column",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_table_cell_format",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_table_column",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_table_formula",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "add_slide",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_slide",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_slide",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "reorder_slides",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_slide",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_slide_deck",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "create_slide_deck",
+      "category": "presentation",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "update_slides",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "create_frame",
+      "category": "presentation",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "update_frame",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_frame",
+      "category": "presentation",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "reorder_frames",
+      "category": "presentation",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "create_shape",
+      "category": "shape",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "wrap_blocks_in_frame",
+      "category": "shape",
+      "target": "one-or-more",
+      "mutation": true
+    },
+    {
+      "name": "update_shape",
+      "category": "shape",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_shape",
+      "category": "shape",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_shape",
+      "category": "shape",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "create_freehand",
+      "category": "freehand",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "update_freehand",
+      "category": "freehand",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "delete_freehand",
+      "category": "freehand",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_freehand",
+      "category": "freehand",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "undo",
+      "category": "history",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "redo",
+      "category": "history",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "add_comment",
+      "category": "collaboration",
+      "target": "one",
+      "mutation": false
+    },
+    {
+      "name": "list_comments",
+      "category": "collaboration",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "edit_comment",
+      "category": "collaboration",
+      "target": "one",
+      "mutation": false
+    },
+    {
+      "name": "resolve_comment",
+      "category": "collaboration",
+      "target": "one",
+      "mutation": false
+    },
+    {
+      "name": "reopen_comment",
+      "category": "collaboration",
+      "target": "one",
+      "mutation": false
+    },
+    {
+      "name": "delete_comment",
+      "category": "collaboration",
+      "target": "one",
+      "mutation": false
+    },
+    {
+      "name": "list_versions",
+      "category": "board",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "create_version",
+      "category": "board",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "restore_version",
+      "category": "board",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "export_board",
+      "category": "board",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "import_markdown",
+      "category": "board",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "list_shares",
+      "category": "board",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "share_board",
+      "category": "board",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "remove_share",
+      "category": "board",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "set_public_link",
+      "category": "board",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "list_files",
+      "category": "file",
+      "target": "none",
+      "mutation": false
+    },
+    {
+      "name": "add_file_block",
+      "category": "file",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "pin_pdf_page",
+      "category": "file",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "focus_view",
+      "category": "view",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "embed_table_in_doc",
+      "category": "content",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "update_table_options",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "move_table_row",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "move_table_column",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_table_row",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "duplicate_table_column",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "paste_table_range",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "import_table",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "sort_table_range",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "freeze_table_panes",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "hide_table_rows",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "hide_table_columns",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "set_table_validation",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "add_table_conditional_format",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "set_table_filter",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "set_table_link",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "set_table_note",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "set_table_sheet_options",
+      "category": "table",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "create_image_flow",
+      "category": "image_flow",
+      "target": "none",
+      "mutation": true
+    },
+    {
+      "name": "update_image_flow_step",
+      "category": "image_flow",
+      "target": "one",
+      "mutation": true
+    },
+    {
+      "name": "connect_image_flow",
+      "category": "image_flow",
+      "target": "two",
+      "mutation": true
+    }
+  ]
+}

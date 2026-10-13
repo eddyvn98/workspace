@@ -1,0 +1,4 @@
+enum WorkspaceResourceKind {
+  DOCUMENT
+  IMAGE
+}

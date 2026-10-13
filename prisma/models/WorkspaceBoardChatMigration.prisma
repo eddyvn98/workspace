@@ -1,0 +1,12 @@
+model WorkspaceBoardChatMigration {
+  id         String   @id @default(cuid())
+  boardId    String
+  userEmail  String
+  migratedAt DateTime @default(now())
+
+  board WorkspaceBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userEmail])
+  @@index([userEmail])
+  @@map("workspace_board_chat_migrations")
+}

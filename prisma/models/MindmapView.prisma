@@ -1,0 +1,12 @@
+model MindmapView {
+  id         String   @id @default(cuid())
+  mindmapId  String
+  userEmail  String
+  lastSeenAt DateTime @default(now())
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@unique([mindmapId, userEmail])
+  @@index([userEmail])
+  @@map("mindmap_views")
+}

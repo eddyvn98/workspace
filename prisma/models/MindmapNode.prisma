@@ -1,0 +1,45 @@
+model MindmapNode {
+  id               String   @id @default(cuid())
+  mindmapId        String
+  parentId         String?
+  order            Int      @default(0)
+  topic            String
+  description      String?
+  icon             String?
+  expanded         Boolean  @default(true)
+  x                Float?
+  y                Float?
+  width            Float?
+  height           Float?
+  /// True when this node has been detached from its structural parent's
+  /// auto-layout position in free-layout mode (dragged to a manual spot).
+  floating         Boolean? @default(false)
+  /// True when this floating node is the root of a detached map and must keep
+  /// its own layout controls instead of following the page-level fallback.
+  floatingMapRoot  Boolean?
+  /// Embedded image — url or base64 data URI. Legacy single-image slot, kept
+  /// for backward compatibility with rows written before the `images` array.
+  image            String?  @db.Text
+  /// Multiple images (gallery/filmstrip). Non-empty `images` takes precedence
+  /// over `image` everywhere it's read — see mindmap-types.ts MindmapNode.
+  images           Json?
+  /// Optional URL attached to the node title.
+  link             String?  @db.Text
+  /// Table layout and cell membership for table nodes.
+  table            Json?
+  tableId          String?
+  tableCellId      String?
+  /// Arbitrary NodeStyle JSON blob (shape, colors, typography, line style, etc.)
+  /// — see components/features/chat/mindmap/mindmap-types.ts NodeStyle.
+  style            Json?
+  /// Typography overrides for the description text, independent from the title.
+  descriptionStyle Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@index([mindmapId])
+  @@index([mindmapId, parentId])
+  @@map("mindmap_nodes")
+}

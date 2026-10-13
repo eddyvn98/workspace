@@ -1,0 +1,10 @@
+enum WorkspaceArtifactStatus {
+  PENDING
+  READY
+  FAILED
+  /// No converter is available/configured on this deployment (e.g.
+  /// LibreOffice not installed) — distinct from FAILED so the UI can say
+  /// "preview isn't supported here" instead of "something went wrong,
+  /// retry", which would be misleading since retrying can't help.
+  UNSUPPORTED
+}

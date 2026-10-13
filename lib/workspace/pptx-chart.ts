@@ -1,0 +1,13 @@
+import ExcelJS from "exceljs";
+import type JSZip from "jszip";
+import { xml, rels } from "./pptx-elements";
+export async function addPptxChart(zip: JSZip, index: number, series: { label: string; value: number }[], accent: string) {
+  const workbook = new ExcelJS.Workbook(), sheet = workbook.addWorksheet("Data");
+  sheet.addRow(["Category", "Value"]); series.forEach((s) => sheet.addRow([s.label, s.value]));
+  zip.file(`ppt/embeddings/chart${index}.xlsx`, await workbook.xlsx.writeBuffer());
+  const end = series.length + 1;
+  const categories = `<c:strRef><c:f>Data!$A$2:$A$${end}</c:f><c:strCache><c:ptCount val="${series.length}"/>${series.map((s, i) => `<c:pt idx="${i}"><c:v>${xml(s.label)}</c:v></c:pt>`).join("")}</c:strCache></c:strRef>`;
+  const values = `<c:numRef><c:f>Data!$B$2:$B$${end}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${series.length}"/>${series.map((s, i) => `<c:pt idx="${i}"><c:v>${s.value}</c:v></c:pt>`).join("")}</c:numCache></c:numRef>`;
+  zip.file(`ppt/charts/chart${index}.xml`, `<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:lang val="vi-VN"/><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/><c:barChart><c:barDir val="bar"/><c:grouping val="clustered"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Value</c:v></c:tx><c:spPr><a:solidFill><a:srgbClr val="${accent}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr><c:cat>${categories}</c:cat><c:val>${values}</c:val></c:ser><c:dLbls><c:dLblPos val="outEnd"/><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/></c:dLbls><c:gapWidth val="60"/><c:axId val="100"/><c:axId val="200"/></c:barChart><c:catAx><c:axId val="100"/><c:scaling><c:orientation val="maxMin"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:tickLblPos val="nextTo"/><c:crossAx val="200"/><c:crosses val="autoZero"/><c:lblAlgn val="ctr"/></c:catAx><c:valAx><c:axId val="200"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="General" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="100"/><c:crosses val="autoZero"/></c:valAx></c:plotArea><c:plotVisOnly val="1"/></c:chart><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1800"/></a:pPr><a:endParaRPr lang="vi-VN"/></a:p></c:txPr><c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>`);
+  zip.file(`ppt/charts/_rels/chart${index}.xml.rels`, rels([{ id: "rId1", type: "package", target: `../embeddings/chart${index}.xlsx` }]));
+}

@@ -1,0 +1,25 @@
+model WorkspaceResource {
+  id             String                @id @default(cuid())
+  boardId        String
+  kind           WorkspaceResourceKind
+  filename       String
+  mimeType       String
+  /// Lower-cased and CHECK-constrained like every other workspace identity
+  /// column — see 20260904100000_normalize_workspace_emails.
+  createdByEmail String
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  /// Optional link back to the extracted-text row for the same upload, so a
+  /// future checkpoint can unify the two without a breaking rewrite of
+  /// WorkspaceSourceDocument. Null until something actually sets it.
+  sourceDocumentId String?                  @unique
+  sourceDocument   WorkspaceSourceDocument? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+
+  board      WorkspaceBoard               @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  versions   WorkspaceFileVersion[]
+  references WorkspaceResourceReference[]
+
+  @@index([boardId, createdAt])
+  @@map("workspace_resources")
+}

@@ -1,0 +1,22 @@
+model MindmapSnapshot {
+  id           String   @id @default(cuid())
+  mindmapId    String
+  /// Full denormalized tree (nodes + relationships + meta) at snapshot time.
+  treeJson     Json
+  /// Optional human-friendly label for manual "save version" snapshots.
+  label        String?
+  createdBy    String
+  createdAt    DateTime @default(now())
+  /// The Mindmap.revision the Y.Doc this snapshot was derived from had been
+  /// seeded/synced to. Lets a reopening room tell "this snapshot's content is
+  /// already in the repository" (its sync landed, so the repository moved past
+  /// baseRevision) from "this snapshot never reached the repository" (the
+  /// repository is still AT baseRevision) without comparing any clocks.
+  /// Null for snapshots written before the revision counter existed.
+  baseRevision Int?
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@index([mindmapId, createdAt])
+  @@map("mindmap_snapshots")
+}

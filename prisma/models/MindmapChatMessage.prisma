@@ -1,0 +1,13 @@
+model MindmapChatMessage {
+  id          String          @id @default(cuid())
+  sessionId   String
+  role        MindmapChatRole
+  content     String          @db.Text
+  attachments Json?
+  createdAt   DateTime        @default(now())
+
+  session MindmapChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("mindmap_chat_messages")
+}

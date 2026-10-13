@@ -1,0 +1,24 @@
+export const xml = (s: unknown) => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+export const emu = (v: number) => Math.round(v * 9525);
+export const color = (v: unknown, fallback: string) => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.slice(1).toUpperCase() : fallback;
+export const NS = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+export const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+export const rels = (items: { id: string; type: string; target: string }[]) => `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${items.map((r) => `<Relationship Id="${r.id}" Type="${REL}${r.type}" Target="${xml(r.target)}"/>`).join("")}</Relationships>`;
+export const group = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
+const position = (x: number, y: number, w: number, h: number) => `<a:xfrm><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm>`;
+export function textParagraph(text: string, size: number, fill: string, font = "Arial", bold = false) {
+  return `<a:p><a:pPr/><a:r><a:rPr lang="vi-VN" sz="${Math.round(size * 100)}"${bold ? ' b="1"' : ""}><a:solidFill><a:srgbClr val="${fill}"/></a:solidFill><a:latin typeface="${xml(font)}"/></a:rPr><a:t xml:space="preserve">${xml(text)}</a:t></a:r><a:endParaRPr lang="vi-VN"/></a:p>`;
+}
+export function textShape(id: number, text: string, x: number, y: number, w: number, h: number, size: number, fill: string, font: string, bold = false) {
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${position(x, y, w, h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" rIns="0" tIns="0" bIns="0"><a:normAutofit/></a:bodyPr><a:lstStyle/>${text.split("\n").map((line) => textParagraph(line, size, fill, font, bold)).join("")}</p:txBody></p:sp>`;
+}
+export function tableShape(id: number, rows: string[][], x: number, y: number, w: number, h: number, fill: string, accent: string, font: string) {
+  const cols = Math.max(1, ...rows.map((r) => r.length)), fontSize = Math.max(10, Math.min(18, h / Math.max(1, rows.length) * 0.5));
+  return `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="Table ${id}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="1" bandRow="1"/><a:tblGrid>${Array.from({ length: cols }, () => `<a:gridCol w="${emu(w / cols)}"/>`).join("")}</a:tblGrid>${rows.map((row, i) => `<a:tr h="${emu(h / rows.length)}">${Array.from({ length: cols }, (_, c) => `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${textParagraph(row[c] ?? "", fontSize, i === 0 ? "FFFFFF" : fill, font, i === 0)}</a:txBody><a:tcPr marL="${emu(12)}" marR="${emu(12)}" marT="${emu(6)}" marB="${emu(6)}"><a:solidFill><a:srgbClr val="${i === 0 ? accent : "F1F5F9"}"/></a:solidFill></a:tcPr></a:tc>`).join("")}</a:tr>`).join("")}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
+}
+export function imageShape(id: number, relId: string, alt: string, x: number, y: number, w: number, h: number) {
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Image ${id}" descr="${xml(alt)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${position(x, y, w, h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+}
+export function chartShape(id: number, relId: string, x: number, y: number, w: number, h: number) {
+  return `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="Chart ${id}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(x)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${relId}"/></a:graphicData></a:graphic></p:graphicFrame>`;
+}

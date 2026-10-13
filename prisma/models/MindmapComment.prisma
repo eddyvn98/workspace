@@ -1,0 +1,17 @@
+model MindmapComment {
+  id              String   @id @default(cuid())
+  mindmapId       String
+  nodeId          String
+  parentCommentId String?
+  authorEmail     String
+  body            String
+  resolved        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  mindmap Mindmap @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+
+  @@index([mindmapId, nodeId])
+  @@index([mindmapId, createdAt])
+  @@map("mindmap_comments")
+}

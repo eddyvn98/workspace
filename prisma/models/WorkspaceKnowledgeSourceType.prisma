@@ -1,0 +1,6 @@
+enum WorkspaceKnowledgeSourceType {
+  DOCUMENT
+  /// A block's own title/description text, re-synced when the board is saved.
+  /// Legacy's equivalent member is NODE; the rename tracks node -> block.
+  BLOCK
+}

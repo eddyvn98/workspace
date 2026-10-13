@@ -1,0 +1,27 @@
+model WorkspaceNotification {
+  id             String                    @id @default(cuid())
+  recipientEmail String
+  boardId        String
+  type           WorkspaceNotificationType
+  body           String
+  read           Boolean                   @default(false)
+  createdAt      DateTime                  @default(now())
+  /// What this notification points at, so the bell can deep-link the way
+  /// MindmapNotification.nodeId/commentId does. Null for a board-level
+  /// notification (SHARE_INVITE, SHARE_LEFT) which anchors to nothing
+  /// smaller than the board itself.
+  blockId        String?
+  commentId      String?
+  /// Who caused it, as a field rather than only baked into `body` — lets the
+  /// UI re-render the actor (avatar/initials) without parsing the string.
+  actorEmail     String?
+
+  board WorkspaceBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  /// The bell's only query is this recipient, newest first, 50 rows — it
+  /// never filters on `read`, so `read` must not sit between the filter and
+  /// the sort. Deliberately not legacy's (read, createdAt) shape, whose
+  /// middle column exists for a query v2 does not make.
+  @@index([recipientEmail, createdAt])
+  @@map("workspace_notifications")
+}

@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+.DS_Store
+.vercel/
+.turbo/
+public/pdf.worker.min.mjs
+playwright-report/
+test-results/

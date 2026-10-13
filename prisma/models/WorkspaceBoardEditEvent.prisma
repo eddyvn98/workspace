@@ -1,0 +1,14 @@
+model WorkspaceBoardEditEvent {
+  id           String   @id @default(cuid())
+  boardId      String
+  blockId      String
+  actorEmail   String
+  opType       String
+  blockVersion Json?
+  createdAt    DateTime @default(now())
+
+  board WorkspaceBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId, blockId, createdAt])
+  @@map("workspace_board_edit_events")
+}

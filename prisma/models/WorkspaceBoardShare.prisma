@@ -1,0 +1,18 @@
+model WorkspaceBoardShare {
+  id           String             @id @default(cuid())
+  boardId      String
+  invitedEmail String
+  role         WorkspaceShareRole
+  invitedBy    String
+  createdAt    DateTime           @default(now())
+  /// When the role last changed. Legacy MindmapShare has always had this;
+  /// without it a demotion from EDITOR to VIEWER leaves no trace of when,
+  /// which is the one question asked afterwards.
+  updatedAt    DateTime           @default(now()) @updatedAt
+
+  board WorkspaceBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, invitedEmail])
+  @@index([invitedEmail])
+  @@map("workspace_board_shares")
+}

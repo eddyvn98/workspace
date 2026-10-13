@@ -1,0 +1,18 @@
+model WorkspacePresence {
+  boardId         String
+  email           String
+  lastSeenAt      DateTime @default(now()) @updatedAt
+  /// Which block this viewer currently has selected, if any — powers the
+  /// presence focus ring (a colored border on a block another collaborator
+  /// is looking at). Null when nothing is selected; overwritten on every
+  /// heartbeat, not append-only.
+  selectedBlockId String?
+  /// Which block this viewer is actively editing, if any. Cleared when the
+  /// editor closes or loses focus.
+  editingBlockId  String?
+
+  board WorkspaceBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, email])
+  @@map("workspace_presence")
+}

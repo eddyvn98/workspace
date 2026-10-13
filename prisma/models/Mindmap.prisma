@@ -1,0 +1,77 @@
+model Mindmap {
+  id         String   @id @default(cuid())
+  ownerEmail String
+  title      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  /// Monotonic version of this whole record (title, display settings AND the
+  /// node tree), incremented inside the same transaction as every write.
+  ///
+  /// This is the ONLY thing the three writers of a mindmap — the browser's
+  /// REST save, the realtime snapshot worker in docker/mindmap-ws, and a
+  /// snapshot restore — are allowed to order themselves by. They run in
+  /// different processes with different wall clocks, so comparing timestamps
+  /// could not distinguish "my content is newer" from "my clock is ahead":
+  /// a ws container running seconds behind silently discarded genuinely newer
+  /// edits, and one running ahead let stale snapshots overwrite fresh saves.
+  /// A writer sends the revision its content was derived from; if the stored
+  /// revision has moved on, the write is refused and the writer refetches.
+  revision Int @default(0)
+
+  /// Map-level display settings — layout algorithm, connector line style,
+  /// default node shape, free-layout toggle. Kept alongside the flat node
+  /// tree (not folded into it) since they describe the whole canvas, not
+  /// any one node. See components/features/chat/mindmap/mindmap-types.ts.
+  layoutType      String?
+  connectionStyle String?
+  nodeShape       String?
+  freeLayout      Boolean?
+  /// Full StylePreset object (see mindmap-presets.ts) — stored whole rather
+  /// than by id so a later edit to the built-in preset list can't retroactively
+  /// change an already-saved mindmap's colors.
+  stylePreset     Json?
+  /// Canvas-level shapes (rectangles, sticky notes, etc. — see CanvasShape in
+  /// mindmap-types.ts) and pen-tool freehand strokes (FreehandStroke in
+  /// freehand-types.ts). Neither lives on the node tree, so both are stored
+  /// here as opaque arrays, same pattern as stylePreset.
+  canvasShapes    Json?
+  freehandStrokes Json?
+
+  /// Owner's choice about how much edit history collaborators can see.
+  /// false (default): a collaborator only sees changes made from the moment
+  /// they were invited — work done before the invite stays private to the
+  /// owner. true: the whole history is shared along with the map.
+  shareFullHistory Boolean @default(false)
+
+  /// Anonymous, no-login read-only link. When enabled, anyone holding
+  /// publicViewToken can GET the map through app/api/mindmaps/public/[token]
+  /// with zero collaborator role — this is the ONLY access path in the app
+  /// that bypasses the email-based auth model in getAccess(). Disabling
+  /// clears the token so a stale/leaked link can't be silently re-enabled
+  /// later with the same URL — turning it back on always mints a fresh one.
+  publicViewEnabled   Boolean   @default(false)
+  publicViewToken     String?   @unique
+  publicViewExpiresAt DateTime?
+
+  /// Set when the corresponding converted Workspace board is deleted. The
+  /// legacy row remains as rollback data, but the batch cutover must not
+  /// resurrect a board the user explicitly deleted.
+  workspaceDeletedAt DateTime?
+
+  nodes           MindmapNode[]
+  relationships   MindmapRelationship[]
+  shares          MindmapShare[]
+  sidebarHides    MindmapSidebarHide[]
+  views           MindmapView[]
+  editEvents      MindmapEditEvent[]
+  snapshots       MindmapSnapshot[]
+  comments        MindmapComment[]
+  notifications   MindmapNotification[]
+  chatSessions    MindmapChatSession[]
+  sourceDocuments MindmapSourceDocument[]
+  knowledgeChunks MindmapKnowledgeChunk[]
+
+  @@index([ownerEmail])
+  @@map("mindmaps")
+}

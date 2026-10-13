@@ -1,0 +1,6 @@
+# Shell scripts must keep LF endings. They run inside Alpine containers
+# (docker-entrypoint.sh is the image's ENTRYPOINT), where a CRLF shebang makes
+# the kernel fail with "no such file or directory" and the container never
+# starts. Windows checkouts default to CRLF here (core.autocrlf=true), so this
+# is pinned rather than left to local git config.
+*.sh text eol=lf
