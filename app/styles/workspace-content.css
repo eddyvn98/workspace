@@ -1,0 +1,261 @@
+@keyframes shimmer {
+	0% {
+		background-position: -400px 0;
+	}
+	100% {
+		background-position: 400px 0;
+	}
+}
+
+.shimmer {
+	background: linear-gradient(
+		90deg,
+		hsl(var(--muted)) 0%,
+		hsl(var(--muted-foreground) / 0.08) 50%,
+		hsl(var(--muted)) 100%
+	);
+	background-size: 800px 100%;
+	animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* ─── Typing indicator dots ──────────────────────────────────────────────── */
+@keyframes typing-bounce {
+	0%,
+	60%,
+	100% {
+		transform: translateY(0);
+		opacity: 0.4;
+	}
+	30% {
+		transform: translateY(-4px);
+		opacity: 1;
+	}
+}
+
+.typing-dot {
+	animation: typing-bounce 1.4s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) {
+	animation-delay: 0.15s;
+}
+.typing-dot:nth-child(3) {
+	animation-delay: 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.streaming-cursor {
+		animation: none;
+		opacity: 0.6;
+	}
+	.typing-dot {
+		animation: none;
+		opacity: 0.6;
+	}
+	.shimmer {
+		animation: none;
+	}
+}
+
+/* ─── Chat message fade-in ───────────────────────────────────────────────── */
+@keyframes msg-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.msg-animate {
+	animation: msg-in 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ─── KaTeX ──────────────────────────────────────────────────────────────── */
+.katex {
+	font-size: 1em !important;
+}
+.katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.5rem 0;
+	max-width: 100%;
+}
+
+/* ─── Focus visible ring ─────────────────────────────────────────────────── */
+:focus-visible {
+	outline: 2px solid hsl(var(--ring));
+	outline-offset: 2px;
+}
+
+/* Workspace Meeting opts out of the site-wide orange focus ring — its inputs
+   already show their own border-color box, so the extra ring was just
+   visual noise (reported against the sidebar search field). Scoped via
+   `.meeting-app` (meeting/layout.tsx) rather than changed globally. */
+.meeting-app :focus-visible {
+	outline: none;
+}
+
+/* ─── Safe area padding for mobile browsers ──────────────────────────────── */
+.safe-bottom {
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ─── Glass surface utility ──────────────────────────────────────────────── */
+.glass {
+	background: hsl(var(--background) / 0.8);
+	backdrop-filter: blur(12px) saturate(180%);
+	-webkit-backdrop-filter: blur(12px) saturate(180%);
+}
+
+/* ─── User message bubble ────────────────────────────────────────────────── */
+.user-bubble {
+	background: linear-gradient(145deg, #27272c 0%, #1d1d21 100%);
+	color: #f2f2f7;
+}
+.dark .user-bubble {
+	background: linear-gradient(145deg, #323238 0%, #28282e 100%);
+	color: #f2f2f7;
+}
+
+/* ─── Docx preview panel — rendered HTML from mammoth ───────────────────── */
+.docx-preview {
+	font-family: var(--font-sans, "Open Sans"), system-ui, sans-serif;
+	font-size: 14px;
+	line-height: 1.8;
+	color: #1f2937;
+}
+.dark .docx-preview {
+	color: #e5e7eb;
+}
+.docx-preview h1,
+.docx-preview h2,
+.docx-preview h3,
+.docx-preview h4,
+.docx-preview h5,
+.docx-preview h6 {
+	font-weight: 700;
+	line-height: 1.3;
+	margin-top: 1.6em;
+	margin-bottom: 0.5em;
+	color: #111827;
+}
+.dark .docx-preview h1,
+.dark .docx-preview h2,
+.dark .docx-preview h3,
+.dark .docx-preview h4,
+.dark .docx-preview h5,
+.dark .docx-preview h6 {
+	color: #f3f4f6;
+}
+.docx-preview h1 {
+	font-size: 1.5rem;
+	border-bottom: 1px solid #e5e7eb;
+	padding-bottom: 0.4em;
+}
+.docx-preview h2 {
+	font-size: 1.25rem;
+	border-bottom: 1px solid #f3f4f6;
+	padding-bottom: 0.3em;
+}
+.docx-preview h3 {
+	font-size: 1.1rem;
+}
+.docx-preview h4 {
+	font-size: 1rem;
+}
+.dark .docx-preview h1 {
+	border-color: #374151;
+}
+.dark .docx-preview h2 {
+	border-color: #1f2937;
+}
+.docx-preview p {
+	margin: 0.75em 0;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+.docx-preview p:first-child {
+	margin-top: 0;
+}
+.docx-preview p:last-child {
+	margin-bottom: 0;
+}
+.docx-preview strong {
+	font-weight: 600;
+}
+.docx-preview em {
+	font-style: italic;
+}
+.docx-preview ul,
+.docx-preview ol {
+	margin: 0.75em 0;
+	padding-left: 1.5em;
+}
+.docx-preview ul {
+	list-style-type: disc;
+}
+.docx-preview ol {
+	list-style-type: decimal;
+}
+.docx-preview li {
+	margin: 0.25em 0;
+}
+.docx-preview table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1.25em 0;
+	font-size: 13px;
+	border-radius: 10px;
+	overflow: hidden;
+	border: 1px solid #e5e7eb;
+}
+.dark .docx-preview table {
+	border-color: #374151;
+}
+.docx-preview th {
+	background: #f9fafb;
+	font-weight: 600;
+	text-align: left;
+	padding: 8px 12px;
+	border-bottom: 1px solid #e5e7eb;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #6b7280;
+}
+.dark .docx-preview th {
+	background: #1e2433;
+	border-color: #374151;
+	color: #9ca3af;
+}
+.docx-preview td {
+	padding: 8px 12px;
+	border-bottom: 1px solid #f3f4f6;
+	vertical-align: top;
+	color: #374151;
+}
+.dark .docx-preview td {
+	border-color: #1f2937;
+	color: #d1d5db;
+}
+.docx-preview tr:last-child td {
+	border-bottom: none;
+}
+.docx-preview img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 8px;
+	margin: 0.75em 0;
+}
+.docx-preview a {
+	color: #2563eb;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	word-break: break-all;
+}
+.dark .docx-preview a {
+	color: #60a5fa;
+}
+
