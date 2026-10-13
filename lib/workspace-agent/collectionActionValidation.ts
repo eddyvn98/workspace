@@ -6,14 +6,14 @@ import { isValidFilterOperator, validOperator } from "@/app/workspace/collection
 const obj = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const str = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
-const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup"]);
+const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"]);
 const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap"]);
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 
 function validValue(field: CollectionField, value: string): boolean {
   if (value.length > 2000) return false;
   if (!value) return true;
-  if (field.type === "lookup") return false;
+  if (field.type === "lookup" || field.type === "formula") return false;
   if (field.type === "relation") return value.length <= 128;
   if (field.type === "checkbox") return value === "true" || value === "false";
   if (field.type === "select") return (field.options ?? []).includes(value);
@@ -46,8 +46,8 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("options" in action && !validOptions(action.options)) return `${type}.options must contain distinct non-empty strings.`;
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
-  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId"].some((key) => key in action)) return "No Collection field changes specified.";
-  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic"].some((key) => key in action)) return "No Collection view changes specified.";
+  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds"].some((key) => key in action)) return "No Collection field changes specified.";
+  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations"].some((key) => key in action)) return "No Collection view changes specified.";
   if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
   return null;
@@ -87,6 +87,19 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     if (data.fields.some((f) => f.id !== action.fieldId && f.name.toLowerCase() === name.toLowerCase())) return "Ambiguous Collection field name; use a distinct name and exact fieldId.";
     const nextType = String(action.fieldType ?? field?.type ?? "text") as CollectionFieldType;
     if (nextType === "select" && "options" in action && !validOptions(action.options)) return "Invalid select options.";
+    if (nextType === "formula") {
+      const op = action.formulaOperation ?? field?.formulaOperation;
+      const sources = action.formulaFieldIds ?? field?.formulaFieldIds;
+      if (!["sum", "subtract", "multiply", "divide", "average", "concat"].includes(String(op)))
+        return "Formula requires a supported formulaOperation.";
+      if (!Array.isArray(sources) || sources.length < 2 || sources.length > 10 ||
+        sources.some(id => !data.fields.some(f => f.id === id && f.type !== "formula")))
+        return "Formula requires 2–10 existing non-formula field IDs.";
+      if (["subtract", "divide"].includes(String(op)) && sources.length !== 2)
+        return "Formula operation requires exactly two fields.";
+      if (op !== "concat" && sources.some(id => !data.fields.some(f => f.id === id && ["number", "lookup"].includes(f.type))))
+        return "Numeric formula fields must be numbers or lookups.";
+    }
     if (nextType === "lookup") {
       const relationId = action.relationFieldId ?? field?.relationFieldId;
       const targetId = action.targetFieldId ?? field?.targetFieldId;
@@ -104,7 +117,7 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     const values = obj(action.values) ?? {};
     for (const [id, value] of Object.entries(values)) {
       const targetField = data.fields.find((f) => f.id === id);
-      if (!targetField || (targetField.type === "lookup") || !validValue(targetField, String(value)))
+      if (!targetField || (targetField.type === "lookup" || targetField.type === "formula") || !validValue(targetField, String(value)))
         return `Unknown, computed or invalid fieldId/value: ${id}.`;
       if (targetField.type === "relation" && value !== "" && !data.records.some(r => r.id === value))
         return `Unknown related recordId: ${String(value).slice(0, 128)}.`;
@@ -116,6 +129,22 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
       if (id !== undefined && id !== null && !data.fields.some((f) => f.id === id && f.type === expectedType)) return `${key} must identify an existing ${expectedType} field.`;
     }
     if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
+    if ("aggregations" in action) {
+      const items = action.aggregations;
+      if (!Array.isArray(items) || items.length > 20) return "Invalid Collection aggregations.";
+      const used = new Set<string>();
+      for (const raw of items) {
+        const item = obj(raw);
+        const id = item?.fieldId;
+        if (typeof id !== "string" || used.has(id) || !data.fields.some(f => f.id === id))
+          return "Invalid or duplicate Collection aggregation fieldId.";
+        used.add(id);
+        if (!["sum", "average", "min", "max", "count"].includes(String(item?.operation)))
+          return "Invalid Collection aggregate operation.";
+        if (item?.operation !== "count" && !data.fields.some(f => f.id === id && ["number", "formula"].includes(f.type)))
+          return "Aggregation requires numeric field or count.";
+      }
+    }
     for (const key of ["filter", "sort", "filters", "sorts"] as const) {
       const items = key.endsWith("s") ? (action[key] ?? []) : action[key] == null ? [] : [action[key]];
       if (!Array.isArray(items) || items.length > 20) return `${key} requires at most 20 conditions.`;

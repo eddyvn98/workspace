@@ -10,6 +10,7 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
     fields: data.fields.slice(0, 100).map((field) => ({
       id: field.id, name: field.name.slice(0, 160), type: field.type,
       relationFieldId: field.relationFieldId, targetFieldId: field.targetFieldId,
+      formulaOperation: field.formulaOperation, formulaFieldIds: field.formulaFieldIds,
       ...(field.type === "select" ? { options: field.options?.slice(0, 60) } : {}),
     })),
     views: data.views.slice(0, 100).map((item) => ({
@@ -17,6 +18,7 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
       groupFieldId: item.groupFieldId, dateFieldId: item.dateFieldId,
       endDateFieldId: item.endDateFieldId, filter: item.filter, sort: item.sort,
       filters: item.filters, sorts: item.sorts, filterLogic: item.filterLogic,
+      aggregations: item.aggregations,
     })),
     activeViewId: data.activeViewId,
     selectedViewId: view?.id,

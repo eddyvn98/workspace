@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { AGGREGATE_OPERATIONS } from "../collections/collectionFormula";
 import { FILTER_OPERATORS, isUnaryFilter, type FilterOperator } from "../collections/collectionFilters";
 import { viewFilters, viewSorts, type CollectionField, type CollectionView } from "../collections/model";
 import { btnClass, inputClass } from "./CollectionFieldEditor";
@@ -17,6 +18,9 @@ export function CollectionViewConditions({ view, fields, readOnly, onChange }: P
   const setFilters = (next: typeof filters) => onChange({ filters: next, filter: undefined });
   const setSorts = (next: typeof sorts) => onChange({ sorts: next, sort: undefined });
   const availableSort = fields.find(field => !sorts.some(item => item.fieldId === field.id));
+  const aggregates = view.aggregations ?? [];
+  const availableAggregate = fields.find(field => !aggregates.some(item => item.fieldId === field.id)
+    && (field.type === "number" || field.type === "formula"));
   return <div className="space-y-2" data-testid="collection-view-conditions">
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -83,6 +87,35 @@ export function CollectionViewConditions({ view, fields, readOnly, onChange }: P
           }}>↑</button>
         <button aria-label={"Remove sort " + (index + 1)} className={btnClass} disabled={readOnly}
           onClick={() => setSorts(sorts.filter((_, i) => i !== index))}>×</button>
+      </div>)}
+    </div>
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <strong>Visible-row totals</strong>
+        <button className={btnClass} disabled={readOnly || !availableAggregate || aggregates.length >= 20}
+          onClick={() => availableAggregate && onChange({
+            aggregations: [...aggregates, { fieldId: availableAggregate.id, operation: "sum" }],
+          })}>+ Aggregate</button>
+      </div>
+      {aggregates.map((item, index) => <div key={item.fieldId} className="flex items-center gap-1">
+        <select aria-label={"Aggregate field " + (index + 1)} className={inputClass}
+          value={item.fieldId} disabled={readOnly}
+          onChange={event => {
+            if (aggregates.some(other => other.fieldId === event.target.value)) return;
+            onChange({ aggregations: aggregates.map((row, i) => i === index
+              ? { ...row, fieldId: event.target.value } : row) });
+          }}>
+          {fields.filter(field => field.type === "number" || field.type === "formula")
+            .map(field => <option key={field.id} value={field.id}>{field.name}</option>)}
+        </select>
+        <select aria-label={"Aggregate operation " + (index + 1)} className={inputClass}
+          value={item.operation} disabled={readOnly}
+          onChange={event => onChange({ aggregations: aggregates.map((row, i) => i === index
+            ? { ...row, operation: event.target.value as typeof row.operation } : row) })}>
+          {AGGREGATE_OPERATIONS.map(op => <option key={op} value={op}>{op}</option>)}
+        </select>
+        <button className={btnClass} aria-label={"Remove aggregate " + (index + 1)}
+          disabled={readOnly} onClick={() => onChange({ aggregations: aggregates.filter((_, i) => i !== index) })}>×</button>
       </div>)}
     </div>
   </div>;

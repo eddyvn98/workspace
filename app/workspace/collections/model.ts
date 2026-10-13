@@ -1,8 +1,9 @@
 import { createWorkspaceId } from "../utils/workspaceId";
 import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./collectionFilters";
 import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
+import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
-export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup";
+export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "formula";
 export type CollectionViewKind = "table" | "kanban" | "calendar" | "timeline" | "gallery" | "mindmap";
 
 export interface CollectionField {
@@ -13,6 +14,8 @@ export interface CollectionField {
   /** Lookup: source relation and target field, both stable field IDs. */
   relationFieldId?: string;
   targetFieldId?: string;
+  formulaOperation?: FormulaOperation;
+  formulaFieldIds?: string[];
 }
 export interface CollectionRecord {
   id: string;
@@ -31,6 +34,7 @@ export interface CollectionView {
   sort?: { fieldId: string; direction: "asc" | "desc" };
   filters?: CollectionFilter[];
   filterLogic?: FilterLogic;
+  aggregations?: CollectionAggregation[];
   sorts?: { fieldId: string; direction: "asc" | "desc" }[];
 }
 export interface CollectionBlockPayload {
@@ -43,7 +47,7 @@ export interface CollectionBlockPayload {
 }
 
 export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap"];
-export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup"];
+export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"];
 export const newId = () => createWorkspaceId();
 
 export function createCollection(): CollectionBlockPayload {
@@ -98,7 +102,7 @@ export function visibleRecords(data: CollectionBlockPayload, view: CollectionVie
   // Keep it in the saved view so users can complete it after reload.
   const filters = viewFilters(view);
   const sorts = viewSorts(view);
-  let rows = data.records.map(record => projectCollectionLookups(data, record))
+  let rows = data.records.map(record => projectCollectionFormulas(data, projectCollectionLookups(data, record)))
     .filter((r) => matchesViewFilters(r, data.fields, filters, view.filterLogic)
     && (!search || Object.values(r.values).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))));
   if (sorts.length) rows = [...rows].sort((a, b) => {
@@ -115,7 +119,7 @@ export function visibleRecords(data: CollectionBlockPayload, view: CollectionVie
 }
 export function setRecordValue(data: CollectionBlockPayload, recordId: string, fieldId: string, value: string): CollectionBlockPayload {
   const field = data.fields.find(f => f.id === fieldId);
-  if (!field || field.type === "lookup") return data;
+  if (!field || field.type === "lookup" || field.type === "formula") return data;
   return { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, [fieldId]: value } } : r) };
 }
 export function addRecord(data: CollectionBlockPayload, values: Record<string, string> = {}): CollectionBlockPayload {
@@ -135,7 +139,9 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
     ...data, fields: data.fields.filter((f) => f.id !== fieldId).map(f =>
       f.relationFieldId === fieldId || f.targetFieldId === fieldId
         ? { ...f, relationFieldId: f.relationFieldId === fieldId ? undefined : f.relationFieldId,
-          targetFieldId: f.targetFieldId === fieldId ? undefined : f.targetFieldId } : f),
+          targetFieldId: f.targetFieldId === fieldId ? undefined : f.targetFieldId } : f)
+      .map(f => f.formulaFieldIds?.includes(fieldId)
+        ? { ...f, formulaFieldIds: f.formulaFieldIds.filter(id => id !== fieldId) } : f),
     records: data.records.map(({ values, ...r }) => ({ ...r, values: Object.fromEntries(Object.entries(values).filter(([id]) => id !== fieldId)) })),
     views: data.views.map((v) => ({
       ...v,
@@ -146,6 +152,7 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       ...(v.filter?.fieldId === fieldId ? { filter: undefined } : {}),
       ...(v.filters ? { filters: v.filters.filter((item) => item.fieldId !== fieldId) } : {}),
       ...(v.sorts ? { sorts: v.sorts.filter((item) => item.fieldId !== fieldId) } : {}),
+      ...(v.aggregations ? { aggregations: v.aggregations.filter(item => item.fieldId !== fieldId) } : {}),
     })),
   };
 }
