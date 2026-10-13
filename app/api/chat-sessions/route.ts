@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams;
   const category = query.get("category");
   if (category && !isCategory(category)) return failure("Invalid chat category", 400);
+  const selectedCategory: ChatSessionCategory | undefined = category && isCategory(category) ? category : undefined;
   const boardId = query.get("workspaceBoardId");
   if (boardId !== null && (!validBoardId(boardId) || !await canReadBoard(boardId, email))) return failure("Not found", 404);
   if (category === "WORKSPACE_AGENT_CHAT_KEY" && !boardId) return failure("workspaceBoardId is required for Workspace history", 400);
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   if (pinned !== null && pinned !== "true" && pinned !== "false") return failure("Invalid pinned filter", 400);
   try {
     const result = await listChatSessions({
-      userId: email, limit: parsed, ...(category ? { categories: [category] } : {}),
+      userId: email, limit: parsed, ...(selectedCategory ? { categories: [selectedCategory] } : {}),
       ...(boardId ? { workspaceBoardId: boardId } : {}),
       ...(cursor ? { cursor } : {}),
       ...(pinned === null ? {} : { pinned: pinned === "true" }),
