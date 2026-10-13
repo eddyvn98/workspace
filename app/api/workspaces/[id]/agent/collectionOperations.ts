@@ -45,7 +45,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   } else if (type === "delete_collection_record") {
     const recordToDelete = data.records.find((item) => item.id === recordId);
     if (recordToDelete) {
-      const title = recordTitle(data, recordToDelete).trim().replace(/[\\r\\n\\u0000-\\u001f]/g, " ").slice(0, 160);
+      const title = recordTitle(data, recordToDelete).trim().replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 160);
       // The label comes from the pre-delete persisted record, never the model claim.
       if (title && title !== "Untitled") confirmedSummary = `deleted Collection record ${JSON.stringify(title)}`;
     }
