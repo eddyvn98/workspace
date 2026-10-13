@@ -182,43 +182,62 @@ export async function runWorkspaceAgentTurn(
         return result(input, conversationId, rounds, "completed", summarizeConfirmationRequest(unconfirmed, input.query), receipts, unresolved);
       }
 
-      await ensureActive();
-      phase = "executor";
-      await reportProgress({ phase: "executing", round });
-      await ensureActive();
-      const execution = await execute(input, input.turnId, round, snapshot.revision, actionsToExecute.map(bindConfirmedWorkspaceDefaults));
-      const committed = execution.httpStatus >= 200 && execution.httpStatus < 300 && execution.body.success === true;
-      const revisionAfter = Number.isInteger(execution.body.revision) ? Number(execution.body.revision) : null;
-      const actions = changedActionResults(execution.body);
+      // The route intentionally rejects mixed Collection reads and edits. Dispatch
+      // contiguous groups in order, each with its own revision and receipt key.
+      const groups: WorkspaceJson[][] = [];
+      for (const action of actionsToExecute) {
+        const previous = groups[groups.length - 1];
+        const read = WORKSPACE_READ_ONLY_COMMANDS.has(String(action.type));
+        if (!previous || WORKSPACE_READ_ONLY_COMMANDS.has(String(previous[0].type)) !== read) groups.push([action]);
+        else previous.push(action);
+      }
+      let currentRevision = snapshot.revision;
       const persistedBeforeRound = receipts.filter((item) => item.persisted).length;
-      actionsToExecute.forEach((action, index) => {
-        const actionType = String(action.type) as WorkspaceRuntimeReceipt["actionType"];
-        const actionResult = actions[index] ?? {};
-        const readOnly = WORKSPACE_READ_ONLY_COMMANDS.has(actionType);
-        const changed = committed && actionResult.changed === true;
-        const replayKey = changed ? workspaceActionReplayKey(action) : null;
-        if (replayKey) confirmedReplayKeys.add(replayKey);
-        const executedRead = committed && readOnly && actionResult.changed === false;
-        const resultIds = Array.isArray(actionResult.ids)
-          ? actionResult.ids.filter((id): id is string => typeof id === "string" && id.length > 0)
-          : typeof action.blockId === "string" ? [action.blockId] : [];
-        const targetIds = changed ? resultIds : [];
-        const receiptLanguage = getWorkspaceResponseLanguageInstruction(input.query) === "Vietnamese" ? "Vietnamese" : "English";
-        const summary = workspaceActionReceiptSummary({ actionType, action, actionResult, language: receiptLanguage, targetIds, snapshot, body: execution.body, changed });
-        if (executedRead) readResults.push(compactWorkspaceReadResult(actionType, execution.body.result));
-        const reason = changed || executedRead ? undefined : String(actionResult.reason ?? execution.body.error ?? "The executor did not confirm this action.");
-        receipts.push({
-          requestId: `${input.turnId}:${round}`,
-          actionType,
-          targetIds,
-          persisted: changed,
-          revisionBefore: snapshot.revision,
-          revisionAfter: changed ? revisionAfter : null,
-          ...(summary ? { summary: `${actionType}: ${summary}` } : {}),
-          ...(!changed && reason ? { reason } : {}),
+      let actions: WorkspaceJson[] = [];
+      let committed = true;
+      for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+        await ensureActive();
+        phase = "executor";
+        await reportProgress({ phase: "executing", round });
+        const group = groups[groupIndex];
+        const execution = await execute(input, input.turnId, round * 100 + groupIndex, currentRevision, group.map(bindConfirmedWorkspaceDefaults));
+        committed = execution.httpStatus >= 200 && execution.httpStatus < 300 && execution.body.success === true;
+        const revisionAfter = Number.isInteger(execution.body.revision) ? Number(execution.body.revision) : null;
+        const groupResults = changedActionResults(execution.body);
+        actions.push(...groupResults);
+        group.forEach((action, index) => {
+          const actionType = String(action.type) as WorkspaceRuntimeReceipt["actionType"];
+          const actionResult = groupResults[index] ?? {};
+          const readOnly = WORKSPACE_READ_ONLY_COMMANDS.has(actionType);
+          const changed = committed && actionResult.changed === true;
+          const replayKey = changed ? workspaceActionReplayKey(action) : null;
+          if (replayKey) confirmedReplayKeys.add(replayKey);
+          const executedRead = committed && readOnly && actionResult.changed === false;
+          const resultIds = Array.isArray(actionResult.ids)
+            ? actionResult.ids.filter((id): id is string => typeof id === "string" && id.length > 0)
+            : typeof action.blockId === "string" ? [action.blockId] : [];
+          const targetIds = changed ? resultIds : [];
+          const receiptLanguage = getWorkspaceResponseLanguageInstruction(input.query) === "Vietnamese" ? "Vietnamese" : "English";
+          const summary = workspaceActionReceiptSummary({ actionType, action, actionResult, language: receiptLanguage, targetIds, snapshot, body: execution.body, changed });
+          if (executedRead) readResults.push(compactWorkspaceReadResult(actionType, execution.body.result));
+          const reason = changed || executedRead ? undefined : String(actionResult.reason ?? execution.body.error ?? "The executor did not confirm this action.");
+          receipts.push({
+            requestId: `${input.turnId}:${round * 100 + groupIndex}`,
+            actionType, targetIds, persisted: changed,
+            revisionBefore: currentRevision,
+            revisionAfter: changed ? revisionAfter : null,
+            ...(summary ? { summary: `${actionType}: ${summary}` } : {}),
+            ...(!changed && reason ? { reason } : {}),
+          });
+          if (!changed && !executedRead) unresolved.push(`${actionType}: ${reason}`);
         });
-        if (!changed && !executedRead) unresolved.push(`${actionType}: ${reason}`);
-      });
+        if (!committed || groupResults.some((entry) => entry.changed !== true && !WORKSPACE_READ_ONLY_COMMANDS.has(String(entry.type)))) {
+          const remaining = groups.slice(groupIndex + 1).flat();
+          for (const pending of remaining) unresolved.push(`${String(pending.type)}: not run because an earlier group failed.`);
+          break;
+        }
+        if (revisionAfter !== null) currentRevision = revisionAfter;
+      }
       const persistedCount = receipts.filter((item) => item.persisted).length;
       if (persistedCount > persistedBeforeRound) {
         const confirmed = receipts.filter((item) => item.persisted);
