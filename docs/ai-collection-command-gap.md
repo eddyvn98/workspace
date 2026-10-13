@@ -197,3 +197,28 @@ Re-test unique-name field/view removal; ambiguous names; field→record→view
 creation; delete followed by search failure; reload PostgreSQL persistence,
 receipt consistency, actor permissions, Dify logs, retries and concurrent edits.
 Do not describe local/Dify/live browser acceptance as passed without running it.
+
+### Issue #5 follow-up: confirmed read results in combined turns
+
+After PR #6 focused CI and Chrome's field→record→view/name-resolution cases
+passed, a combined delete+search browser request exposed only the delete
+save receipt. The local Dify-history inspection confirmed the model proposed
+both delete and search, then search again, and finally no actions. The runtime
+previously retained successful `workspaceReadResults` between rounds but
+`completedAnswer` on a final empty proposal discarded them. A successful
+read also has `persisted:false`, correctly excluding it from mutation
+receipts, so the UI had no other visible search result.
+
+The runtime now composes a separate **Workspace-verified read result**
+from executor-returned Collection records (bounded samples and stable IDs),
+alongside any persisted mutation summary. The SSE answer envelope and
+client answer parser preserve that text. Read-only actions remain
+non-mutating and are not represented as saved edits; failed reads remain
+partial with an unresolved action receipt. Multiple read actions in one
+phase use their corresponding indexed result, rather than duplicating the
+first/combined result. A repeated identical read is de-duplicated only in
+the final display, not skipped in the executor.
+
+The combined Chrome/Dify/Postgres/Mongo scenario is **still unverified after
+this change**; run it again and inspect the displayed search result and
+read-versus-write receipts before describing end-to-end acceptance as green.
