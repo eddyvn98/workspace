@@ -9,6 +9,7 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
     collectionTitle: data.title.slice(0, 160),
     fields: data.fields.slice(0, 100).map((field) => ({
       id: field.id, name: field.name.slice(0, 160), type: field.type,
+      relationFieldId: field.relationFieldId, targetFieldId: field.targetFieldId,
       ...(field.type === "select" ? { options: field.options?.slice(0, 60) } : {}),
     })),
     views: data.views.slice(0, 100).map((item) => ({

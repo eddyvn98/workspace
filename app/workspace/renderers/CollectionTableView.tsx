@@ -18,6 +18,8 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
   // Calling the latest patch via a ref avoids unmounting the focused input.
   const patchRef = useRef(patch);
   patchRef.current = patch;
+  const dataRef = useRef(data);
+  dataRef.current = data;
   // Stable controlled state: one sorting array per saved View configuration.
   const sorting = useMemo<SortingState>(() => viewSorts(view).map(s =>
     ({ id: s.fieldId, desc: s.direction === "desc" })), [view]);
@@ -25,7 +27,8 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
     id: field.id, accessorFn: record => record.values[field.id] ?? "", header: () => field.name,
     sortingFn: field.type === "number" ? "basic" : "alphanumeric",
     cell: ctx => <FieldEditor field={field} value={ctx.row.original.values[field.id] ?? ""}
-      readOnly={readOnly} onSet={value => patchRef.current(ctx.row.original, field, value)} />,
+      readOnly={readOnly} data={dataRef.current} recordId={ctx.row.original.id}
+      onSet={value => patchRef.current(ctx.row.original, field, value)} />,
   })), [data.fields, readOnly]);
   const table = useReactTable({
     data: rows, columns, getRowId: getRecordId,
