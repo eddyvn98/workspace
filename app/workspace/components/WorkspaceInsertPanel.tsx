@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Calculator, FileText, ImagePlus, Presentation, Table2 } from "lucide-react";
+import { Calculator, FileText, ImagePlus, Presentation, Table2, LayoutGrid } from "lucide-react";
+import { createCollection } from "../collections/model";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { type CanvasBlock, createBlockId, createDualTransform } from "../types/block";
 import { getLegacyTableTransform } from "../utils/workspaceTablePlacement";
@@ -81,7 +82,16 @@ export function WorkspaceInsertPanel() {
     setPendingEditBlockId(block.id);
   }, [addBlock, blocks, setSelection, setPendingEditBlockId]);
 
+  const handleAddCollection = useCallback(() => {
+    const now = Date.now();
+    const transform = createDualTransform({ ...getLegacyTableTransform(blocks), w: 900, h: 540 });
+    const block: CanvasBlock<"collection"> = { id: createBlockId(), type: "collection", transform, data: createCollection(), createdAt: now, updatedAt: now };
+    addBlock(block);
+    setSelection([block.id]);
+  }, [addBlock, blocks, setSelection]);
+
   const insertActions = [
+    { label: "Add Collection", Icon: LayoutGrid, onClick: handleAddCollection },
     { label: "Add Doc", Icon: FileText, onClick: handleAddDoc },
     { label: "Add Table", Icon: Table2, onClick: () => handleAddTable("document") },
     { label: "Add Spreadsheet", Icon: Calculator, onClick: () => handleAddTable("spreadsheet") },

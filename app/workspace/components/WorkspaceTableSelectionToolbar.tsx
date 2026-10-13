@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import { Calculator, ExternalLink, GripVertical, Maximize2, Table2 } from "lucide-react";
+import { Calculator, ExternalLink, GripVertical, Maximize2, Table2, LayoutGrid } from "lucide-react";
+import { fromTableBlock } from "../collections/io";
+import { createBlockId, createDualTransform, resolveTransform } from "../types/block";
 import type { BlockId, CanvasBlock } from "../types/block";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import type { TableMode } from "../types/table";
@@ -33,6 +35,9 @@ export function WorkspaceTableSelectionToolbar({
   position = "fixed",
 }: WorkspaceTableSelectionToolbarProps) {
   const updateBlock = useWorkspaceStore((state) => state.updateBlock);
+  const addBlock = useWorkspaceStore((state) => state.addBlock);
+  const setSelection = useWorkspaceStore((state) => state.setSelection);
+  const isReadOnly = useWorkspaceStore((state) => state.isReadOnly);
   const boardId = useWorkspaceStore((state) => state.boardId);
   const mode: TableMode = block.data?.mode === "spreadsheet" ? "spreadsheet" : "document";
   const isStructuralTable = Boolean(block.data?.disableCellAttachment);
@@ -40,6 +45,19 @@ export function WorkspaceTableSelectionToolbar({
   const changeMode = (nextMode: TableMode) => {
     if (isStructuralTable || nextMode === mode) return;
     updateBlock(block.id, { data: { ...block.data, mode: nextMode } });
+  };
+
+  const createFromTable = () => {
+    if (isReadOnly || isStructuralTable) return;
+    const frame = resolveTransform(block.transform, { x: 0, y: 0, w: 480, h: 300, rotation: 0, zIndex: 0 });
+    const now = Date.now();
+    const collection: CanvasBlock<"collection"> = {
+      id: createBlockId(), type: "collection",
+      transform: createDualTransform({ ...frame, x: frame.x + frame.w + 80, w: 900, h: 540 }),
+      data: fromTableBlock(block), createdAt: now, updatedAt: now,
+    };
+    addBlock(collection);
+    setSelection([collection.id]);
   };
 
   return (
@@ -94,6 +112,7 @@ export function WorkspaceTableSelectionToolbar({
             <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         )}
+        {!isStructuralTable && <button type="button" className="flex items-center gap-1 rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300" title="Create a collection from this table (original stays unchanged)" disabled={isReadOnly} onClick={createFromTable}><LayoutGrid className="h-3.5 w-3.5" /><span>To Collection</span></button>}
         {onMoveToCanvas && (
           <button type="button" onClick={onMoveToCanvas} className="flex items-center justify-center rounded-md border border-slate-200 p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100" title="Move table to canvas" aria-label="Move table to canvas">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
