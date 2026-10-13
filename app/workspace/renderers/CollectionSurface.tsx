@@ -56,7 +56,8 @@ export function CollectionSurface({ data, onChange, readOnly }: Props) {
       {!readOnly && <select aria-label="Add view" className={inputClass} value="" onChange={(e) => e.target.value && onChange(addView(data, e.target.value as CollectionView["kind"]))}><option value="">+ View</option>{VIEW_KINDS.map((v) => <option key={v} value={v}>{v}</option>)}</select>}
       <input aria-label="Search records" className={inputClass + " ml-auto w-32"} placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
     </div>
-    {settings && <div className="max-h-52 shrink-0 space-y-2 overflow-auto border-b bg-slate-50 p-2 text-xs dark:bg-slate-900">
+    {settings && <div role="region" aria-label="Collection settings" tabIndex={0} data-testid="collection-settings"
+      className="max-h-[min(55vh,28rem)] min-h-0 shrink-0 space-y-2 overflow-y-scroll overscroll-contain border-b bg-slate-50 p-2 text-xs dark:bg-slate-900">
       <div className="flex flex-wrap items-center gap-2"><label>View name <input className={inputClass} value={view.name} disabled={readOnly} onChange={(e) => renameView({ name: e.target.value })} /></label>
         <button className={btnClass} disabled={readOnly || data.views.length <= 1} onClick={() => onChange(removeView(data, view.id))}>Delete view</button>
       </div>
