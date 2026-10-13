@@ -99,7 +99,7 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await table.getByRole("button", { name: "Settings" }).click();
   await table.getByRole("button", { name: "+ Filter" }).click();
   await table.getByRole("combobox", { name: "Filter field 1" }).selectOption({ label: "Status" });
-  await table.getByRole("textbox", { name: "Filter value 1" }).fill("Done");
+  await table.getByRole("textbox", { name: "Filter value 1" }).fill("done");
   await expect(table.getByRole("textbox", { name: "Name" })).toHaveCount(1);
   await expect(table.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
   await table.getByRole("button", { name: "+ Filter" }).click();
@@ -109,13 +109,12 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await table.getByRole("combobox", { name: "Sort field 1" }).selectOption({ label: "Status" });
   await table.getByRole("button", { name: "+ Sort" }).click();
   await table.getByRole("combobox", { name: "Sort field 2" }).selectOption({ label: "Name" });
-  await expect(table.getByRole("combobox", { name: "Sort field 2" })).toHaveValue(
-    await table.getByRole("combobox", { name: "Sort field 2" }).inputValue());
+  await expect(table.getByRole("combobox", { name: "Sort field 2" })).toBeVisible();
   await page.reload();
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   const reopened = page.getByTestId("collection-block");
   await reopened.getByRole("button", { name: "Settings" }).click();
-  await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("Done");
+  await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("done");
   await expect(reopened.getByRole("textbox", { name: "Filter value 2" })).toHaveValue("Other row");
   await expect(reopened.getByRole("combobox", { name: "Sort field 2" })).toBeVisible();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
