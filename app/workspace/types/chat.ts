@@ -50,6 +50,8 @@ export interface WorkspaceChatMessage {
    *  nothing (appliedActionCount 0), so a described-but-failed edit is
    *  visible instead of silently indistinguishable from a real success. */
   unresolvedSummaries?: string[];
+  /** Runtime-only executor allowlist for stable Collection row IDs in verified reads. */
+  verifiedRecordIds?: string[];
   /** Agent-mode only — search_knowledge_base hits this turn, shown as
    *  compact reference chips (name only; full path/excerpt on hover). */
   references?: WorkspaceKnowledgeReference[];
