@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { addField, addRecord, addView, createCollection, deleteRecord, removeField, setParent, setRecordValue, updateField, updateView, visibleRecords } from "@/app/workspace/collections/model";
-import { exportCollectionCsv, fromTableBlock, importCollectionCsv, importCollectionJson } from "@/app/workspace/collections/io";
-import { createDualTransform, type CanvasBlock } from "@/app/workspace/types/block";
+import { addField, addRecord, addView, createCollection, deleteRecord, removeField, setParent, setRecordValue, updateField, updateView, visibleRecords } from "../../app/workspace/collections/model";
+import { exportCollectionCsv, fromTableBlock, importCollectionCsv, importCollectionJson } from "../../app/workspace/collections/io";
+import { createDualTransform, type CanvasBlock } from "../../app/workspace/types/block";
 
 describe("Workspace universal collections", () => {
   it("preserves record identities across all view switches", () => {

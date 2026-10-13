@@ -340,6 +340,7 @@ const BlockFrameComponent: React.FC<BlockFrameProps> = ({ block, boardId, isVers
         <Renderer
           block={block as never}
           isSelected={isSelected}
+          readOnly={effectiveReadOnly}
           onChange={handleChange}
         />
 

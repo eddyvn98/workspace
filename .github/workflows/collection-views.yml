@@ -10,6 +10,13 @@ on:
       - 'app/workspace/components/WorkspaceInsertPanel.tsx'
       - 'app/workspace/components/WorkspaceTableSelectionToolbar.tsx'
       - '__tests__/workspace/collection-views.test.ts'
+      - '__tests__/workspace/collection-conflicts.test.ts'
+      - '__tests__/browser/collection-acceptance.spec.ts'
+      - 'playwright.collection.config.ts'
+      - 'app/collection-acceptance/**'
+      - 'app/workspace/utils/mergeBoardConflict.ts'
+      - 'lib/workspace/collectionGuard.ts'
+      - 'app/api/workspaces/[id]/sync-board/route.ts'
       - '.github/workflows/collection-views.yml'
 jobs:
   validate:
@@ -28,9 +35,13 @@ jobs:
       - run: pnpm prisma:generate
         env:
           DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
-      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts
+      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts
       - run: pnpm exec tsc --noEmit
       - run: pnpm build
         env:
           DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
           MONGODB_URI: mongodb://localhost:27017/workspace
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test -c playwright.collection.config.ts
+        env:
+          CI: 'true'

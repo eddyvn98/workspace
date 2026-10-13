@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { CollectionBlockPayload, CollectionField, CollectionRecord, CollectionView } from "../collections/model";
 import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FIELD_TYPES, newId, primaryField, recordTitle, removeField, removeView, selectField, setParent, setRecordValue, updateField, updateView, VIEW_KINDS, visibleRecords } from "../collections/model";
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
@@ -21,11 +22,12 @@ function FieldEditor({ field, value, onSet, readOnly }: { field: CollectionField
 
 export function CollectionSurface({ data, onChange, readOnly }: Props) {
   const [search, setSearch] = useState("");
+  const [localViewId, setLocalViewId] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [full, setFull] = useState(false);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const fileInput = useRef<HTMLInputElement>(null);
-  const view = data.views.find((v) => v.id === data.activeViewId) ?? data.views[0];
+  const view = data.views.find((v) => v.id === (localViewId ?? data.activeViewId)) ?? data.views[0];
   const rows = useMemo(() => visibleRecords(data, view, search), [data, view, search]);
   const titleField = primaryField(data);
   const group = selectField(data, view);
@@ -44,16 +46,17 @@ export function CollectionSurface({ data, onChange, readOnly }: Props) {
       if (window.confirm("Replace this collection with imported records?")) onChange(next);
     } catch (error) { window.alert(error instanceof Error ? error.message : "Import failed"); }
   };
-  return <div className={"flex h-full w-full flex-col overflow-hidden bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 " + (full ? "fixed inset-0 z-[9999] p-6" : "")}
-    onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
+  const content = <div className={"flex h-full w-full flex-col overflow-hidden bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 " + (full ? "fixed inset-0 z-[9999] p-2 sm:p-6" : "")}
+    onPointerDown={(e) => { if (!(e.target as HTMLElement).closest("[data-collection-drag-handle]")) e.stopPropagation(); }} onDoubleClick={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 p-2 dark:border-slate-700">
+      <span data-collection-drag-handle title="Drag collection on canvas" className="cursor-move select-none rounded border px-2 py-1 text-xs text-slate-400">⋮⋮</span>
       <input aria-label="Collection title" className="min-w-24 flex-1 bg-transparent text-sm font-semibold outline-none" value={data.title} disabled={readOnly} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       <span className="text-xs text-slate-400">{data.records.length} records</span>
       <button className={btnClass} onClick={() => setFull(!full)}>{full ? "Exit full screen" : "Expand"}</button>
       <button className={btnClass} onClick={() => setSettings(!settings)}>Settings</button>
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 p-2 dark:border-slate-700">
-      {data.views.map((v) => <button key={v.id} className={btnClass + (v.id === view.id ? " border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900" : "")} onClick={() => onChange({ ...data, activeViewId: v.id })}>{v.name}</button>)}
+      {data.views.map((v) => <button key={v.id} className={btnClass + (v.id === view.id ? " border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900" : "")} onClick={() => { if (readOnly) setLocalViewId(v.id); else { setLocalViewId(null); onChange({ ...data, activeViewId: v.id }); } }}>{v.name}</button>)}
       {!readOnly && <select aria-label="Add view" className={inputClass} value="" onChange={(e) => e.target.value && onChange(addView(data, e.target.value as CollectionView["kind"]))}><option value="">+ View</option>{VIEW_KINDS.map((v) => <option key={v} value={v}>{v}</option>)}</select>}
       <input aria-label="Search records" className={inputClass + " ml-auto w-32"} placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
     </div>
@@ -91,6 +94,7 @@ export function CollectionSurface({ data, onChange, readOnly }: Props) {
       <input ref={fileInput} type="file" accept=".csv,.json" className="hidden" onChange={(e) => { void loadFile(e.target.files?.[0]); e.target.value = ""; }} />
     </div>
   </div>;
+  return full && typeof document !== "undefined" ? createPortal(content, document.body) : content;
 }
 
 function CalendarView({ month, setMonth, rows, data, field, readOnly, patch }: { month: string; setMonth: (value: string) => void; rows: CollectionRecord[]; data: CollectionBlockPayload; field?: CollectionField; readOnly: boolean; patch: (r: CollectionRecord, f: CollectionField, v: string) => void }) {

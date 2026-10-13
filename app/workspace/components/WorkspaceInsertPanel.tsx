@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Calculator, FileText, ImagePlus, Presentation, Table2, LayoutGrid } from "lucide-react";
 import { createCollection } from "../collections/model";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
+import { setWorkspaceRealtimeLive } from "../utils/workspaceRealtimeProjection";
 import { type CanvasBlock, createBlockId, createDualTransform } from "../types/block";
 import { getLegacyTableTransform } from "../utils/workspaceTablePlacement";
 import { normalizeSlideDeckData } from "../utils/slideDeckOps";
@@ -86,6 +87,7 @@ export function WorkspaceInsertPanel() {
     const now = Date.now();
     const transform = createDualTransform({ ...getLegacyTableTransform(blocks), w: 900, h: 540 });
     const block: CanvasBlock<"collection"> = { id: createBlockId(), type: "collection", transform, data: createCollection(), createdAt: now, updatedAt: now };
+    setWorkspaceRealtimeLive(null);
     addBlock(block);
     setSelection([block.id]);
   }, [addBlock, blocks, setSelection]);

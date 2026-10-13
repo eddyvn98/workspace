@@ -6,6 +6,7 @@ import { fromTableBlock } from "../collections/io";
 import { createBlockId, createDualTransform, resolveTransform } from "../types/block";
 import type { BlockId, CanvasBlock } from "../types/block";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
+import { setWorkspaceRealtimeLive } from "../utils/workspaceRealtimeProjection";
 import type { TableMode } from "../types/table";
 import { TableCellEditorToolbar, type TableCellEditorCommand } from "./table/TableCellEditorToolbar";
 import { requestSpreadsheetEditor } from "./table/workspaceTableEvents";
@@ -56,6 +57,7 @@ export function WorkspaceTableSelectionToolbar({
       transform: createDualTransform({ ...frame, x: frame.x + frame.w + 80, w: 900, h: 540 }),
       data: fromTableBlock(block), createdAt: now, updatedAt: now,
     };
+    setWorkspaceRealtimeLive(null);
     addBlock(collection);
     setSelection([collection.id]);
   };
