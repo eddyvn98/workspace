@@ -29,7 +29,11 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
     ? selected.parentId : "";
   return <div className="flex h-full min-h-[420px] flex-col gap-2" data-testid="collection-mindmap">
     <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs">
-      <span>Drag to pan, scroll to zoom, select a node to change its parent.</span>
+      <span>Drag to pan or scroll to zoom. Select a record to change its parent.</span>
+      <select aria-label="Mind Map selected record" className={inputClass} value={selected?.id ?? ""}
+        onChange={event => setSelectedId(event.target.value)}>
+        {graph.nodes.map(node => <option key={node.id} value={node.id}>{labels.get(node.id) ?? "Untitled"}</option>)}
+      </select>
       {graph.truncated > 0 && <span className="text-amber-600">
         Displaying first 200 records; {graph.truncated} not drawn
       </span>}
