@@ -1,0 +1,11 @@
+"use client";
+import React from "react";
+import { addRecord, recordTitle, setRecordValue, type CollectionBlockPayload, type CollectionField, type CollectionRecord } from "../collections/model";
+import { btnClass, inputClass, FieldEditor } from "./CollectionFieldEditor";
+interface Props { data: CollectionBlockPayload; rows: CollectionRecord[]; group?: CollectionField;
+  titleField?: CollectionField; groupOptions: string[]; readOnly: boolean;
+  onChange: (next: CollectionBlockPayload) => void;
+  patch: (record: CollectionRecord, field: CollectionField, value: string) => void; }
+export function CollectionKanbanView({ data, rows, group, titleField, groupOptions, readOnly, onChange, patch }: Props) {
+  return <div className="flex h-full min-w-max gap-3">{["", ...groupOptions].map((status) => <div key={status} className="w-52 shrink-0 rounded-lg bg-slate-100 p-2 dark:bg-slate-900" onDragOver={(e) => { if (!readOnly) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/collection-record"); if (group && data.records.some((r) => r.id === id)) onChange(setRecordValue(data, id, group.id, status)); }}><div className="mb-2 text-xs font-semibold">{status || "Unassigned"} · {rows.filter((r) => (r.values[group?.id ?? ""] ?? "") === status).length}</div>{rows.filter((r) => (r.values[group?.id ?? ""] ?? "") === status).map((r) => <div key={r.id} draggable={!readOnly} onDragStart={(e) => e.dataTransfer.setData("text/collection-record", r.id)} className="mb-2 rounded border bg-white p-2 text-xs shadow-sm dark:bg-slate-800"><div className="mb-2 font-semibold">{recordTitle(data, r)}</div>{titleField && <FieldEditor field={titleField} value={r.values[titleField.id] ?? ""} readOnly={readOnly} onSet={(v) => patch(r, titleField, v)} />}{group && <select className={inputClass + " mt-1 w-full"} disabled={readOnly} value={r.values[group.id] ?? ""} onChange={(e) => patch(r, group, e.target.value)}><option value="">Unassigned</option>{groupOptions.map((o) => <option key={o}>{o}</option>)}</select>}</div>)}<button className={btnClass} disabled={readOnly} onClick={() => onChange(addRecord(data, group ? { [group.id]: status } : {}))}>+ Card</button></div>)}</div>;
+}
