@@ -1,4 +1,5 @@
 import type { WorkspaceJson } from "./contracts";
+import { compactCollectionReadResult } from "./collectionReadCompaction";
 import { getWorkspaceResponseLanguageInstruction } from "@/app/workspace/utils/workspaceChatRequest";
 
 export const WORKSPACE_READ_ONLY_COMMANDS = new Set([
@@ -97,6 +98,9 @@ function compact(value: unknown, depth = 0, maxString = 3500, maxArray = 12, max
 export function compactWorkspaceReadResult(actionType: string, value: unknown): WorkspaceJson {
   let result = compact(value, 0, 1200, 8, 16);
   if (JSON.stringify(result).length > 8000) result = compact(value, 0, 500, 4, 12);
+  if (["read_collection", "search_collection_records"].includes(actionType) && result && typeof result === "object" && !Array.isArray(result)) {
+    result = { ...(result as WorkspaceJson), ...compactCollectionReadResult(value) };
+  }
   return { actionType, result: result && typeof result === "object" && !Array.isArray(result) ? result as WorkspaceJson : { value: result } };
 }
 

@@ -8,6 +8,8 @@ import { consumeWorkspaceChatResponse } from "@/app/workspace/utils/workspaceCha
 import { safeWorkspaceAssistantContent } from "@/app/workspace/utils/workspaceChatVisibleContent";
 import type { WorkspaceJson, WorkspaceRuntimeRequest } from "@/lib/workspace-agent/contracts";
 import { verifiedCollectionReadAnswer } from "@/lib/workspace-agent/runtimeReadAnswer";
+import { compactWorkspaceReadResult } from "@/lib/workspace-agent/runtimeSafety";
+import { summarizeCollection } from "@/lib/workspace-agent/collectionContext";
 
 function setup(query: string) {
   const data = createCollection();
@@ -119,5 +121,19 @@ describe("verified read answer shows computed formula values", () => {
     expect(answer).toContain('Fields: {"Price":"10"}');
     expect(answer).toContain('Computed: {"Total":"30"}');
     expect(answer).not.toContain("f-total");
+  });
+});
+
+describe("compacted Collection reads keep every field", () => {
+  it("does not drop fields beyond the eighth or their computed values", () => {
+    const data = createCollection();
+    for (let i = 0; i < 4; i += 1) data.fields.push({ id: `extra-${i}`, name: `Extra ${i}`, type: "number" });
+    data.fields.push({ id: "tot", name: "Total", type: "formula", formulaOperation: "sum", formulaFieldIds: ["extra-0", "extra-1"] });
+    data.records.push({ id: "r1", values: { [data.fields[0].id]: "Row", "extra-0": "2", "extra-1": "3" } });
+    const read = compactWorkspaceReadResult("read_collection", summarizeCollection(data));
+    const answer = verifiedCollectionReadAnswer([read], "Report Total");
+    expect(data.fields.length).toBeGreaterThan(8);
+    expect(answer).toContain('"Extra 1":"3"');
+    expect(answer).toContain('Computed: {"Total":"5"}');
   });
 });
