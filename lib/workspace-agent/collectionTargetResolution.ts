@@ -82,12 +82,21 @@ export function resolveCollectionTargets(raw: WorkspaceJson, board: WorkspaceJso
       const error = resolve(key, null, fields, "field");
       if (error) return { action: next, error };
     }
-    for (const key of ["filter", "sort"]) {
-      const config = object(next[key]);
-      if (!config) continue;
-      const target = matchIdOrName(fields, config.fieldId, "field");
-      if (target.error) return { action: next, error: target.error };
-      next[key] = { ...config, fieldId: target.id };
+    for (const key of ["filter", "sort", "filters", "sorts"]) {
+      const original = next[key];
+      const many = key.endsWith("s");
+      const entries = many ? original : original == null ? [] : [original];
+      if (!Array.isArray(entries)) continue;
+      const resolved: WorkspaceJson[] = [];
+      for (const rawCondition of entries) {
+        const condition = object(rawCondition);
+        if (!condition) { resolved.push(rawCondition as WorkspaceJson); continue; }
+        const target = matchIdOrName(fields, condition.fieldId, "field");
+        if (target.error) return { action: next, error: target.error };
+        resolved.push({ ...condition, fieldId: target.id });
+      }
+      if (many) next[key] = resolved;
+      else if (resolved.length) next[key] = resolved[0];
     }
   }
   return { action: next };

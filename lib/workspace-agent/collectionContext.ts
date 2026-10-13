@@ -15,6 +15,7 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
       id: item.id, name: item.name.slice(0, 160), kind: item.kind,
       groupFieldId: item.groupFieldId, dateFieldId: item.dateFieldId,
       endDateFieldId: item.endDateFieldId, filter: item.filter, sort: item.sort,
+      filters: item.filters, sorts: item.sorts,
     })),
     activeViewId: data.activeViewId,
     selectedViewId: view?.id,

@@ -33,6 +33,7 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   await expect(container).toBeVisible();
   await container.getByRole("button", { name: "+ Record" }).click();
   await container.getByRole("textbox", { name: "Name" }).first().fill("Persisted acceptance record");
+  await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Persisted acceptance record");
   await container.getByRole("button", { name: "Kanban", exact: true }).click();
   await expect(container.getByText("Persisted acceptance record").first()).toBeVisible();
   const reloadResponse = await page.reload();
@@ -59,7 +60,12 @@ test("convert table without mutating source, edit and delete a record", async ({
   const container = page.getByTestId("collection-block");
   await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Original row");
   await expect(page.getByTestId("table-source")).toContainText("Original row");
+  const firstRowId = await container.locator("tr[data-record-id]").first().getAttribute("data-record-id");
   await container.getByRole("textbox", { name: "Name" }).first().fill("Changed in Collection");
+  // A frozen main thread prevents the following assertions from completing.
+  await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Changed in Collection");
+  await expect(container.locator("tr[data-record-id]").first()).toHaveAttribute("data-record-id", firstRowId!);
+  expect(await page.evaluate(() => document.readyState)).toBe("complete");
   await expect(page.getByTestId("table-source")).toContainText("Original row");
   await container.getByRole("button", { name: "Delete Changed in Collection" }).click();
   await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
@@ -87,4 +93,67 @@ test("fullscreen canvas-portal works at desktop and mobile viewport", async ({ p
   expect(dimensions!.height).toBeGreaterThanOrEqual(dimensions!.screenHeight - 2);
   await exit.click();
   await expect(page.getByTestId("collection-block").getByRole("button", { name: "Expand" })).toBeVisible();
+});
+
+test("Table multi-filter and multi-sort survive reload while legacy views remain usable", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  await page.getByRole("button", { name: "Table conversion controls" }).click();
+  await page.getByRole("button", { name: "To Collection" }).click();
+  const table = page.getByTestId("collection-block");
+  await expect(table.getByTestId("collection-tanstack-table")).toBeVisible();
+  await table.getByRole("button", { name: "Settings" }).click();
+  await table.getByRole("button", { name: "+ Filter" }).click();
+  const cells = table.getByTestId("collection-tanstack-table");
+  const nameCells = cells.getByRole("textbox", { name: "Name", exact: true });
+  // An unfinished filter must not hide the existing records.
+  await expect(nameCells).toHaveCount(2);
+  await expect(table.getByText("Inactive until value is entered")).toBeVisible();
+  await table.getByRole("combobox", { name: "Filter field 1" }).selectOption({ label: "Status" });
+  await expect(nameCells).toHaveCount(2);
+  await expect(cells.getByRole("button", { name: "Sort Name", exact: true })).toBeVisible();
+  await expect(cells.getByRole("button", { name: "Sort Status", exact: true })).toBeVisible();
+  // Table conversion saves option labels ("Done"), not source IDs ("done").
+  await table.getByRole("textbox", { name: "Filter value 1" }).fill("Done");
+  expect(await page.evaluate(() => document.readyState)).toBe("complete");
+  await expect(nameCells).toHaveCount(1);
+  await expect(nameCells).toHaveValue("Other row");
+  await table.getByRole("button", { name: "+ Filter" }).click();
+  await table.getByRole("textbox", { name: "Filter value 2" }).fill("Other row");
+  await expect(nameCells).toHaveCount(1);
+  await expect(nameCells).toHaveValue("Other row");
+  await table.getByRole("button", { name: "+ Sort" }).click();
+  await table.getByRole("combobox", { name: "Sort field 1" }).selectOption({ label: "Status" });
+  await table.getByRole("button", { name: "+ Sort" }).click();
+  await table.getByRole("combobox", { name: "Sort field 2" }).selectOption({ label: "Name" });
+  await expect(table.getByRole("combobox", { name: "Sort field 2" })).toBeVisible();
+  // Verify the bottom field controls can be reached inside Settings via scrolling.
+  await table.getByRole("button", { name: "+ Field" }).scrollIntoViewIfNeeded();
+  await expect(table.getByRole("button", { name: "+ Field" })).toBeVisible();
+  const settings = table.getByTestId("collection-settings");
+  await expect(settings).toBeVisible();
+  const reload = await page.reload();
+  expect(reload?.status()).toBe(200);
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  const reopened = page.getByTestId("collection-block");
+  await reopened.getByRole("button", { name: "Settings" }).click();
+  await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("Done");
+  await expect(reopened.getByRole("textbox", { name: "Filter value 2" })).toHaveValue("Other row");
+  await expect(reopened.getByRole("combobox", { name: "Filter field 1" }).locator("option:checked")).toHaveText("Status");
+  await expect(reopened.getByRole("combobox", { name: "Filter field 2" }).locator("option:checked")).toHaveText("Name");
+  await expect(reopened.getByRole("combobox", { name: "Sort field 1" }).locator("option:checked")).toHaveText("Status");
+  await expect(reopened.getByRole("combobox", { name: "Sort field 2" }).locator("option:checked")).toHaveText("Name");
+  await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Other row");
+  await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await expect(reopened.getByRole("button", { name: "+ Filter" })).toBeDisabled();
+  await expect(reopened.getByTestId("collection-tanstack-table")
+    .getByRole("button", { name: "Sort Name", exact: true })).toBeDisabled();
+  // Existing Kanban view still reads the same Collection, and switching back
+  // must not erase the Table view-specific multi-condition configuration.
+  await reopened.getByRole("button", { name: "Kanban", exact: true }).click();
+  await expect(reopened.getByText("Other row", { exact: true }).first()).toBeVisible();
+  await reopened.getByRole("button", { name: "Table", exact: true }).click();
+  await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Other row");
+  await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("Done");
+  await expect(reopened.getByRole("textbox", { name: "Filter value 2" })).toHaveValue("Other row");
 });

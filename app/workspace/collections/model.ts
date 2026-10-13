@@ -21,8 +21,11 @@ export interface CollectionView {
   groupFieldId?: string;
   dateFieldId?: string;
   endDateFieldId?: string;
+  /** Legacy persisted single-condition representation. */
   filter?: { fieldId: string; value: string };
   sort?: { fieldId: string; direction: "asc" | "desc" };
+  filters?: { fieldId: string; value: string }[];
+  sorts?: { fieldId: string; direction: "asc" | "desc" }[];
 }
 export interface CollectionBlockPayload {
   version: 1;
@@ -77,19 +80,26 @@ export function dateField(data: CollectionBlockPayload, view: CollectionView): C
 export function endDateField(data: CollectionBlockPayload, view: CollectionView): CollectionField | undefined {
   return data.fields.find((f) => f.id === view.endDateFieldId && f.type === "date") ?? dateField(data, view);
 }
+export const viewFilters = (view: CollectionView) => view.filters ?? (view.filter ? [view.filter] : []);
+export const viewSorts = (view: CollectionView) => view.sorts ?? (view.sort ? [view.sort] : []);
+/** New arrays override old scalar configs, including intentionally empty arrays. */
 export function visibleRecords(data: CollectionBlockPayload, view: CollectionView, search = ""): CollectionRecord[] {
-  let rows = data.records.filter((r) => (!view.filter || r.values[view.filter.fieldId] === view.filter.value)
+  // An unfinished filter row has no effect until its value is entered.
+  // Keep it in the saved view so users can complete it after reload.
+  const filters = viewFilters(view).filter((filter) => filter.value.trim().length > 0);
+  const sorts = viewSorts(view);
+  let rows = data.records.filter((r) => filters.every((filter) => r.values[filter.fieldId] === filter.value)
     && (!search || Object.values(r.values).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))));
-  if (view.sort) {
-    const { fieldId, direction } = view.sort;
-    const type = data.fields.find((f) => f.id === fieldId)?.type;
-    rows = [...rows].sort((a, b) => {
+  if (sorts.length) rows = [...rows].sort((a, b) => {
+    for (const { fieldId, direction } of sorts) {
+      const type = data.fields.find((f) => f.id === fieldId)?.type;
       const left = a.values[fieldId] ?? "", right = b.values[fieldId] ?? "";
       const diff = type === "number" ? Number(left || 0) - Number(right || 0)
         : left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
-      return direction === "desc" ? -diff : diff;
-    });
-  }
+      if (diff) return direction === "desc" ? -diff : diff;
+    }
+    return 0;
+  });
   return rows;
 }
 export function setRecordValue(data: CollectionBlockPayload, recordId: string, fieldId: string, value: string): CollectionBlockPayload {
@@ -119,6 +129,8 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       ...(v.endDateFieldId === fieldId ? { endDateFieldId: undefined } : {}),
       ...(v.sort?.fieldId === fieldId ? { sort: undefined } : {}),
       ...(v.filter?.fieldId === fieldId ? { filter: undefined } : {}),
+      ...(v.filters ? { filters: v.filters.filter((item) => item.fieldId !== fieldId) } : {}),
+      ...(v.sorts ? { sorts: v.sorts.filter((item) => item.fieldId !== fieldId) } : {}),
     })),
   };
 }
