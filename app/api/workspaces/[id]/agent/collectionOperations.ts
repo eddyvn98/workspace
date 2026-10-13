@@ -71,10 +71,12 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts"] as const) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) Object.assign(patch, { [key]: raw[key] ?? undefined });
     }
-    if ("filters" in patch) patch.filter = undefined;
-    if ("sorts" in patch) patch.sort = undefined;
-    if ("filter" in patch) patch.filters = undefined;
-    if ("sort" in patch) patch.sorts = undefined;
+    // Test the submitted keys, not the patch keys mutated above: otherwise
+    // setting a new plural config would immediately clear itself.
+    if (Object.prototype.hasOwnProperty.call(raw, "filters")) patch.filter = undefined;
+    else if (Object.prototype.hasOwnProperty.call(raw, "filter")) patch.filters = undefined;
+    if (Object.prototype.hasOwnProperty.call(raw, "sorts")) patch.sort = undefined;
+    else if (Object.prototype.hasOwnProperty.call(raw, "sort")) patch.sorts = undefined;
     next = updateView(data, viewId, patch);
     if (prop(raw, "active") === true) next = { ...next, activeViewId: viewId };
   } else if (type === "remove_collection_view") {
