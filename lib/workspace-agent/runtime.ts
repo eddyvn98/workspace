@@ -182,8 +182,6 @@ export async function runWorkspaceAgentTurn(
         return result(input, conversationId, rounds, "completed", summarizeConfirmationRequest(unconfirmed, input.query), receipts, unresolved);
       }
 
-      // The route intentionally rejects mixed Collection reads and edits. Dispatch
-      // contiguous groups in order, each with its own revision and receipt key.
       const groups: WorkspaceJson[][] = [];
       for (const action of actionsToExecute) {
         const previous = groups[groups.length - 1];
@@ -249,15 +247,11 @@ export async function runWorkspaceAgentTurn(
           ...(typeof latestRevision === "number" ? { revision: latestRevision } : {}),
         });
       }
-      // The executor may finish a durable commit while cancellation races it.
-      // Keep the receipt above, then stop this turn before another model step.
       await ensureActive();
       if (!committed) {
         if (unresolved.length === 0) unresolved.push("The executor did not confirm that the batch was saved.");
         return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
       }
-      // A committed history transition completes this request; another model
-      // round could repeat it or undo the confirmed transition itself.
       const historyTransition = actionsToExecute.some((action) => action.type === "undo" || action.type === "redo");
       if (proposal.done || historyTransition) {
         if (actions.some((action) => WORKSPACE_READ_ONLY_COMMANDS.has(String(action.type)))) {
