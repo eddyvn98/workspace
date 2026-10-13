@@ -6,6 +6,8 @@ export interface DifyAgentResponseMetadata {
   focusBlockIds?: string[];
   appliedSummaries?: string[];
   unresolvedSummaries?: string[];
+  /** Workspace runtime verified record IDs, not model-trusted in legacy mode. */
+  verifiedRecordIds?: string[];
   references?: WorkspaceChatMessage["references"];
 }
 
@@ -161,6 +163,7 @@ export function parseDifyAgentAnswer(answer: string): ParsedDifyAgentAnswer {
     focusBlockIds: asStringArray(object.focusBlockIds),
     appliedSummaries: asStringArray(object.appliedSummaries),
     unresolvedSummaries: asStringArray(object.unresolvedSummaries),
+    verifiedRecordIds: asStringArray(object.verifiedRecordIds),
     references: Array.isArray(object.references) ? object.references as WorkspaceChatMessage["references"] : undefined,
   };
 }
