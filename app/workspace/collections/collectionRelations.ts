@@ -7,7 +7,7 @@ export function getCollectionValue(data: CollectionBlockPayload, record: Collect
   // Resolve the canonical field by stable ID; callers may hold a pre-update field snapshot.
   const current = data.fields.find(item => item.id === field.id && item.type === "lookup");
   const relation = data.fields.find(item => item.id === current?.relationFieldId && item.type === "relation");
-  const source = data.fields.find(item => item.id === current?.targetFieldId && item.type !== "lookup" && item.type !== "formula");
+  const source = data.fields.find(item => item.id === current?.targetFieldId && item.type !== "lookup");
   if (!relation || !source) return "";
   const linkedId = record.values[relation.id];
   const target = data.records.find(item => item.id === linkedId);
