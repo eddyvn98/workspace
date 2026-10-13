@@ -4,6 +4,8 @@ import { applyCollectionAction } from "@/app/api/workspaces/[id]/agent/collectio
 import { resolveCollectionTargets } from "@/lib/workspace-agent/collectionTargetResolution";
 import { parseWorkspaceModelProposal } from "@/lib/workspace-agent/proposalValidation";
 import { runWorkspaceAgentTurn } from "@/lib/workspace-agent/runtime";
+import { parseDifyAgentAnswer } from "@/app/workspace/utils/workspaceDifyAgentResponse";
+import { consumeWorkspaceChatResponse } from "@/app/workspace/utils/workspaceChatStream";
 import type { WorkspaceJson, WorkspaceRuntimeRequest } from "@/lib/workspace-agent/contracts";
 
 function fixture() {
@@ -93,5 +95,106 @@ describe("Collection AI issue #5 regressions", () => {
     expect(result.status).toBe("partial");
     expect(result.receipts.map((item) => item.persisted)).toEqual([true, false]);
     expect(result.receipts[0].revisionAfter).toBe(2);
+  });
+
+  it("surfaces a verified search after a saved delete through the final stream when Dify later emits no actions", async () => {
+    const { state, data } = fixture();
+    const primary = data.fields[0].id;
+    const searchResult = {
+      blockId: "c1", collectionTitle: "Smoke", fields: data.fields,
+      records: [{ id: "remaining-r", values: { [primary]: "AI collection parity smoke" } }],
+      recordCount: 1,
+    };
+    let revision = 1;
+    const proposals = [
+      { done: false, message: "Deleting and searching", actions: [
+        { type: "delete_collection_record", blockId: "c1", recordId: "deleted-r" },
+        { type: "search_collection_records", blockId: "c1", query: "AI collection parity smoke" },
+      ] },
+      { done: false, message: "Checking search", actions: [
+        { type: "search_collection_records", blockId: "c1", query: "AI collection parity smoke" },
+      ] },
+      { done: true, message: "Done", actions: [] },
+    ];
+    const execute = vi.fn(async (_input, _turnId, _step, baseRevision, actions) => {
+      expect(baseRevision).toBe(revision);
+      if (actions[0].type === "delete_collection_record") {
+        revision += 1;
+        return { httpStatus: 200, body: { success: true, revision, actions: [
+          { type: "delete_collection_record", ids: ["c1"], changed: true, summary: "deleted-r" },
+        ] } };
+      }
+      return { httpStatus: 200, body: { success: true, revision, actions: [
+        { type: "search_collection_records", ids: ["c1"], changed: false },
+      ], result: searchResult } };
+    });
+    const input: WorkspaceRuntimeRequest = {
+      boardId: "b1", turnId: "turn-read-followup", query: "Delete record then search for AI collection parity smoke",
+      modelSelector: "model", authorization: "Bearer key", workspaceUserToken: "token",
+      canMutate: true, signal: new AbortController().signal,
+    };
+    const turn = await runWorkspaceAgentTurn(input, {
+      readSnapshot: async () => ({ revision, ...state }) as never,
+      modelProvider: { propose: async ({ round }) => ({
+        answer: JSON.stringify(proposals[round - 1]), conversationId: "provider-c",
+      }) },
+      execute,
+    });
+    expect(turn.status).toBe("completed");
+    expect(turn.rounds).toBe(3);
+    expect(execute).toHaveBeenCalledTimes(3);
+    expect(turn.receipts.map((receipt) => [receipt.actionType, receipt.persisted])).toEqual([
+      ["delete_collection_record", true],
+      ["search_collection_records", false],
+      ["search_collection_records", false],
+    ]);
+    expect(turn.unresolvedSummaries).toEqual([]);
+    expect(turn.answer).toContain("search_collection_records");
+    expect(turn.answer).toContain("AI collection parity smoke");
+    expect(turn.answer).toContain("Workspace-verified Collection read result");
+    expect(turn.appliedSummaries).toHaveLength(1);
+    const answer = JSON.stringify({
+      answer: turn.answer,
+      focusBlockIds: turn.focusBlockIds,
+      appliedSummaries: turn.appliedSummaries,
+      unresolvedSummaries: turn.unresolvedSummaries,
+    });
+    const event = { event: "workflow_finished", conversation_id: turn.conversationId, data: { outputs: { answer } } };
+    const stream = new Response(`data: ${JSON.stringify(event)}\\n\\ndata: [DONE]\\n\\n`,
+      { headers: { "content-type": "text/event-stream" } });
+    const parsed = parseDifyAgentAnswer((await consumeWorkspaceChatResponse(stream, () => {})).answer);
+    expect(parsed.content).toContain("search_collection_records");
+    expect(parsed.content).toContain("remaining-r");
+    expect(parsed.appliedSummaries).toHaveLength(1);
+  });
+
+  it("reports a failed read phase as partial and never fabricates a successful read receipt", async () => {
+    const { state } = fixture();
+    const input: WorkspaceRuntimeRequest = {
+      boardId: "b1", turnId: "turn-search-fails", query: "Delete record, then search",
+      modelSelector: "model", authorization: "Bearer key", workspaceUserToken: "token",
+      canMutate: true, signal: new AbortController().signal,
+    };
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ httpStatus: 200, body: { success: true, revision: 4, actions: [
+        { type: "delete_collection_record", ids: ["c1"], changed: true, summary: "deleted" },
+      ] } })
+      .mockResolvedValueOnce({ httpStatus: 422, body: { success: false, revision: 4, error: "Search failed",
+        actions: [{ type: "search_collection_records", ids: [], changed: false }] } });
+    const turn = await runWorkspaceAgentTurn(input, {
+      readSnapshot: async () => ({ revision: 3, ...state }) as never,
+      modelProvider: { propose: async () => ({
+        answer: JSON.stringify({ done: true, message: "All done", actions: [
+          { type: "delete_collection_record", blockId: "c1", recordId: "r" },
+          { type: "search_collection_records", blockId: "c1", query: "remaining" },
+        ] }), conversationId: "provider-c",
+      }) },
+      execute,
+    });
+    expect(turn.status).toBe("partial");
+    expect(turn.receipts.map((r) => r.persisted)).toEqual([true, false]);
+    expect(turn.receipts[1].reason).toMatch(/Search failed/);
+    expect(turn.unresolvedSummaries.join(" ")).toContain("search_collection_records");
+    expect(turn.answer).not.toContain("Workspace-verified Collection read result");
   });
 });
