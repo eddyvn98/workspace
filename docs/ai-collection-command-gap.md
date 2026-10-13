@@ -222,3 +222,28 @@ the final display, not skipped in the executor.
 The combined Chrome/Dify/Postgres/Mongo scenario is **still unverified after
 this change**; run it again and inspect the displayed search result and
 read-versus-write receipts before describing end-to-end acceptance as green.
+
+### Issue #5 follow-up: Collection read field labels and stable row IDs
+
+Chrome retest on `c5fdf37` confirmed read results survive the final model
+round but showed empty row IDs and empty field keys. The Collection executor
+already returns `result.records[].id`, `result.records[].values[fieldId]`,
+and `result.fields[] = {id, name, type}` from `summarizeCollection`.
+The runtime initially printed the raw ID-keyed JSON; the shared assistant
+content sanitizer intentionally strips UUIDs, including IDs embedded as JSON
+keys, corrupting that displayed output.
+
+Verified read summaries now map each value's field ID to its **server-provided
+field name**, render each record's stable ID separately as `Record ID`, and
+include a bounded sample of multiple fields. The runtime passes an allowlist
+of record IDs obtained only from confirmed Workspace read responses; the UI
+sanitizer preserves only those IDs in the `Record ID:` display context.
+All other raw UUID stripping remains unchanged; model text does not authorize
+an allowlist in legacy Dify mode. This is display metadata, not new mutation
+authority, and is retained in the saved chat message.
+
+Focused tests now exercise the actual `summarizeCollection` payload with
+three different fields, stable UUID roundtrip through SSE and the visible
+content sanitizer, filtering of other UUIDs, and existing partial-failure
+semantics. **The combined browser scenario remains unverified on this latest
+commit** until the reviewer re-runs it with local Dify/Postgres/Mongo.
