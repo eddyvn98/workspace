@@ -56,7 +56,7 @@ describe("Collection AI issue #5 confirmed receipt follow-up", () => {
     });
     expect(turn.status).toBe("completed");
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(data.records).toHaveLength(0);
+    expect(state.blocks["collection-1"].data.records).toHaveLength(0);
     expect(turn.receipts).toMatchObject([{ persisted: true, actionType: "delete_collection_record", revisionAfter: 2 }]);
     expect(turn.receipts[0].summary).toContain('deleted Collection record "PR6 smoke keep"');
     expect(turn.answer).not.toContain("delete_collection_record ()");
@@ -95,8 +95,8 @@ describe("Collection AI issue #5 confirmed receipt follow-up", () => {
     expect(turn.receipts).toMatchObject([{ actionType: "create_collection_record", persisted: true }]);
     expect(turn.receipts).toHaveLength(1);
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(data.records).toHaveLength(1);
-    expect(data.records[0].id).toBe(stableId);
+    expect(state.blocks["collection-1"].data.records).toHaveLength(1);
+    expect(state.blocks["collection-1"].data.records[0].id).toBe(stableId);
     expect(turn.answer).toContain("create_collection_record");
     expect(turn.answer).not.toMatch(/Some changes were saved, but|Một phần thay đổi|could not confirm/i);
     const rendered = await visibleRuntimeAnswer(turn.answer, turn.appliedSummaries);
