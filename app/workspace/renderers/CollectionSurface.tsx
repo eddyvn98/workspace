@@ -8,6 +8,7 @@ import { MindMapView } from "./CollectionMindMapView";
 import { CollectionTableView } from "./CollectionTableView";
 import { CollectionKanbanView } from "./CollectionKanbanView";
 import { CollectionGalleryView } from "./CollectionGalleryView";
+import { CollectionViewConditions } from "./CollectionViewConditions";
 import { createPortal } from "react-dom";
 import type { CollectionBlockPayload, CollectionField, CollectionRecord, CollectionView } from "../collections/model";
 import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FIELD_TYPES, newId, primaryField, recordTitle, removeField, removeView, selectField, setParent, setRecordValue, updateField, updateView, VIEW_KINDS, visibleRecords } from "../collections/model";
@@ -57,16 +58,13 @@ export function CollectionSurface({ data, onChange, readOnly }: Props) {
     </div>
     {settings && <div className="max-h-52 shrink-0 space-y-2 overflow-auto border-b bg-slate-50 p-2 text-xs dark:bg-slate-900">
       <div className="flex flex-wrap items-center gap-2"><label>View name <input className={inputClass} value={view.name} disabled={readOnly} onChange={(e) => renameView({ name: e.target.value })} /></label>
-        <label>Sort <select className={inputClass} value={view.sort?.fieldId ?? ""} disabled={readOnly} onChange={(e) => renameView({ sort: e.target.value ? { fieldId: e.target.value, direction: "asc" } : undefined })}><option value="">None</option>{data.fields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
-        {view.sort && <select className={inputClass} value={view.sort.direction} disabled={readOnly} onChange={(e) => renameView({ sort: { ...view.sort!, direction: e.target.value as "asc" | "desc" } })}><option value="asc">Ascending</option><option value="desc">Descending</option></select>}
         <button className={btnClass} disabled={readOnly || data.views.length <= 1} onClick={() => onChange(removeView(data, view.id))}>Delete view</button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <label>Filter <select className={inputClass} value={view.filter?.fieldId ?? ""} disabled={readOnly} onChange={(e) => renameView({ filter: e.target.value ? { fieldId: e.target.value, value: "" } : undefined })}><option value="">None</option>{data.fields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
-        {view.filter && <input className={inputClass} value={view.filter.value} disabled={readOnly} placeholder="Exact value" onChange={(e) => renameView({ filter: { ...view.filter!, value: e.target.value } })} />}
         {view.kind === "kanban" && <label>Group <select className={inputClass} value={group?.id ?? ""} disabled={readOnly} onChange={(e) => renameView({ groupFieldId: e.target.value })}>{data.fields.filter((f) => f.type === "select").map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>}
         {(view.kind === "calendar" || view.kind === "timeline") && <><label>Date <select className={inputClass} value={date?.id ?? ""} disabled={readOnly} onChange={(e) => renameView({ dateFieldId: e.target.value })}>{data.fields.filter((f) => f.type === "date").map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label><label>End <select className={inputClass} value={end?.id ?? ""} disabled={readOnly} onChange={(e) => renameView({ endDateFieldId: e.target.value })}>{data.fields.filter((f) => f.type === "date").map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label></>}
       </div>
+      <CollectionViewConditions view={view} fields={data.fields} readOnly={readOnly} onChange={renameView} />
       <div className="flex flex-wrap gap-2 items-center">
         {data.fields.map((f) => <span key={f.id} className="flex items-center gap-1 rounded border p-1"><input aria-label={"Rename " + f.name} className="w-20 bg-transparent" value={f.name} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { name: e.target.value }))} /><select aria-label={"Type " + f.name} className={inputClass} value={f.type} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { type: e.target.value as CollectionField["type"] }))}>{FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>{f.type === "select" && <input aria-label={"Options " + f.name} className={inputClass + " w-36"} value={(f.options ?? []).join(", ")} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { options: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) }))}/>}<button disabled={readOnly || f.id === data.fields[0].id} onClick={() => onChange(removeField(data, f.id))}>×</button></span>)}
         <button className={btnClass} disabled={readOnly} onClick={() => onChange(addField(data, "Field " + (data.fields.length + 1), "text"))}>+ Field</button>
