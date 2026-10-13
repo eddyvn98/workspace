@@ -57,6 +57,8 @@ export interface WorkspaceRuntimeResult {
   appliedSummaries: string[];
   unresolvedSummaries: string[];
   focusBlockIds: string[];
+  /** Whitelisted by the Workspace executor; never from model-supplied text. */
+  verifiedRecordIds?: string[];
 }
 
 export interface WorkspaceBoardSnapshot extends WorkspaceJson {
