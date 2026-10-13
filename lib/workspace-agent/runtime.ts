@@ -29,15 +29,12 @@ export interface WorkspaceRuntimeDependencies {
   isCancelled?(): Promise<boolean>;
   onProgress?(event: WorkspaceTurnProgressInput): Promise<unknown>;
 }
-
 function record(value: unknown): WorkspaceJson {
   return value && typeof value === "object" && !Array.isArray(value) ? value as WorkspaceJson : {};
 }
-
 function changedActionResults(body: WorkspaceJson): WorkspaceJson[] {
   return Array.isArray(body.actions) ? body.actions.map(record) : [];
 }
-
 function awaitWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(signal.reason ?? new Error("Workspace runtime was cancelled."));
   return new Promise((resolve, reject) => {
@@ -53,12 +50,10 @@ function awaitWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<
     );
   });
 }
-
 const NON_BLOCK_TARGET_ACTIONS = new Set([
   "list_versions", "create_version", "restore_version", "export_board", "import_markdown",
   "list_shares", "share_board", "remove_share", "set_public_link",
 ]);
-
 function result(
   input: WorkspaceRuntimeRequest,
   conversationId: string | null,
@@ -182,8 +177,13 @@ export async function runWorkspaceAgentTurn(
         await ensureActive();
         phase = "executor";
         await reportProgress({ phase: "executing", round });
+        // Progress persistence can yield; never execute after durable cancellation.
+        await ensureActive();
         const group = groups[groupIndex];
-        const execution = await execute(input, input.turnId, round * 100 + groupIndex, currentRevision, group.map(bindConfirmedWorkspaceDefaults));
+        // Preserve the existing single-phase receipt contract (turnId:round).
+        // Extra read/write phases have separate deterministic replay keys.
+        const requestRound = groupIndex === 0 ? round : round * 100 + groupIndex;
+        const execution = await execute(input, input.turnId, requestRound, currentRevision, group.map(bindConfirmedWorkspaceDefaults));
         committed = execution.httpStatus >= 200 && execution.httpStatus < 300 && execution.body.success === true;
         const revisionAfter = Number.isInteger(execution.body.revision) ? Number(execution.body.revision) : null;
         const groupResults = changedActionResults(execution.body);
@@ -213,7 +213,7 @@ export async function runWorkspaceAgentTurn(
           }
           const reason = changed || executedRead ? undefined : String(actionResult.reason ?? execution.body.error ?? "The executor did not confirm this action.");
           receipts.push({
-            requestId: `${input.turnId}:${round * 100 + groupIndex}`,
+            requestId: `${input.turnId}:${requestRound}`,
             actionType, targetIds, persisted: changed,
             revisionBefore: currentRevision,
             revisionAfter: changed ? revisionAfter : null,
