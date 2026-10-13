@@ -116,7 +116,7 @@ describe("Collection AI issue #5 regressions", () => {
       ] },
       { done: true, message: "Done", actions: [] },
     ];
-    const execute = vi.fn(async (_input, _turnId, _step, baseRevision, actions) => {
+    const execute = vi.fn(async (_input: WorkspaceRuntimeRequest, _turnId: string, _step: number, baseRevision: number, actions: WorkspaceJson[]) => {
       expect(baseRevision).toBe(revision);
       if (actions[0].type === "delete_collection_record") {
         revision += 1;
@@ -160,7 +160,7 @@ describe("Collection AI issue #5 regressions", () => {
       unresolvedSummaries: turn.unresolvedSummaries,
     });
     const event = { event: "workflow_finished", conversation_id: turn.conversationId, data: { outputs: { answer } } };
-    const stream = new Response(`data: ${JSON.stringify(event)}\\n\\ndata: [DONE]\\n\\n`,
+    const stream = new Response(`data: ${JSON.stringify(event)}\n\ndata: [DONE]\n\n`,
       { headers: { "content-type": "text/event-stream" } });
     const parsed = parseDifyAgentAnswer((await consumeWorkspaceChatResponse(stream, () => {})).answer);
     expect(parsed.content).toContain("search_collection_records");
