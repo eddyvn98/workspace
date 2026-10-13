@@ -5,6 +5,7 @@ import { flexRender, getCoreRowModel, useReactTable,
 import { deleteRecord, recordTitle, viewSorts, type CollectionBlockPayload,
   type CollectionField, type CollectionRecord, type CollectionView } from "../collections/model";
 import { btnClass, FieldEditor } from "./CollectionFieldEditor";
+import { calculateCollectionAggregate } from "../collections/collectionFormula";
 
 interface Props {
   data: CollectionBlockPayload; view: CollectionView; rows: CollectionRecord[];
@@ -63,5 +64,10 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
       <td><button aria-label={"Delete " + recordTitle(data, row.original)} className={btnClass}
         disabled={readOnly} onClick={() => onChange(deleteRecord(data, row.original.id))}>×</button></td>
     </tr>)}</tbody>
+    {!!view.aggregations?.length && <tfoot><tr>{data.fields.map(field => {
+      const aggregate = view.aggregations?.find(item => item.fieldId === field.id);
+      return <td key={field.id} className="border-t bg-slate-50 p-2 text-xs font-semibold dark:bg-slate-900">
+        {aggregate ? aggregate.operation + ": " + calculateCollectionAggregate(rows, aggregate) : ""}</td>;
+    })}<td className="border-t text-xs">Visible totals</td></tr></tfoot>}
   </table>;
 }

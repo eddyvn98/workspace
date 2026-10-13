@@ -83,12 +83,21 @@ export function resolveCollectionTargets(raw: WorkspaceJson, board: WorkspaceJso
       if (error) return { action: next, error };
     }
   }
+  if ((type === "add_collection_field" || type === "update_collection_field") && Array.isArray(next.formulaFieldIds)) {
+    const resolved: string[] = [];
+    for (const name of next.formulaFieldIds) {
+      const target = matchIdOrName(fields, name, "field");
+      if (target.error) return { action: next, error: target.error };
+      resolved.push(target.id!);
+    }
+    next.formulaFieldIds = resolved;
+  }
   if (type === "configure_collection_view") {
     for (const key of ["groupFieldId", "dateFieldId", "endDateFieldId"]) {
       const error = resolve(key, null, fields, "field");
       if (error) return { action: next, error };
     }
-    for (const key of ["filter", "sort", "filters", "sorts"]) {
+    for (const key of ["filter", "sort", "filters", "sorts", "aggregations"]) {
       const original = next[key];
       const many = key.endsWith("s");
       const entries = many ? original : original == null ? [] : [original];

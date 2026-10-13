@@ -55,7 +55,9 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     const field: CollectionField = { id: fieldId, name: str(prop(raw, "name")).trim(), type: typeValue,
       ...(typeValue === "select" ? { options: prop(raw, "options") as string[] ?? [] } : {}),
       ...(typeValue === "lookup" ? { relationFieldId: str(prop(raw, "relationFieldId")),
-        targetFieldId: str(prop(raw, "targetFieldId")) } : {}) };
+        targetFieldId: str(prop(raw, "targetFieldId")) } : {}),
+      ...(typeValue === "formula" ? { formulaOperation: prop(raw, "formulaOperation") as CollectionField["formulaOperation"],
+        formulaFieldIds: prop(raw, "formulaFieldIds") as string[] } : {}) };
     next = { ...data, fields: [...data.fields, field] };
   } else if (type === "update_collection_field") {
     const patch: Partial<CollectionField> = {};
@@ -64,6 +66,8 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     if (prop(raw, "options") !== undefined) patch.options = prop(raw, "options") as string[];
     if (prop(raw, "relationFieldId") !== undefined) patch.relationFieldId = str(prop(raw, "relationFieldId"));
     if (prop(raw, "targetFieldId") !== undefined) patch.targetFieldId = str(prop(raw, "targetFieldId"));
+    if (prop(raw, "formulaOperation") !== undefined) patch.formulaOperation = prop(raw, "formulaOperation") as CollectionField["formulaOperation"];
+    if (prop(raw, "formulaFieldIds") !== undefined) patch.formulaFieldIds = prop(raw, "formulaFieldIds") as string[];
     next = updateField(data, fieldId, patch);
   } else if (type === "remove_collection_field") {
     next = removeField(data, fieldId);
@@ -72,7 +76,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     next = { ...data, views: [...data.views, view] };
   } else if (type === "configure_collection_view") {
     const patch: Partial<CollectionView> = {};
-    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic"] as const) {
+    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations"] as const) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) Object.assign(patch, { [key]: raw[key] ?? undefined });
     }
     // Test the submitted keys, not the patch keys mutated above: otherwise
