@@ -34,7 +34,7 @@ jobs:
       - run: pnpm prisma:generate
         env:
           DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
-      - run: pnpm exec vitest run __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-ai-issue5.test.ts __tests__/workspace/chat-sessions-routes.test.ts __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/workspace-agent-capability-selection.test.ts __tests__/workspace/agent-action-schema-coverage.test.ts
+      - run: pnpm exec vitest run __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-ai-issue5.test.ts __tests__/workspace/workspace-agent-progress.test.ts __tests__/workspace/workspace-agent-runtime.test.ts __tests__/workspace/chat-sessions-routes.test.ts __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/workspace-agent-capability-selection.test.ts __tests__/workspace/agent-action-schema-coverage.test.ts
       # The main branch has existing failures. Compare *all* Workspace tests
       # by individual test name, never blanket-ignore a failed suite.
       - name: Compare full Workspace Vitest suite with main
