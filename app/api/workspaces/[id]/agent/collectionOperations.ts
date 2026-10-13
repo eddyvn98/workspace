@@ -1,7 +1,7 @@
 import { fromTableBlock } from "@/app/workspace/collections/io";
 import { deleteRecord, recordTitle, removeField, removeView, updateField, updateView, type CollectionBlockPayload, type CollectionField, type CollectionView } from "@/app/workspace/collections/model";
 import type { CanvasBlock } from "@/app/workspace/types/block";
-import { validateCollectionAction, validateCollectionTarget } from "@/lib/workspace-agent/collectionActionValidation";
+import { normalizeCollectionValue, validateCollectionAction, validateCollectionTarget } from "@/lib/workspace-agent/collectionActionValidation";
 import { COLLECTION_COMMANDS, COLLECTION_READ_COMMANDS } from "@/lib/workspace-agent/collectionActionSchema";
 import type { AgentBoardState } from "./operationsCore";
 import { now, record } from "./operationsCore";
@@ -37,10 +37,13 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   const viewId = str(prop(raw, "viewId"));
   let next = data;
   let confirmedSummary: string | undefined;
+  const display = (value: string) => JSON.stringify(value.replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 120));
+  const normalizedValues = () => Object.fromEntries(Object.entries(prop(raw, "values") as Record<string, unknown>)
+    .map(([id, value]) => [id, normalizeCollectionValue(value)!]));
   if (type === "create_collection_record") {
-    next = { ...data, records: [...data.records, { id: recordId, values: prop(raw, "values") as Record<string, string> }] };
+    next = { ...data, records: [...data.records, { id: recordId, values: normalizedValues() }] };
   } else if (type === "update_collection_record") {
-    const values = prop(raw, "values") as Record<string, string>;
+    const values = normalizedValues();
     next = { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, ...values } } : r) };
   } else if (type === "delete_collection_record") {
     const recordToDelete = data.records.find((item) => item.id === recordId);
@@ -89,6 +92,28 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     if (prop(raw, "active") === true) next = { ...next, activeViewId: viewId };
   } else if (type === "remove_collection_view") {
     next = removeView(data, viewId);
+  }
+  if (!confirmedSummary) {
+    const savedRecord = next.records.find((item) => item.id === recordId);
+    const oldRecord = data.records.find((item) => item.id === recordId);
+    const savedField = next.fields.find((item) => item.id === fieldId);
+    const oldField = data.fields.find((item) => item.id === fieldId);
+    const savedView = next.views.find((item) => item.id === viewId);
+    const oldView = data.views.find((item) => item.id === viewId);
+    if (type === "create_collection_record" && savedRecord) confirmedSummary = `created Collection record ${display(recordTitle(next, savedRecord))}`;
+    if (type === "update_collection_record" && savedRecord) {
+      const changes = Object.entries(normalizedValues()).slice(0, 5).map(([id, value]) => {
+        const field = next.fields.find((item) => item.id === id);
+        return field ? `${field.name.slice(0, 80)} = ${display(value)}` : "";
+      }).filter(Boolean).join(", ");
+      confirmedSummary = `updated Collection record ${display(recordTitle(next, oldRecord ?? savedRecord))}: ${changes}`;
+    }
+    if (type === "add_collection_field" && savedField) confirmedSummary = `added Collection field ${display(savedField.name)}`;
+    if (type === "update_collection_field" && savedField) confirmedSummary = `updated Collection field ${display(savedField.name)}`;
+    if (type === "remove_collection_field" && oldField) confirmedSummary = `removed Collection field ${display(oldField.name)}`;
+    if (type === "add_collection_view" && savedView) confirmedSummary = `added Collection view ${display(savedView.name)}`;
+    if (type === "configure_collection_view" && savedView) confirmedSummary = `configured Collection view ${display(savedView.name)}`;
+    if (type === "remove_collection_view" && oldView) confirmedSummary = `removed Collection view ${display(oldView.name)}`;
   }
   if (JSON.stringify(next) === JSON.stringify(data)) return rejected("Collection command made no changes.");
   block.data = next as unknown as JsonMap;
