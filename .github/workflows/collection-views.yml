@@ -16,6 +16,11 @@ on:
       - '__tests__/workspace/collection-calendar-dates.test.ts'
       - '__tests__/workspace/collection-timeline-dates.test.ts'
       - '__tests__/workspace/collection-mindmap-layout.test.ts'
+      - '__tests__/workspace/collection-filter-engine.test.ts'
+      - '__tests__/browser/collection-engine-acceptance.spec.ts'
+      - 'app/workspace/collections/collectionFilters.ts'
+      - 'lib/workspace-agent/collectionActionSchema.ts'
+      - 'lib/workspace-agent/collectionActionValidation.ts'
       - 'app/workspace/renderers/collectionMindMapLayout.ts'
       - 'app/workspace/renderers/collectionTimelineDates.ts'
       - 'app/workspace/renderers/collectionCalendarDates.ts'
@@ -43,7 +48,7 @@ jobs:
       - run: pnpm prisma:generate
         env:
           DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
-      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/collection-multi-filter-sort.test.ts __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-kanban-dnd.test.ts __tests__/workspace/collection-calendar-dates.test.ts __tests__/workspace/collection-timeline-dates.test.ts __tests__/workspace/collection-mindmap-layout.test.ts
+      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/collection-multi-filter-sort.test.ts __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-kanban-dnd.test.ts __tests__/workspace/collection-calendar-dates.test.ts __tests__/workspace/collection-timeline-dates.test.ts __tests__/workspace/collection-mindmap-layout.test.ts __tests__/workspace/collection-filter-engine.test.ts
       - run: pnpm exec tsc --noEmit
       - run: pnpm build
         env:

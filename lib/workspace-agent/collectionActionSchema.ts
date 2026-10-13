@@ -6,13 +6,15 @@ const values: PropertySchema = { type: "object", additionalProperties: true };
 const fieldType: PropertySchema = { type: "string", enum: ["text", "number", "date", "select", "checkbox", "url", "image"] };
 const viewKind: PropertySchema = { type: "string", enum: ["table", "kanban", "calendar", "timeline", "gallery", "mindmap"] };
 const options: PropertySchema = { type: "array", maxItems: 60, items: { type: "string", minLength: 1, maxLength: 160 } };
+const filterOperator: PropertySchema = { type: "string", enum: ["eq", "neq", "contains", "not_contains", "gt", "gte", "lt", "lte", "empty", "not_empty"] };
+const filterLogic: PropertySchema = { type: "string", enum: ["and", "or"] };
 const filter: PropertySchema = { type: "object", nullable: true, additionalProperties: false,
-  required: ["fieldId", "value"], properties: { fieldId: id, value: { type: "string", maxLength: 2000 } } };
+  required: ["fieldId", "value"], properties: { fieldId: id, value: { type: "string", maxLength: 2000 }, operator: filterOperator } };
 const sort: PropertySchema = { type: "object", nullable: true, additionalProperties: false,
   required: ["fieldId", "direction"], properties: { fieldId: id, direction: { type: "string", enum: ["asc", "desc"] } } };
 
 const filters: PropertySchema = { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false,
-  required: ["fieldId", "value"], properties: { fieldId: id, value: { type: "string", maxLength: 2000 } } } };
+  required: ["fieldId", "value"], properties: { fieldId: id, value: { type: "string", maxLength: 2000 }, operator: filterOperator } } };
 const sorts: PropertySchema = { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false,
   required: ["fieldId", "direction"], properties: { fieldId: id, direction: { type: "string", enum: ["asc", "desc"] } } } };
 function define(name: string, required: string[], properties: Record<string, PropertySchema> = {}): RuntimeActionSchema {
@@ -37,7 +39,7 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
     viewId: id, name: word, kind: viewKind }),
   configure_collection_view: define("configure_collection_view", [], {
     viewId: id, viewName: word, name: word, active: { type: "boolean" }, groupFieldId: { ...id, nullable: true },
-    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort, filters, sorts }),
+    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort, filters, sorts, filterLogic }),
   remove_collection_view: define("remove_collection_view", [], { viewId: id, viewName: word }),
   convert_table_to_collection: define("convert_table_to_collection", []),
 };

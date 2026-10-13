@@ -1,4 +1,5 @@
 import { createWorkspaceId } from "../utils/workspaceId";
+import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./collectionFilters";
 
 export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image";
 export type CollectionViewKind = "table" | "kanban" | "calendar" | "timeline" | "gallery" | "mindmap";
@@ -24,7 +25,8 @@ export interface CollectionView {
   /** Legacy persisted single-condition representation. */
   filter?: { fieldId: string; value: string };
   sort?: { fieldId: string; direction: "asc" | "desc" };
-  filters?: { fieldId: string; value: string }[];
+  filters?: CollectionFilter[];
+  filterLogic?: FilterLogic;
   sorts?: { fieldId: string; direction: "asc" | "desc" }[];
 }
 export interface CollectionBlockPayload {
@@ -59,15 +61,11 @@ export function createCollection(): CollectionBlockPayload {
 
 export function normalizeCollection(input: CollectionBlockPayload | null | undefined): CollectionBlockPayload {
   if (!input || !Array.isArray(input.fields) || !Array.isArray(input.records) || !Array.isArray(input.views)) return createCollection();
-  const originalViews = input.views.length ? input.views : createCollection().views;
+  const oldViews = input.views.length ? input.views : createCollection().views;
   const dates = input.fields.filter(field => field.type === "date");
-  // Lazily migrate legacy defaults that pointed both ends at Due.
-  // Never change record IDs, field IDs, or already distinct user choices.
-  const views = originalViews.map(view => {
-    if ((view.kind !== "timeline" && view.kind !== "calendar") || dates.length < 2
-      || view.dateFieldId !== view.endDateFieldId) return view;
-    return { ...view, dateFieldId: dates[0].id, endDateFieldId: dates[1].id };
-  });
+  const views = oldViews.map(view => (view.kind === "timeline" || view.kind === "calendar")
+    && dates.length >= 2 && view.dateFieldId === view.endDateFieldId
+      ? { ...view, dateFieldId: dates[0].id, endDateFieldId: dates[1].id } : view);
   return { ...input, version: 1, title: input.title || "Untitled collection", views, activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
 }
 export function primaryField(data: CollectionBlockPayload): CollectionField | undefined {
@@ -88,15 +86,15 @@ export function dateField(data: CollectionBlockPayload, view: CollectionView): C
 export function endDateField(data: CollectionBlockPayload, view: CollectionView): CollectionField | undefined {
   return data.fields.find((f) => f.id === view.endDateFieldId && f.type === "date") ?? dateField(data, view);
 }
-export const viewFilters = (view: CollectionView) => view.filters ?? (view.filter ? [view.filter] : []);
+export const viewFilters = (view: CollectionView): CollectionFilter[] => view.filters ?? (view.filter ? [view.filter] : []);
 export const viewSorts = (view: CollectionView) => view.sorts ?? (view.sort ? [view.sort] : []);
 /** New arrays override old scalar configs, including intentionally empty arrays. */
 export function visibleRecords(data: CollectionBlockPayload, view: CollectionView, search = ""): CollectionRecord[] {
   // An unfinished filter row has no effect until its value is entered.
   // Keep it in the saved view so users can complete it after reload.
-  const filters = viewFilters(view).filter((filter) => filter.value.trim().length > 0);
+  const filters = viewFilters(view);
   const sorts = viewSorts(view);
-  let rows = data.records.filter((r) => filters.every((filter) => r.values[filter.fieldId] === filter.value)
+  let rows = data.records.filter((r) => matchesViewFilters(r, data.fields, filters, view.filterLogic)
     && (!search || Object.values(r.values).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))));
   if (sorts.length) rows = [...rows].sort((a, b) => {
     for (const { fieldId, direction } of sorts) {
