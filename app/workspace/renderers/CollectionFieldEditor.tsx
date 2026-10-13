@@ -8,7 +8,7 @@ export function FieldEditor({ field, value, onSet, readOnly, data, recordId }: {
   field: CollectionField; value: string; onSet: (value: string) => void;
   readOnly: boolean; data?: CollectionBlockPayload; recordId?: string;
 }) {
-  if (field.type === "lookup") return <output aria-label={field.name}
+  if (field.type === "lookup" || field.type === "formula") return <output aria-label={field.name}
     className="block min-w-20 truncate rounded bg-slate-100 p-1 text-xs dark:bg-slate-800" title={value}>{value}</output>;
   if (field.type === "relation") return <select aria-label={field.name} className={inputClass}
     value={value} disabled={readOnly || !data} onChange={event => onSet(event.target.value)}>
