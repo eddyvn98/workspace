@@ -35,4 +35,37 @@ export const IMAGE_FLOW_ACTION_SCHEMAS: Record<string, RuntimeActionSchema> = {
 			y: { type: "number", minimum: -1000000, maximum: 1000000 },
 		},
 	},
+	update_image_flow_step: {
+		type: "object",
+		additionalProperties: false,
+		required: ["type"],
+		properties: {
+			type: { type: "string", const: "update_image_flow_step" },
+			blockId: { type: "string", minLength: 1, maxLength: 128 },
+			patch: {
+				type: "object", additionalProperties: false,
+				properties: {
+					prompt: { type: "string", maxLength: 8000 },
+					manualText: { type: "string", maxLength: 2000 },
+					// Dynamic mode-specific keys are validated against current mode options in the executor.
+					settings: { type: "object", additionalProperties: true },
+				},
+			},
+			// Existing command callers may send fields under params instead of at top level.
+			params: { type: "object", additionalProperties: true },
+		},
+	},
+	connect_image_flow: {
+		type: "object",
+		additionalProperties: false,
+		required: ["type"],
+		properties: {
+			type: { type: "string", const: "connect_image_flow" },
+			fromBlockId: { type: "string", minLength: 1, maxLength: 128 },
+			toBlockId: { type: "string", minLength: 1, maxLength: 128 },
+			role: { type: "string", enum: ["main", "reference"] },
+			params: { type: "object", additionalProperties: true },
+		},
+	},
+
 };

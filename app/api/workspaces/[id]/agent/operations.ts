@@ -1,3 +1,4 @@
+import { applyCollectionAction } from "./collectionOperations";
 import { targetIds } from "./paritySelectionOperations";
 import { containerPositions, moveContainerMembers } from "./containerMovement";
 import { editContainerFrame } from "./containerFrameEditing";
@@ -91,6 +92,8 @@ export function applyAgentAction(state: AgentBoardState, raw: JsonMap): AgentAct
 
 function applyAgentActionUnnormalized(state: AgentBoardState, raw: JsonMap): AgentActionResult {
   const type = String(raw.type ?? "").toLowerCase();
+  const collectionAction = applyCollectionAction(state, raw);
+  if (collectionAction) return collectionAction;
   const imageFlowAction = applyImageFlowCommand(state, raw, type);
   if (imageFlowAction) return imageFlowAction;
   const mapLayoutChange = type === "arrange_selection" ? redirectMapArrange(state, raw) : null;

@@ -1,3 +1,4 @@
+import { handleCollectionRead } from "./collectionRead";
 import { handleCanvasRead } from "./canvasRead";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -88,6 +89,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (boardResponse) return boardResponse;
   const fileReadResponse = await handleFileReadActions(board, email, plannedActions);
   if (fileReadResponse) return fileReadResponse;
+  const collectionReadResponse = handleCollectionRead(board, plannedActions);
+  if (collectionReadResponse) return collectionReadResponse;
 
   // Operations mutate entities in place, so diffs and history need detached before-images.
   const boardBlocksBefore = structuredClone(board.blocks);
@@ -111,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let editOperation = String(body.editOperation ?? action);
   let state: AgentBoardState = { ...boardContent(board), blocks: nextBlocks, blockOrder: nextOrder, connectors: nextConnectors, title: board.title };
   const previousState = structuredClone(state);
-  const appliedActions: Array<{ type: string; ids: string[]; changed: boolean; reason?: string; notes?: string[] }> = [];
+  const appliedActions: Array<{ type: string; ids: string[]; changed: boolean; reason?: string; notes?: string[]; targets?: { blockId: string; recordId?: string; fieldId?: string; viewId?: string } }> = [];
   const historyType = plannedActions.length === 1 && (plannedActions[0].type === "undo" || plannedActions[0].type === "redo") ? plannedActions[0].type as "undo" | "redo" : undefined;
 
   if (!historyType) {
@@ -170,7 +173,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         // applied its mutation. The complete board diff is calculated once
         // below, instead of cloning/stringifying the board for every action.
         const changed = paletteApplied || result.ids.length > 0;
-        appliedActions.push({ type: String(planned.type ?? ""), ids: result.ids, changed, ...(result.reason ? { reason: result.reason } : {}), ...(result.summary ? { summary: result.summary.slice(0, 240) } : {}), ...(result.notes?.length ? { notes: result.notes } : {}) });
+        const isCollection = String(planned.type ?? "").includes("collection");
+        const collectionTargets = isCollection ? { blockId: String(planned.blockId ?? ""),
+          ...(typeof planned.recordId === "string" ? { recordId: planned.recordId } : {}),
+          ...(typeof planned.fieldId === "string" ? { fieldId: planned.fieldId } : {}),
+          ...(typeof planned.viewId === "string" ? { viewId: planned.viewId } : {}) } : undefined;
+        appliedActions.push({ type: String(planned.type ?? ""), ids: result.ids, changed, ...(collectionTargets ? { targets: collectionTargets } : {}), ...(result.reason ? { reason: result.reason } : {}), ...(result.summary ? { summary: result.summary.slice(0, 240) } : {}), ...(result.notes?.length ? { notes: result.notes } : {}) });
         if (result.operation) editOperation = `ai.${result.operation}`;
       }
       // A model may follow a structured layout choice with arbitrary

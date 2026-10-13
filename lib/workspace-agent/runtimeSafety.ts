@@ -7,6 +7,7 @@ export const WORKSPACE_READ_ONLY_COMMANDS = new Set([
   "export_board",
   "list_shares",
   "list_files",
+  "read_collection", "search_collection_records",
 ]);
 
 const EXPLICIT_CONFIRMATION = /\b(confirm(?:ed)?|yes|proceed|approve|go ahead)\b|xác nhận|đồng ý|tiến hành|cứ làm|hãy thực hiện/i; // vi-allow

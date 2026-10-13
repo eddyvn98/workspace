@@ -173,12 +173,10 @@ export async function listChatSessions(
 	if (typeof input.pinned === "boolean") filter.pinned = input.pinned;
 	const andFilters: Record<string, unknown>[] = [];
 	if (input.workspaceBoardId) {
-		andFilters.push({
-			$or: [
-				{ workspaceBoardId: input.workspaceBoardId },
-				{ workspaceBoardId: { $exists: false } },
-			],
-		});
+		// A board-scoped Workspace history query must not pull legacy/unscoped
+		// conversations into an unrelated board. The owner may still retrieve
+		// those conversations through an unscoped category query.
+		filter.workspaceBoardId = input.workspaceBoardId;
 	}
 
 	if (input.cursor) {

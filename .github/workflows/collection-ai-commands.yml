@@ -1,0 +1,39 @@
+name: Collection AI commands
+on:
+  push:
+    branches: [feat/collection-ai-commands]
+  pull_request:
+    paths:
+      - 'app/api/workspaces/**/agent/**'
+      - 'app/workspace/collections/**'
+      - 'lib/workspace-agent/**'
+      - 'lib/workspace-command-*.ts'
+      - 'config/workspace-command-registry.json'
+      - '__tests__/workspace/collection-ai-commands.test.ts'
+      - '__tests__/workspace/chat-sessions-routes.test.ts'
+      - 'app/api/chat-sessions/**'
+      - 'services/mongodb/chatSessions.repo.ts'
+      - '.github/workflows/collection-ai-commands.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:generate
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+      - run: pnpm exec vitest run __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/chat-sessions-routes.test.ts __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/workspace-agent-capability-selection.test.ts __tests__/workspace/agent-action-schema-coverage.test.ts
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+          MONGODB_URI: mongodb://localhost:27017/workspace

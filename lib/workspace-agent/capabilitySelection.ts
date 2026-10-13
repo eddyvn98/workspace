@@ -12,6 +12,7 @@ const CATEGORY_HINTS: Record<WorkspaceCapabilityCategory, RegExp> = {
   relationship: /connector|connect|disconnect|relationship|edge|link|kết nối|đường nối|liên kết/i, // vi-allow
   map: /\bmap\b|mind.?map|tree.?map|timeline|fishbone|org.?chart|treeview|hierarchy|map.?layout|sơ đồ tư duy|bản đồ|xương cá|sơ đồ tổ chức/i, // vi-allow
   diagram: /diagram|flowchart|swimlane|process|workflow|sơ đồ|quy trình|lưu đồ/i, // vi-allow
+  collection: /collection|database|record|records|kanban|gallery|calendar|collection view|bộ sưu tập|bản ghi|hồ sơ|trạng thái|kanban|lịch|tập hợp dữ liệu/i, // vi-allow
   table: /table|spreadsheet|workbook|worksheet|sheet|cell|row|column|formula|filter|sort|merge|freeze|bảng|ô dữ liệu|hàng|cột|công thức|lọc|sắp xếp bảng/i, // vi-allow
   presentation: /slide|deck|frame|present|speaker note|trình chiếu|trang chiếu|khung trình bày|ghi chú thuyết trình/i, // vi-allow
   shape: /shape|rectangle|ellipse|sticky|hình|khung|hình khối|chú thích dán/i, // vi-allow

@@ -1,3 +1,4 @@
+import { validateCollectionAction } from "./collectionActionValidation";
 import { validateDiagramAction } from "./diagramActionValidation";
 import { validateFrameAction } from "./frameActionValidation";
 import { validateShapeViewContainerAction } from "./shapeViewContainerActionValidation";
@@ -11,7 +12,8 @@ import { validateTableSurfaceAction } from "./tableSurfaceActionValidation";
 import { validateTableWorkbookAction } from "./tableWorkbookActionValidation";
 
 export function validateWorkspaceActionSemantics(action: Record<string, unknown>): string | null {
-  return validateDiagramAction(action)
+  return validateCollectionAction(action)
+    ?? validateDiagramAction(action)
     ?? validateFrameAction(action)
     ?? validateShapeViewContainerAction(action)
     ?? validateSlideAction(action)
