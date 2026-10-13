@@ -235,8 +235,10 @@ test("Timeline date-aligned Gantt commits start and end in one edit and survives
   await block.getByLabel("Due", { exact: true }).first().fill("2026-10-14");
   await block.getByRole("button", { name: "Timeline", exact: true }).click();
   await block.getByRole("button", { name: "Settings" }).click();
-  await expect(block.getByLabel("Date", { exact: true }).locator("option:checked")).toHaveText("Start");
-  await expect(block.getByLabel("End", { exact: true }).locator("option:checked")).toHaveText("Due");
+  await expect.poll(() => block.getByRole("combobox", { name: "Date", exact: true })
+    .evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.text)).toBe("Start");
+  await expect.poll(() => block.getByRole("combobox", { name: "End", exact: true })
+    .evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]?.text)).toBe("Due");
   const timeline = block.getByTestId("collection-timeline");
   await expect(timeline.getByRole("img", { name: "Timeline duration Schedule task 3 days" })).toBeVisible();
   await expect(timeline.getByRole("button", { name: "Extend Schedule task by one day" })).toBeEnabled();
