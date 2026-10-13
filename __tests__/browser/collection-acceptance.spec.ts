@@ -104,12 +104,18 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await expect(table.getByTestId("collection-tanstack-table")).toBeVisible();
   await table.getByRole("button", { name: "Settings" }).click();
   await table.getByRole("button", { name: "+ Filter" }).click();
+  const cells = table.getByTestId("collection-tanstack-table");
+  const nameCells = cells.getByRole("textbox", { name: "Name", exact: true });
+  // An unfinished filter must not hide the existing records.
+  await expect(nameCells).toHaveCount(2);
+  await expect(table.getByText("Inactive until value is entered")).toBeVisible();
   await table.getByRole("combobox", { name: "Filter field 1" }).selectOption({ label: "Status" });
+  await expect(nameCells).toHaveCount(2);
+  await expect(cells.getByRole("button", { name: "Sort Name", exact: true })).toBeVisible();
+  await expect(cells.getByRole("button", { name: "Sort Status", exact: true })).toBeVisible();
   // Table conversion saves option labels ("Done"), not source IDs ("done").
   await table.getByRole("textbox", { name: "Filter value 1" }).fill("Done");
   expect(await page.evaluate(() => document.readyState)).toBe("complete");
-  const cells = table.getByTestId("collection-tanstack-table");
-  const nameCells = cells.getByRole("textbox", { name: "Name", exact: true });
   await expect(nameCells).toHaveCount(1);
   await expect(nameCells).toHaveValue("Other row");
   await table.getByRole("button", { name: "+ Filter" }).click();
@@ -121,6 +127,11 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await table.getByRole("button", { name: "+ Sort" }).click();
   await table.getByRole("combobox", { name: "Sort field 2" }).selectOption({ label: "Name" });
   await expect(table.getByRole("combobox", { name: "Sort field 2" })).toBeVisible();
+  // Verify the bottom field controls can be reached inside Settings via scrolling.
+  await table.getByRole("button", { name: "+ Field" }).scrollIntoViewIfNeeded();
+  await expect(table.getByRole("button", { name: "+ Field" })).toBeVisible();
+  const settings = table.getByTestId("collection-settings");
+  await expect(settings).toBeVisible();
   const reload = await page.reload();
   expect(reload?.status()).toBe(200);
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
@@ -135,10 +146,8 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Other row");
   await page.getByRole("checkbox", { name: "Read-only" }).check();
   await expect(reopened.getByRole("button", { name: "+ Filter" })).toBeDisabled();
-  // The Table sort buttons currently use stable field IDs as their aria-labels.
-  // Select by the displayed column header rather than assuming "Sort Name".
-  const nameHeader = reopened.getByTestId("collection-tanstack-table").locator("thead th").filter({ hasText: "Name" });
-  await expect(nameHeader.getByRole("button")).toBeDisabled();
+  await expect(reopened.getByTestId("collection-tanstack-table")
+    .getByRole("button", { name: "Sort Name", exact: true })).toBeDisabled();
   // Existing Kanban view still reads the same Collection, and switching back
   // must not erase the Table view-specific multi-condition configuration.
   await reopened.getByRole("button", { name: "Kanban", exact: true }).click();
@@ -185,6 +194,7 @@ test("Kanban dnd-kit drag changes persisted status, respects read-only mode", as
   await expect(reopened.getByRole("button", { name: "Drag Drag test record" })).toBeDisabled();
   await expect(reopened.getByRole("combobox", { name: "Status for Drag test record" })).toBeDisabled();
 });
+
 test("Calendar month/week/day navigation and date persistence", async ({ page }) => {
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
@@ -210,6 +220,7 @@ test("Calendar month/week/day navigation and date persistence", async ({ page })
   await page.getByRole("checkbox", { name: "Read-only" }).check();
   await expect(reopened.getByTestId("collection-calendar").getByLabel("Due", { exact: true })).toBeDisabled();
 });
+
 test("Timeline date-aligned Gantt commits start and end in one edit and survives reload", async ({ page }) => {
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
@@ -236,6 +247,7 @@ test("Timeline date-aligned Gantt commits start and end in one edit and survives
   await expect(reopened.getByRole("button", { name: "Move Schedule task forward one day" })).toBeDisabled();
   await expect(reopened.getByRole("button", { name: "Extend Schedule task by one day" })).toBeDisabled();
 });
+
 test("React Flow Mind Map persists parent links, supports zoom and read-only", async ({ page }) => {
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
