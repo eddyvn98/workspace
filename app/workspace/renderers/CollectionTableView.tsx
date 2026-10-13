@@ -45,7 +45,7 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
     <thead>{table.getHeaderGroups().map(group => <tr key={group.id}>
       {group.headers.map(header => <th key={header.id} className="sticky top-0 whitespace-nowrap border-b bg-slate-100 p-2 dark:bg-slate-800">
         <button type="button" disabled={readOnly} onClick={header.column.getToggleSortingHandler()}
-          aria-label={"Sort " + header.column.id}
+          aria-label={"Sort " + (data.fields.find(field => field.id === header.column.id)?.name ?? "column")}
           title="Shift-click to sort by multiple columns">
           {flexRender(header.column.columnDef.header, header.getContext())}
           {header.column.getIsSorted() === "asc" ? " ↑" : header.column.getIsSorted() === "desc" ? " ↓" : ""}

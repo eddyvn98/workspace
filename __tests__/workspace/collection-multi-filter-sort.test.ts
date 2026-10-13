@@ -23,6 +23,17 @@ describe("Collection multiple filters/sorts compatibility", () => {
     expect(viewSorts(view)).toHaveLength(1);
     expect(visibleRecords(d, view).map(r => r.id)).toEqual(["r3", "r0", "r1"]);
   });
+  it("keeps records visible while a blank new filter is being configured", () => {
+    const d = fixture();
+    const view = { ...d.views[0], filters: [
+      { fieldId: d.fields[1].id, value: "" },
+      { fieldId: d.fields[0].id, value: "  " }], sorts: [] };
+    expect(visibleRecords(d, view)).toHaveLength(4);
+    expect(visibleRecords(d, { ...view, filters: [
+      ...view.filters, { fieldId: d.fields[2].id, value: "2026-10-12" }] })).toHaveLength(3);
+    // The unfinished rows are persisted, not discarded or turned into an "is empty" operator.
+    expect(view.filters).toHaveLength(2);
+  });
   it("uses ordered multi-column sort with multi-condition AND filtering", () => {
     const d = fixture();
     const view = { ...d.views[0], filters: [

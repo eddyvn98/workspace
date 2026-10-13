@@ -31,9 +31,10 @@ export function CollectionViewConditions({ view, fields, readOnly, onChange }: P
           }}>
           {fields.map(field => <option key={field.id} value={field.id}>{field.name}</option>)}
         </select>
-        <input aria-label={"Filter value " + (index + 1)} className={inputClass} placeholder="Exact value"
+        <input aria-label={"Filter value " + (index + 1)} className={inputClass} placeholder="Enter value to apply filter"
           disabled={readOnly} value={entry.value} onChange={e => setFilters(filters.map((item, i) =>
             i === index ? { ...item, value: e.target.value } : item))} />
+        {!entry.value.trim() && <span className="text-slate-500" role="status">Inactive until value is entered</span>}
         <button aria-label={"Remove filter " + (index + 1)} className={btnClass} disabled={readOnly}
           onClick={() => setFilters(filters.filter((_, i) => i !== index))}>×</button>
       </div>)}
