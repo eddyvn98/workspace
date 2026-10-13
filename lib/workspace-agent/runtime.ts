@@ -18,6 +18,7 @@ import { parseWorkspaceModelProposal } from "./proposalValidation";
 import { executeWorkspaceActions, readWorkspaceSnapshot, type WorkspaceExecutorResult } from "./workspaceExecutor";
 import { workspaceActionReceiptSummary } from "./receiptSummaries";
 import { partialAnswer } from "./partialAnswer";
+import { completedWorkspaceAnswer } from "./runtimeReadAnswer";
 import { hasPlainMutationClaim, isCanvasMutationRequest } from "@/app/workspace/utils/workspaceDifyAgentResponse";
 import { getWorkspaceResponseLanguageInstruction } from "@/app/workspace/utils/workspaceChatRequest";
 
@@ -70,18 +71,6 @@ function result(
   const appliedSummaries = receipts.filter((item) => item.persisted && item.summary).map((item) => item.summary!);
   const focusBlockIds = [...new Set(receipts.filter((item) => item.persisted && !NON_BLOCK_TARGET_ACTIONS.has(item.actionType)).flatMap((item) => item.targetIds).filter((id) => id !== "board"))];
   return { answer, turnId: input.turnId, conversationId, rounds, status, receipts, appliedSummaries, unresolvedSummaries, focusBlockIds };
-}
-
-function completedAnswer(receipts: WorkspaceRuntimeReceipt[], fallback: string, query: string): string {
-  const summaries = receipts.filter((item) => item.persisted && item.summary).map((item) => item.summary!);
-  const versionReceipt = receipts.find((item) => item.persisted && item.actionType === "create_version" && item.summary);
-  if (versionReceipt?.summary && receipts.filter((item) => item.persisted).length === 1) {
-    return versionReceipt.summary.replace(/^create_version:\s*/, "");
-  }
-  if (summaries.length && getWorkspaceResponseLanguageInstruction(query) === "Vietnamese") {
-    return `Đã lưu các thay đổi trong Workspace: ${summaries.join("; ")}.`; // vi-allow: translated runtime status
-  }
-  return summaries.length ? `Workspace changes were saved: ${summaries.join("; ")}.` : fallback || "Done.";
 }
 
 export async function runWorkspaceAgentTurn(
@@ -150,14 +139,14 @@ export async function runWorkspaceAgentTurn(
       if (proposal.actions.length > 0 && actionsToExecute.length === 0 && replayGuard.suppressed + imageFlowGuard.suppressed > 0) {
         const status = unresolved.length ? "partial" : "completed";
         const answer = status === "completed"
-          ? completedAnswer(receipts, "Workspace changes were saved.", input.query)
+          ? completedWorkspaceAnswer(receipts, "Workspace changes were saved.", input.query, readResults)
           : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts);
         return result(input, conversationId, rounds, status, answer, receipts, unresolved);
       }
       if (proposal.actions.length === 0) {
         if (unresolved.length) return result(input, conversationId, rounds, "partial", partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
-        if (receipts.some((item) => item.persisted)) {
-          return result(input, conversationId, rounds, "completed", completedAnswer(receipts, "Workspace changes were saved.", input.query), receipts, unresolved);
+        if (receipts.some((item) => item.persisted) || readResults.some((item) => ["read_collection", "search_collection_records"].includes(String(item.actionType)))) {
+          return result(input, conversationId, rounds, "completed", completedWorkspaceAnswer(receipts, "Workspace changes were saved.", input.query, readResults), receipts, unresolved);
         }
         if (isCanvasMutationRequest(input.query) && hasPlainMutationClaim(proposal.message)) {
           unresolved.push("The model reported a change without a persisted action receipt.");
@@ -213,7 +202,15 @@ export async function runWorkspaceAgentTurn(
           const targetIds = changed ? resultIds : [];
           const receiptLanguage = getWorkspaceResponseLanguageInstruction(input.query) === "Vietnamese" ? "Vietnamese" : "English";
           const summary = workspaceActionReceiptSummary({ actionType, action, actionResult, language: receiptLanguage, targetIds, snapshot, body: execution.body, changed });
-          if (executedRead) readResults.push(compactWorkspaceReadResult(actionType, execution.body.result));
+          if (executedRead) {
+            const collectionReads = record(execution.body.result).collections;
+            const readValue = Array.isArray(collectionReads) ? collectionReads[index] : execution.body.result;
+            readResults.push({
+              ...compactWorkspaceReadResult(actionType, readValue),
+              ...(typeof action.query === "string" ? { query: action.query } : {}),
+              ...(typeof action.blockId === "string" ? { blockId: action.blockId } : {}),
+            });
+          }
           const reason = changed || executedRead ? undefined : String(actionResult.reason ?? execution.body.error ?? "The executor did not confirm this action.");
           receipts.push({
             requestId: `${input.turnId}:${round * 100 + groupIndex}`,
@@ -256,14 +253,16 @@ export async function runWorkspaceAgentTurn(
       const historyTransition = actionsToExecute.some((action) => action.type === "undo" || action.type === "redo");
       if (proposal.done || historyTransition) {
         if (actions.some((action) => WORKSPACE_READ_ONLY_COMMANDS.has(String(action.type)))) {
-          if (round < WORKSPACE_RUNTIME_MAX_ROUNDS) continue;
-          const details = JSON.stringify(readResults).slice(0, 8000);
-          const language = getWorkspaceResponseLanguageInstruction(input.query);
-          const answer = language === "Vietnamese" ? `Kết quả tra cứu: ${details}` : `Lookup result: ${details}`; // vi-allow
-          return result(input, conversationId, rounds, "completed", answer, receipts, unresolved);
+          const hasCollectionRead = actions.some((action) => ["read_collection", "search_collection_records"].includes(String(action.type)));
+          if (!hasCollectionRead && round < WORKSPACE_RUNTIME_MAX_ROUNDS) continue;
+          const status = unresolved.length ? "partial" : "completed";
+          const answer = status === "completed"
+            ? hasCollectionRead ? completedWorkspaceAnswer(receipts, proposal.message, input.query, readResults) : JSON.stringify(readResults).slice(0, 8000)
+            : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts);
+          return result(input, conversationId, rounds, status, answer, receipts, unresolved);
         }
         const status = unresolved.length ? "partial" : "completed";
-        return result(input, conversationId, rounds, status, status === "completed" ? completedAnswer(receipts, proposal.message, input.query) : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
+        return result(input, conversationId, rounds, status, status === "completed" ? completedWorkspaceAnswer(receipts, proposal.message, input.query, readResults) : partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved);
       }
     }
     unresolved.push("The runtime reached its round limit before confirming the full request.");
