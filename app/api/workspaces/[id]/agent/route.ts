@@ -8,7 +8,7 @@ import { commitAgentMutation, replayCommand } from "./commitMutation";
 import { resolveWorkspaceCallerAuth } from "../../_auth";
 import { resolveAccessRole } from "../../_access";
 import { asBlockRecord, collectBlockEditEvents, collectConnectorEditEvents } from "../../_edit-events";
-import { applyAgentAction, ensureMapClearOfOtherBlocks, type AgentBoardState } from "./operations";
+import { applyAgentAction, ensureMapClearOfOtherBlocks, type AgentActionResult, type AgentBoardState } from "./operations";
 import { layoutExistingMap } from "./mapLayout";
 import { mapRoot } from "./operationsCore";
 import { prepareHistory } from "./history";
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         });
         const resolved = resolveCollectionTargets(planned, { blocks: state.blocks });
         const effective = resolved.action;
-        const result = resolved.error
+        const result: AgentActionResult = resolved.error
           ? { ids: [], operation: String(planned.type ?? ""), reason: resolved.error }
           : applyAgentAction(state, effective);
         if (planned.type === "update_map_style" && result.geometryChanged && result.ids[0]) {
