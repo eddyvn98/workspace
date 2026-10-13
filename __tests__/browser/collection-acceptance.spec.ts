@@ -260,7 +260,7 @@ test("React Flow Mind Map persists parent links, supports zoom and read-only", a
   await block.getByRole("button", { name: "Mind Map", exact: true }).click();
   const map = block.getByTestId("collection-mindmap");
   await expect(map.locator(".react-flow__node")).toHaveCount(2);
-  await map.locator(".react-flow__node").filter({ hasText: "Child" }).click();
+  await map.getByRole("combobox", { name: "Mind Map selected record" }).selectOption({ label: "Child" });
   await map.getByRole("combobox", { name: "Parent of Child" }).selectOption({ label: "Parent" });
   await expect(map.locator(".react-flow__edge")).toHaveCount(1);
   await expect(map.getByRole("button", { name: "Zoom In" })).toBeVisible();
@@ -268,6 +268,6 @@ test("React Flow Mind Map persists parent links, supports zoom and read-only", a
   const reopened = page.getByTestId("collection-block").getByTestId("collection-mindmap");
   await expect(reopened.locator(".react-flow__edge")).toHaveCount(1);
   await page.getByRole("checkbox", { name: "Read-only" }).check();
-  await reopened.locator(".react-flow__node").filter({ hasText: "Child" }).click();
+  await reopened.getByRole("combobox", { name: "Mind Map selected record" }).selectOption({ label: "Child" });
   await expect(reopened.getByRole("combobox", { name: "Parent of Child" })).toBeDisabled();
 });
