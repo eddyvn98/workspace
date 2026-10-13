@@ -236,3 +236,26 @@ test("Timeline date-aligned Gantt commits start and end in one edit and survives
   await expect(reopened.getByRole("button", { name: "Move Schedule task forward one day" })).toBeDisabled();
   await expect(reopened.getByRole("button", { name: "Extend Schedule task by one day" })).toBeDisabled();
 });
+test("React Flow Mind Map persists parent links, supports zoom and read-only", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  const block = page.getByTestId("collection-block");
+  await block.getByRole("button", { name: "+ Record" }).click();
+  await block.getByRole("textbox", { name: "Name", exact: true }).first().fill("Parent");
+  await block.getByRole("button", { name: "+ Record" }).click();
+  await block.getByRole("textbox", { name: "Name", exact: true }).nth(1).fill("Child");
+  await block.getByRole("button", { name: "Mind Map", exact: true }).click();
+  const map = block.getByTestId("collection-mindmap");
+  await expect(map.locator(".react-flow__node")).toHaveCount(2);
+  await map.locator(".react-flow__node").filter({ hasText: "Child" }).click();
+  await map.getByRole("combobox", { name: "Parent of Child" }).selectOption({ label: "Parent" });
+  await expect(map.locator(".react-flow__edge")).toHaveCount(1);
+  await expect(map.getByRole("button", { name: "Zoom In" })).toBeVisible();
+  await page.reload();
+  const reopened = page.getByTestId("collection-block").getByTestId("collection-mindmap");
+  await expect(reopened.locator(".react-flow__edge")).toHaveCount(1);
+  await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await reopened.locator(".react-flow__node").filter({ hasText: "Child" }).click();
+  await expect(reopened.getByRole("combobox", { name: "Parent of Child" })).toBeDisabled();
+});
