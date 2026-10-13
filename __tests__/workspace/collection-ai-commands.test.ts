@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCollection } from "@/app/workspace/collections/model";
+import { summarizeCollection } from "@/lib/workspace-agent/collectionContext";
 import { applyCollectionAction } from "@/app/api/workspaces/[id]/agent/collectionOperations";
 import { validateCollectionAction, validateCollectionTarget } from "@/lib/workspace-agent/collectionActionValidation";
 import { WORKSPACE_RUNTIME_ACTION_SCHEMAS, validateWorkspaceRuntimeAction } from "@/lib/workspace-agent/actionSchema";
@@ -49,7 +50,49 @@ describe("Collection AI command contracts", () => {
     expect(applyCollectionAction(state as never, action)?.ids).toEqual(["c1"]);
     expect(applyCollectionAction(state as never, action)?.ids).toEqual([]);
     expect(state.blocks.c1.data.records).toHaveLength(1);
-    expect(validateCollectionAction({ ...action, values: { [data.fields[0].id]: 5 } })).toMatch(/values/);
+    expect(validateCollectionAction({ ...action, values: { [data.fields[0].id]: 5 } })).toBeNull();
+  });
+  it("normalizes JSON numbers and booleans before saving, rejecting non-scalar inputs", () => {
+    const { data, state } = setup();
+    const price = data.fields[0].id;
+    const enabled = data.fields.find((field) => field.type === "checkbox")?.id ?? "checked";
+    if (!data.fields.some((field) => field.id === enabled)) data.fields.push({ id: enabled, name: "Checked", type: "checkbox" });
+    const command = { type: "create_collection_record", blockId: "c1", recordId: "row-numbers", values: { [price]: 10, [enabled]: true } };
+    expect(validateWorkspaceRuntimeAction(command)).toBeNull();
+    expect(applyCollectionAction(state as never, command)?.ids).toEqual(["c1"]);
+    expect(state.blocks.c1.data.records[0].values).toEqual({ [price]: "10", [enabled]: "true" });
+    expect(validateCollectionAction({ ...command, values: { [price]: null } })).toMatch(/values/);
+    expect(validateCollectionAction({ ...command, values: { [price]: [10] } })).toMatch(/values/);
+  });
+  it("returns formula results as labelled, non-editable computed values", () => {
+    const { data } = setup();
+    const price = "price", quantity = "qty", total = "total";
+    data.fields.push({ id: price, name: "Price", type: "number" },
+      { id: quantity, name: "Qty", type: "number" },
+      { id: total, name: "Total", type: "formula", formulaOperation: "multiply", formulaFieldIds: [price, quantity] });
+    data.records.push({ id: "r1", values: { [data.fields[0].id]: "Test", [price]: "10", [quantity]: "3" } });
+    const read = summarizeCollection(data);
+    expect(read.records[0].values[total]).toBe("30");
+    expect(read.records[0].computedValues).toEqual({ [total]: "30" });
+    expect(data.records[0].values[total]).toBeUndefined();
+  });
+  it("returns human-readable executor-confirmed summaries", () => {
+    const { data, state } = setup();
+    data.records.push({ id: "r1", values: { [data.fields[0].id]: "Task C" } });
+    const updated = applyCollectionAction(state as never, {
+      type: "update_collection_record", blockId: "c1", recordId: "r1", values: { [data.fields[1].id]: "Done" },
+    });
+    expect(updated?.summary).toContain('Task C');
+    expect(updated?.summary).toContain('Status = "Done"');
+    const added = applyCollectionAction(state as never, {
+      type: "add_collection_field", blockId: "c1", fieldId: "stable-custom-id", name: "Priority", fieldType: "text",
+    });
+    expect(added?.summary).toContain('Priority');
+    expect(added?.summary).not.toContain('stable-custom-id');
+    const view = applyCollectionAction(state as never, {
+      type: "configure_collection_view", blockId: "c1", viewId: data.views[0].id, name: "Backlog",
+    });
+    expect(view?.summary).toContain('Backlog');
   });
   it("refuses ambiguous/unknown IDs and retains view identity", () => {
     const { data, state } = setup();

@@ -1,6 +1,7 @@
 import type { CollectionBlockPayload } from "@/app/workspace/collections/model";
 import type { WorkspaceJson } from "./contracts";
 import { COLLECTION_COMMANDS } from "./collectionActionSchema";
+import { normalizeCollectionValue } from "./collectionActionValidation";
 
 type Named = { id: string; name: string };
 type Resolution = { action: WorkspaceJson; error?: string };
@@ -72,7 +73,7 @@ export function resolveCollectionTargets(raw: WorkspaceJson, board: WorkspaceJso
         const target = matchIdOrName(fields, reference, "field");
         if (target.error) return { action: next, error: target.error };
         if (target.id! in mapped) return { action: next, error: `Duplicate Collection field reference: ${reference}.` };
-        mapped[target.id!] = value;
+        mapped[target.id!] = normalizeCollectionValue(value) ?? value;
       }
       next.values = mapped;
     }

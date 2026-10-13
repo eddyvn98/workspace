@@ -292,7 +292,9 @@ export async function runWorkspaceAgentTurn(
     });
     unresolved.push(cancelled
       ? "The turn was cancelled; no further actions were run. Check confirmed receipts before retrying."
-      : "The turn stopped before all proposed work could be confirmed. Check the board before retrying.");
+      : phase === "proposal_validation" && safeErrorMessage
+        ? `The proposed action failed validation: ${safeErrorMessage.slice(0, 220)}`
+        : "The turn stopped before all proposed work could be confirmed. Check the board before retrying.");
     const status = cancelled || receipts.some((item) => item.persisted) ? "partial" : "failed";
     return result(input, conversationId, rounds, status, partialAnswer(receipts.filter((item) => item.persisted).length, input.query, receipts), receipts, unresolved, readResults);
   }

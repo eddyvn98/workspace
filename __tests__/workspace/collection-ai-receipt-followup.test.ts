@@ -7,6 +7,7 @@ import { parseDifyAgentAnswer } from "@/app/workspace/utils/workspaceDifyAgentRe
 import { consumeWorkspaceChatResponse } from "@/app/workspace/utils/workspaceChatStream";
 import { safeWorkspaceAssistantContent } from "@/app/workspace/utils/workspaceChatVisibleContent";
 import type { WorkspaceJson, WorkspaceRuntimeRequest } from "@/lib/workspace-agent/contracts";
+import { verifiedCollectionReadAnswer } from "@/lib/workspace-agent/runtimeReadAnswer";
 
 function setup(query: string) {
   const data = createCollection();
@@ -103,5 +104,20 @@ describe("Collection AI issue #5 confirmed receipt follow-up", () => {
     expect(rendered.visible).toContain("create_collection_record");
     expect(rendered.visible).not.toMatch(/attempted, but applied nothing|Một phần thay đổi/i);
     expect(modelProvider.propose).toHaveBeenCalledTimes(done ? 1 : 2);
+  });
+});
+
+describe("verified read answer shows computed formula values", () => {
+  it("labels computedValues by field name without exposing field IDs", () => {
+    const answer = verifiedCollectionReadAnswer([{
+      actionType: "read_collection", blockId: "b1",
+      result: {
+        fields: [{ id: "f-price", name: "Price" }, { id: "f-total", name: "Total" }],
+        records: [{ id: "r1", values: { "f-price": "10" }, computedValues: { "f-total": "30" } }],
+      },
+    }] as WorkspaceJson[], "Report Total");
+    expect(answer).toContain('Fields: {"Price":"10"}');
+    expect(answer).toContain('Computed: {"Total":"30"}');
+    expect(answer).not.toContain("f-total");
   });
 });
