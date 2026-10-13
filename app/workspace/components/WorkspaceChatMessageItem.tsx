@@ -23,7 +23,7 @@ export const WorkspaceChatMessageItem = React.memo(function WorkspaceChatMessage
   const [copied, setCopied] = useState(false);
   const displayContent =
     msg.role === "assistant"
-      ? safeWorkspaceAssistantContent(msg.content, Boolean(msg.isStreaming || msg.isLoading))
+      ? safeWorkspaceAssistantContent(msg.content, Boolean(msg.isStreaming || msg.isLoading), msg.verifiedRecordIds)
       : msg.content;
 
   const copyContent = async (event: React.MouseEvent) => {
