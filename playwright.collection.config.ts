@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./__tests__/browser",
-  testMatch: "collection-acceptance.spec.ts",
+  testMatch: ["collection-acceptance.spec.ts", "collection-engine-acceptance.spec.ts"],
   timeout: 45_000,
   retries: 0,
   // Keep both projects concurrent to catch cross-browser races, but serve

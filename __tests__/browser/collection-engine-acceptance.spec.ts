@@ -1,0 +1,37 @@
+import { test, expect } from "@playwright/test";
+
+test("compound Collection filters, OR/AND, persistence and read-only controls", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  await page.getByRole("button", { name: "Table conversion controls" }).click();
+  await page.getByRole("button", { name: "To Collection" }).click();
+  const block = page.getByTestId("collection-block");
+  const cells = block.getByTestId("collection-tanstack-table");
+  const names = cells.getByRole("textbox", { name: "Name", exact: true });
+  await block.getByRole("button", { name: "Settings" }).click();
+  await block.getByRole("button", { name: "+ Filter" }).click();
+  await block.getByRole("combobox", { name: "Filter field 1" }).selectOption({ label: "Status" });
+  await block.getByRole("combobox", { name: "Filter operator 1" }).selectOption("neq");
+  await block.getByRole("textbox", { name: "Filter value 1" }).fill("Done");
+  await expect(names).toHaveCount(1);
+  await expect(names.first()).toHaveValue("Original row");
+  await block.getByRole("button", { name: "+ Filter" }).click();
+  await block.getByRole("combobox", { name: "Filter field 2" }).selectOption({ label: "Name" });
+  await block.getByRole("combobox", { name: "Filter operator 2" }).selectOption("contains");
+  await block.getByRole("textbox", { name: "Filter value 2" }).fill("Other");
+  await expect(names).toHaveCount(0);
+  await block.getByRole("combobox", { name: "Filter logic" }).selectOption("or");
+  await expect(names).toHaveCount(2);
+  await page.reload();
+  const reopened = page.getByTestId("collection-block");
+  await reopened.getByRole("button", { name: "Settings" }).click();
+  await expect(reopened.getByRole("combobox", { name: "Filter logic" })).toHaveValue("or");
+  await expect(reopened.getByRole("combobox", { name: "Filter operator 1" })).toHaveValue("neq");
+  await expect(reopened.getByRole("combobox", { name: "Filter operator 2" })).toHaveValue("contains");
+  await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("Done");
+  await expect(reopened.getByRole("textbox", { name: "Filter value 2" })).toHaveValue("Other");
+  await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true })).toHaveCount(2);
+  await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await expect(reopened.getByRole("combobox", { name: "Filter logic" })).toBeDisabled();
+  await expect(reopened.getByRole("combobox", { name: "Filter operator 1" })).toBeDisabled();
+});
