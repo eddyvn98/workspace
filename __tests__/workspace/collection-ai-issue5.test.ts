@@ -8,6 +8,7 @@ import { summarizeCollection } from "@/lib/workspace-agent/collectionContext";
 import { safeWorkspaceAssistantContent } from "@/app/workspace/utils/workspaceChatVisibleContent";
 import { parseDifyAgentAnswer } from "@/app/workspace/utils/workspaceDifyAgentResponse";
 import { consumeWorkspaceChatResponse } from "@/app/workspace/utils/workspaceChatStream";
+import { workspaceReceiptRequestRounds } from "@/lib/workspace-agent/turnStore";
 import type { WorkspaceJson, WorkspaceRuntimeRequest } from "@/lib/workspace-agent/contracts";
 
 function fixture() {
@@ -94,6 +95,8 @@ describe("Collection AI issue #5 regressions", () => {
     expect(execute).toHaveBeenCalledTimes(2);
     expect(execute.mock.calls[0][3]).toBe(1);
     expect(execute.mock.calls[1][3]).toBe(2);
+    expect(execute.mock.calls.map((args) => args[2])).toEqual([1, 101]);
+    expect(result.receipts.map((item) => item.requestId)).toEqual(["turn5:1", "turn5:101"]);
     expect(result.status).toBe("partial");
     expect(result.receipts.map((item) => item.persisted)).toEqual([true, false]);
     expect(result.receipts[0].revisionAfter).toBe(2);
@@ -151,6 +154,8 @@ describe("Collection AI issue #5 regressions", () => {
     expect(turn.status).toBe("completed");
     expect(turn.rounds).toBe(3);
     expect(execute).toHaveBeenCalledTimes(3);
+    expect(execute.mock.calls.map((args) => args[2])).toEqual([1, 101, 2]);
+    expect(turn.receipts.map((receipt) => receipt.requestId)).toEqual(["turn-read-followup:1", "turn-read-followup:101", "turn-read-followup:2"]);
     expect(turn.receipts.map((receipt) => [receipt.actionType, receipt.persisted])).toEqual([
       ["delete_collection_record", true],
       ["search_collection_records", false],
@@ -222,5 +227,52 @@ describe("Collection AI issue #5 regressions", () => {
     expect(turn.receipts[1].reason).toMatch(/Search failed/);
     expect(turn.unresolvedSummaries.join(" ")).toContain("search_collection_records");
     expect(turn.answer).not.toContain("Workspace-verified Collection read result");
+  });
+
+  it("keeps legacy phase request IDs and recovers distinct later phase keys", () => {
+    const ids = workspaceReceiptRequestRounds("turn-phase");
+    expect(ids).toHaveLength(60);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("turn-phase:1");
+    expect(ids).toContain("turn-phase:2");
+    expect(ids).toContain("turn-phase:101");
+    expect(ids).toContain("turn-phase:201");
+    expect(ids).not.toContain("turn-phase:100");
+  });
+
+  it("never runs a read phase after durable cancellation during its progress event", async () => {
+    const { state } = fixture();
+    let cancelled = false;
+    let executingEvents = 0;
+    const execute = vi.fn().mockResolvedValue({
+      httpStatus: 200, body: { success: true, revision: 2,
+        actions: [{ type: "delete_collection_record", ids: ["c1"], changed: true, summary: "deleted" }] },
+    });
+    const input: WorkspaceRuntimeRequest = {
+      boardId: "b1", turnId: "turn-cancel-between", query: "Delete then search",
+      modelSelector: "model", authorization: "Bearer test", workspaceUserToken: "test",
+      canMutate: true, signal: new AbortController().signal,
+    };
+    const turn = await runWorkspaceAgentTurn(input, {
+      readSnapshot: async () => ({ revision: 1, ...state }) as never,
+      modelProvider: { propose: async () => ({
+        answer: JSON.stringify({ done: true, message: "", actions: [
+          { type: "delete_collection_record", blockId: "c1", recordId: "delete-me" },
+          { type: "search_collection_records", blockId: "c1", query: "remaining" },
+        ] }), conversationId: null,
+      }) },
+      execute,
+      isCancelled: async () => cancelled,
+      onProgress: async (event) => {
+        if (event.phase === "executing" && ++executingEvents === 2) {
+          await Promise.resolve();
+          cancelled = true;
+        }
+      },
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(turn.status).toBe("partial");
+    expect(turn.receipts).toMatchObject([{ actionType: "delete_collection_record", persisted: true }]);
+    expect(turn.unresolvedSummaries.join(" ")).toContain("cancelled");
   });
 });
