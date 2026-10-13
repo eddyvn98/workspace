@@ -6,13 +6,15 @@ import { isValidFilterOperator, validOperator } from "@/app/workspace/collection
 const obj = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const str = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
-const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image"]);
+const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup"]);
 const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap"]);
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 
 function validValue(field: CollectionField, value: string): boolean {
   if (value.length > 2000) return false;
   if (!value) return true;
+  if (field.type === "lookup") return false;
+  if (field.type === "relation") return value.length <= 128;
   if (field.type === "checkbox") return value === "true" || value === "false";
   if (field.type === "select") return (field.options ?? []).includes(value);
   if (field.type === "number") return Number.isFinite(Number(value));
@@ -44,7 +46,7 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("options" in action && !validOptions(action.options)) return `${type}.options must contain distinct non-empty strings.`;
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
-  if (type === "update_collection_field" && !["name", "fieldType", "options"].some((key) => key in action)) return "No Collection field changes specified.";
+  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId"].some((key) => key in action)) return "No Collection field changes specified.";
   if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic"].some((key) => key in action)) return "No Collection view changes specified.";
   if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
@@ -85,6 +87,12 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     if (data.fields.some((f) => f.id !== action.fieldId && f.name.toLowerCase() === name.toLowerCase())) return "Ambiguous Collection field name; use a distinct name and exact fieldId.";
     const nextType = String(action.fieldType ?? field?.type ?? "text") as CollectionFieldType;
     if (nextType === "select" && "options" in action && !validOptions(action.options)) return "Invalid select options.";
+    if (nextType === "lookup") {
+      const relationId = action.relationFieldId ?? field?.relationFieldId;
+      const targetId = action.targetFieldId ?? field?.targetFieldId;
+      if (!data.fields.some(f => f.id === relationId && f.type === "relation")) return "Lookup requires an existing relationFieldId.";
+      if (!data.fields.some(f => f.id === targetId && f.type !== "lookup")) return "Lookup requires an existing non-lookup targetFieldId.";
+    }
     if (type === "update_collection_field") {
       const replacement: CollectionField = { ...field!, type: nextType, options: "options" in action ? action.options as string[] : field!.options };
       if (data.records.some((r) => !validValue(replacement, r.values[field!.id] ?? ""))) return "Existing values are incompatible with the new field type/options.";
@@ -96,7 +104,10 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     const values = obj(action.values) ?? {};
     for (const [id, value] of Object.entries(values)) {
       const targetField = data.fields.find((f) => f.id === id);
-      if (!targetField || !validValue(targetField, String(value))) return `Unknown fieldId or invalid value: ${id}.`;
+      if (!targetField || (targetField.type === "lookup") || !validValue(targetField, String(value)))
+        return `Unknown, computed or invalid fieldId/value: ${id}.`;
+      if (targetField.type === "relation" && value !== "" && !data.records.some(r => r.id === value))
+        return `Unknown related recordId: ${String(value).slice(0, 128)}.`;
     }
   }
   if (type === "configure_collection_view") {

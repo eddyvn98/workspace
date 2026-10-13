@@ -1,0 +1,33 @@
+import { test, expect } from "@playwright/test";
+
+test("Collection relation IDs and live lookup projections survive edit and reload", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  const block = page.getByTestId("collection-block");
+  await block.getByRole("button", { name: "+ Record" }).click();
+  await block.getByRole("textbox", { name: "Name", exact: true }).first().fill("Parent");
+  await block.getByRole("button", { name: "+ Record" }).click();
+  await block.getByRole("textbox", { name: "Name", exact: true }).nth(1).fill("Child");
+  await block.getByRole("button", { name: "Settings" }).click();
+  await block.getByRole("button", { name: "+ Field" }).click();
+  await block.getByRole("combobox", { name: "Type Field 7" }).selectOption("relation");
+  await block.getByRole("button", { name: "+ Field" }).click();
+  await block.getByRole("combobox", { name: "Type Field 8" }).selectOption("lookup");
+  await block.getByRole("combobox", { name: "Lookup relation Field 8" }).selectOption({ label: "Field 7" });
+  await block.getByRole("combobox", { name: "Lookup target Field 8" }).selectOption({ label: "Name" });
+  const table = block.getByTestId("collection-tanstack-table");
+  const rows = table.locator("tr[data-record-id]");
+  await expect(rows).toHaveCount(2);
+  const stableId = await rows.nth(1).getAttribute("data-record-id");
+  await rows.nth(1).getByRole("combobox", { name: "Field 7" }).selectOption({ label: "Parent" });
+  await expect(rows.nth(1).locator('output[aria-label="Field 8"]')).toHaveText("Parent");
+  await rows.first().getByRole("textbox", { name: "Name", exact: true }).fill("Updated Parent");
+  await expect(rows.nth(1).locator('output[aria-label="Field 8"]')).toHaveText("Updated Parent");
+  await page.reload();
+  const reopened = page.getByTestId("collection-block").getByTestId("collection-tanstack-table");
+  await expect(reopened.locator("tr[data-record-id]").nth(1)).toHaveAttribute("data-record-id", stableId!);
+  await expect(reopened.locator('output[aria-label="Field 8"]').nth(1)).toHaveText("Updated Parent");
+  await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await expect(reopened.getByRole("combobox", { name: "Field 7" }).nth(1)).toBeDisabled();
+});

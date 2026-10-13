@@ -77,6 +77,12 @@ export function resolveCollectionTargets(raw: WorkspaceJson, board: WorkspaceJso
       next.values = mapped;
     }
   }
+  if (type === "add_collection_field" || type === "update_collection_field") {
+    for (const key of ["relationFieldId", "targetFieldId"]) {
+      const error = resolve(key, null, fields, "field");
+      if (error) return { action: next, error };
+    }
+  }
   if (type === "configure_collection_view") {
     for (const key of ["groupFieldId", "dateFieldId", "endDateFieldId"]) {
       const error = resolve(key, null, fields, "field");

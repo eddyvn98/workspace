@@ -53,13 +53,17 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   } else if (type === "add_collection_field") {
     const typeValue = str(prop(raw, "fieldType")) as CollectionField["type"];
     const field: CollectionField = { id: fieldId, name: str(prop(raw, "name")).trim(), type: typeValue,
-      ...(typeValue === "select" ? { options: prop(raw, "options") as string[] ?? [] } : {}) };
+      ...(typeValue === "select" ? { options: prop(raw, "options") as string[] ?? [] } : {}),
+      ...(typeValue === "lookup" ? { relationFieldId: str(prop(raw, "relationFieldId")),
+        targetFieldId: str(prop(raw, "targetFieldId")) } : {}) };
     next = { ...data, fields: [...data.fields, field] };
   } else if (type === "update_collection_field") {
     const patch: Partial<CollectionField> = {};
     if (prop(raw, "name") !== undefined) patch.name = str(prop(raw, "name")).trim();
     if (prop(raw, "fieldType") !== undefined) patch.type = str(prop(raw, "fieldType")) as CollectionField["type"];
     if (prop(raw, "options") !== undefined) patch.options = prop(raw, "options") as string[];
+    if (prop(raw, "relationFieldId") !== undefined) patch.relationFieldId = str(prop(raw, "relationFieldId"));
+    if (prop(raw, "targetFieldId") !== undefined) patch.targetFieldId = str(prop(raw, "targetFieldId"));
     next = updateField(data, fieldId, patch);
   } else if (type === "remove_collection_field") {
     next = removeField(data, fieldId);
