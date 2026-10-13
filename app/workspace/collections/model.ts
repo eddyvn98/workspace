@@ -127,6 +127,8 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       ...(v.endDateFieldId === fieldId ? { endDateFieldId: undefined } : {}),
       ...(v.sort?.fieldId === fieldId ? { sort: undefined } : {}),
       ...(v.filter?.fieldId === fieldId ? { filter: undefined } : {}),
+      ...(v.filters ? { filters: v.filters.filter((item) => item.fieldId !== fieldId) } : {}),
+      ...(v.sorts ? { sorts: v.sorts.filter((item) => item.fieldId !== fieldId) } : {}),
     })),
   };
 }
