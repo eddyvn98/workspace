@@ -11,6 +11,7 @@ import { CollectionGalleryView } from "./CollectionGalleryView";
 import { CollectionFormView } from "./CollectionFormView";
 import { CollectionCardFormSettings } from "./CollectionCardFormSettings";
 import { CollectionAutomationSettings } from "./CollectionAutomationSettings";
+import { CollectionAuditPanel } from "./CollectionAuditPanel";
 import { CollectionViewConditions } from "./CollectionViewConditions";
 import { createPortal } from "react-dom";
 import type { CollectionBlockPayload, CollectionSources, CollectionField, CollectionRecord, CollectionView } from "../collections/model";
@@ -24,6 +25,7 @@ export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Pr
   const [search, setSearch] = useState("");
   const [localViewId, setLocalViewId] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [full, setFull] = useState(false);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const fileInput = useRef<HTMLInputElement>(null);
@@ -54,12 +56,14 @@ export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Pr
       <span className="text-xs text-slate-400">{data.records.length} records</span>
       <button className={btnClass} onClick={() => setFull(!full)}>{full ? "Exit full screen" : "Expand"}</button>
       <button className={btnClass} onClick={() => setSettings(!settings)}>Settings</button>
+      <button className={btnClass} onClick={() => setShowHistory(!showHistory)}>{showHistory ? "Hide history" : "History"}</button>
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 p-2 dark:border-slate-700">
       {data.views.map((v) => <button key={v.id} className={btnClass + (v.id === view.id ? " border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900" : "")} onClick={() => { if (readOnly) setLocalViewId(v.id); else { setLocalViewId(null); onChange({ ...data, activeViewId: v.id }); } }}>{v.name}</button>)}
       {!readOnly && <select aria-label="Add view" className={inputClass} value="" onChange={(e) => e.target.value && onChange(addView(data, e.target.value as CollectionView["kind"]))}><option value="">+ View</option>{VIEW_KINDS.map((v) => <option key={v} value={v}>{v}</option>)}</select>}
       <input aria-label="Search records" className={inputClass + " ml-auto w-32"} placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
     </div>
+    {showHistory && <CollectionAuditPanel data={data} onClose={() => setShowHistory(false)} />}
     {settings && <div role="region" aria-label="Collection settings" tabIndex={0} data-testid="collection-settings"
       className="max-h-[min(55vh,28rem)] min-h-0 shrink-0 space-y-2 overflow-y-scroll overscroll-contain border-b bg-slate-50 p-2 text-xs dark:bg-slate-900">
       <div className="flex flex-wrap items-center gap-2"><label>View name <input className={inputClass} value={view.name} disabled={readOnly} onChange={(e) => renameView({ name: e.target.value })} /></label>
