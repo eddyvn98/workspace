@@ -4,6 +4,7 @@ const id: PropertySchema = { type: "string", minLength: 1, maxLength: 128 };
 const word: PropertySchema = { type: "string", minLength: 1, maxLength: 160 };
 const values: PropertySchema = { type: "object", additionalProperties: true };
 const body: PropertySchema = { type: "string", maxLength: 20000 };
+const dependsOn: PropertySchema = { type: "array", maxItems: 20, items: id };
 const fieldType: PropertySchema = { type: "string", enum: ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"] };
 const formulaOperation: PropertySchema = { type: "string", enum: ["sum", "subtract", "multiply", "divide", "average", "concat", "expression"] };
 const formulaExpression: PropertySchema = { type: "string", minLength: 1, maxLength: 500 };
@@ -35,7 +36,7 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
   search_collection_records: define("search_collection_records", ["query"], {
     query: { type: "string", minLength: 1, maxLength: 200 }, viewId: id, limit: { type: "integer", minimum: 1, maximum: 30 } }),
   create_collection_record: define("create_collection_record", ["recordId", "values"], { recordId: id, values, body }),
-  update_collection_record: define("update_collection_record", [], { recordId: id, recordName: word, values, body }),
+  update_collection_record: define("update_collection_record", [], { recordId: id, recordName: word, values, body, dependsOn }),
   delete_collection_record: define("delete_collection_record", [], { recordId: id, recordName: word }),
   add_collection_field: define("add_collection_field", ["fieldId", "name", "fieldType"], {
     fieldId: id, name: word, fieldType, options, relationFieldId: id, targetFieldId: id,

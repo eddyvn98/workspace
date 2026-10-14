@@ -1,3 +1,4 @@
+import { setCollectionDependencies } from "@/app/workspace/collections/collectionDependencies";
 import { appendCollectionAudit } from "@/app/workspace/collections/collectionAudit";
 import { deletedCollectionIds, pruneDeletedCollectionLinks } from "@/app/workspace/collections/collectionBoardIntegrity";
 import { applyCollectionAutomations } from "@/app/workspace/collections/collectionAutomations";
@@ -53,6 +54,8 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     next = { ...data, records: data.records.map((r) => r.id === recordId
       ? applyCollectionAutomations(data, r, { ...r, values: { ...r.values, ...values },
         ...(typeof prop(raw, "body") === "string" ? { body: prop(raw, "body") as string } : {}) }, Object.keys(values)) : r) };
+    if (Array.isArray(prop(raw, "dependsOn"))) next = setCollectionDependencies(next, recordId,
+      prop(raw, "dependsOn") as string[]);
   } else if (type === "delete_collection_record") {
     const recordToDelete = data.records.find((item) => item.id === recordId);
     if (recordToDelete) {
