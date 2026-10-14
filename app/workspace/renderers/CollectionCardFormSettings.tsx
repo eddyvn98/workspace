@@ -10,7 +10,7 @@ interface Props {
 export function CollectionCardFormSettings({ view, fields, readOnly, onChange }: Props) {
   if (view.kind !== "gallery" && view.kind !== "form") return null;
   const isForm = view.kind === "form";
-  const allowed = isForm ? fields.filter(field => field.type !== "lookup" && field.type !== "formula") :
+  const allowed = isForm ? fields.filter(field => !["lookup", "formula", "rollup"].includes(field.type)) :
     fields.filter(field => field.type !== "image");
   const defaultGallery = allowed.filter(field => field.id !== fields[0]?.id).slice(0, 3).map(field => field.id);
   const visible = isForm ? (view.formFieldIds ?? allowed.map(field => field.id))

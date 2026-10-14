@@ -3,7 +3,7 @@ import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./c
 import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
 import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
-export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "formula";
+export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "rollup" | "formula";
 export type CollectionViewKind = "table" | "kanban" | "calendar" | "timeline" | "gallery" | "mindmap" | "form";
 
 export interface CollectionField {
@@ -14,6 +14,8 @@ export interface CollectionField {
   /** Lookup: source relation and target field, both stable field IDs. */
   relationFieldId?: string;
   targetFieldId?: string;
+  relationMultiple?: boolean;
+  rollupOperation?: "sum" | "average" | "min" | "max" | "count";
   formulaOperation?: FormulaOperation;
   formulaFieldIds?: string[];
 }
@@ -51,7 +53,7 @@ export interface CollectionBlockPayload {
 }
 
 export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"];
-export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"];
+export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"];
 export const newId = () => createWorkspaceId();
 
 export function createCollection(): CollectionBlockPayload {
@@ -123,7 +125,7 @@ export function visibleRecords(data: CollectionBlockPayload, view: CollectionVie
 }
 export function setRecordValue(data: CollectionBlockPayload, recordId: string, fieldId: string, value: string): CollectionBlockPayload {
   const field = data.fields.find(f => f.id === fieldId);
-  if (!field || field.type === "lookup" || field.type === "formula") return data;
+  if (!field || ["lookup", "formula", "rollup"].includes(field.type)) return data;
   return { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, [fieldId]: value } } : r) };
 }
 export function addRecord(data: CollectionBlockPayload, values: Record<string, string> = {}): CollectionBlockPayload {

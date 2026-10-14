@@ -1,12 +1,13 @@
 import type { WorkspaceJson } from "./contracts";
 import { COLLECTION_COMMANDS } from "./collectionActionSchema";
 import type { CollectionBlockPayload, CollectionField, CollectionFieldType } from "@/app/workspace/collections/model";
+import { relationValueValid } from "@/app/workspace/collections/collectionRelations";
 import { isValidFilterOperator, validOperator } from "@/app/workspace/collections/collectionFilters";
 
 const obj = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const str = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
-const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"]);
+const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"]);
 const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"]);
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -21,7 +22,7 @@ export function normalizeCollectionValue(value: unknown): string | null {
 function validValue(field: CollectionField, value: string): boolean {
   if (value.length > 2000) return false;
   if (!value) return true;
-  if (field.type === "lookup" || field.type === "formula") return false;
+  if (["lookup", "formula", "rollup"].includes(field.type)) return false;
   if (field.type === "relation") return value.length <= 128;
   if (field.type === "checkbox") return value === "true" || value === "false";
   if (field.type === "select") return (field.options ?? []).includes(value);
@@ -54,7 +55,7 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("options" in action && !validOptions(action.options)) return `${type}.options must contain distinct non-empty strings.`;
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
-  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds"].some((key) => key in action)) return "No Collection field changes specified.";
+  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds", "rollupOperation", "relationMultiple"].some((key) => key in action)) return "No Collection field changes specified.";
   if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations", "galleryFieldIds", "formFieldIds", "formRequiredFieldIds"].some((key) => key in action)) return "No Collection view changes specified.";
   if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
@@ -108,12 +109,24 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
       if (op !== "concat" && sources.some(id => !data.fields.some(f => f.id === id && ["number", "lookup"].includes(f.type))))
         return "Numeric formula fields must be numbers or lookups.";
     }
-    if (nextType === "lookup") {
+    if (nextType === "lookup" || nextType === "rollup") {
       const relationId = action.relationFieldId ?? field?.relationFieldId;
       const targetId = action.targetFieldId ?? field?.targetFieldId;
       if (!data.fields.some(f => f.id === relationId && f.type === "relation")) return "Lookup requires an existing relationFieldId.";
-      if (!data.fields.some(f => f.id === targetId && f.type !== "lookup")) return "Lookup requires an existing non-lookup targetFieldId.";
+      if (nextType !== "rollup" || (action.rollupOperation ?? field?.rollupOperation) !== "count") {
+        if (!data.fields.some(f => f.id === targetId && !["lookup", "rollup", "formula", "relation"].includes(f.type)))
+          return "Computed relation requires an existing source field.";
+      }
+      if (nextType === "rollup") {
+        const op = action.rollupOperation ?? field?.rollupOperation;
+        if (!["sum", "average", "min", "max", "count"].includes(String(op))) return "Invalid rollup operation.";
+        if (op !== "count" && !data.fields.some(f => f.id === targetId && f.type === "number"))
+          return "Numeric rollups require a number source field.";
+      }
     }
+    if (nextType === "relation" && action.relationMultiple === false && data.records.some(record =>
+      (record.values[String(action.fieldId)] ?? "").startsWith("[")))
+      return "Remove multi-link values before disabling multiple links.";
     if (type === "update_collection_field") {
       const replacement: CollectionField = { ...field!, type: nextType, options: "options" in action ? action.options as string[] : field!.options };
       if (data.records.some((r) => !validValue(replacement, r.values[field!.id] ?? ""))) return "Existing values are incompatible with the new field type/options.";
@@ -125,9 +138,9 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     const values = obj(action.values) ?? {};
     for (const [id, value] of Object.entries(values)) {
       const targetField = data.fields.find((f) => f.id === id);
-      if (!targetField || (targetField.type === "lookup" || targetField.type === "formula") || !validValue(targetField, String(value)))
+      if (!targetField || ["lookup", "formula", "rollup"].includes(targetField.type) || !validValue(targetField, String(value)))
         return `Unknown, computed or invalid fieldId/value: ${id}.`;
-      if (targetField.type === "relation" && value !== "" && !data.records.some(r => r.id === value))
+      if (targetField.type === "relation" && !relationValueValid(data, targetField, String(value)))
         return `Unknown related recordId: ${String(value).slice(0, 128)}.`;
     }
   }
@@ -142,7 +155,7 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
         return "Invalid or duplicate Collection " + key + ".";
       }
       if (key !== "galleryFieldIds" && ids.some(id => data.fields.some(field => field.id === id
-        && (field.type === "formula" || field.type === "lookup")))) {
+        && (["formula", "lookup", "rollup"].includes(field.type))))) {
         return "Form fields cannot be computed.";
       }
       if (key === "galleryFieldIds" && view?.kind !== "gallery") return "Gallery fields require a Gallery view.";
@@ -172,7 +185,7 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
         used.add(id);
         if (!["sum", "average", "min", "max", "count"].includes(String(item?.operation)))
           return "Invalid Collection aggregate operation.";
-        if (item?.operation !== "count" && !data.fields.some(f => f.id === id && ["number", "formula"].includes(f.type)))
+        if (item?.operation !== "count" && !data.fields.some(f => f.id === id && ["number", "formula", "rollup"].includes(f.type)))
           return "Aggregation requires numeric field or count.";
       }
     }

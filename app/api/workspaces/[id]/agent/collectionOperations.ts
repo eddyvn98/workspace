@@ -57,8 +57,10 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     const typeValue = str(prop(raw, "fieldType")) as CollectionField["type"];
     const field: CollectionField = { id: fieldId, name: str(prop(raw, "name")).trim(), type: typeValue,
       ...(typeValue === "select" ? { options: prop(raw, "options") as string[] ?? [] } : {}),
-      ...(typeValue === "lookup" ? { relationFieldId: str(prop(raw, "relationFieldId")),
+      ...(typeValue === "lookup" || typeValue === "rollup" ? { relationFieldId: str(prop(raw, "relationFieldId")),
         targetFieldId: str(prop(raw, "targetFieldId")) } : {}),
+      ...(typeValue === "relation" ? { relationMultiple: prop(raw, "relationMultiple") === true } : {}),
+      ...(typeValue === "rollup" ? { rollupOperation: str(prop(raw, "rollupOperation")) as CollectionField["rollupOperation"] } : {}),
       ...(typeValue === "formula" ? { formulaOperation: prop(raw, "formulaOperation") as CollectionField["formulaOperation"],
         formulaFieldIds: prop(raw, "formulaFieldIds") as string[] } : {}) };
     next = { ...data, fields: [...data.fields, field] };
@@ -67,6 +69,8 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     if (prop(raw, "name") !== undefined) patch.name = str(prop(raw, "name")).trim();
     if (prop(raw, "fieldType") !== undefined) patch.type = str(prop(raw, "fieldType")) as CollectionField["type"];
     if (prop(raw, "options") !== undefined) patch.options = prop(raw, "options") as string[];
+    if (prop(raw, "relationMultiple") !== undefined) patch.relationMultiple = prop(raw, "relationMultiple") === true;
+    if (prop(raw, "rollupOperation") !== undefined) patch.rollupOperation = str(prop(raw, "rollupOperation")) as CollectionField["rollupOperation"];
     if (prop(raw, "relationFieldId") !== undefined) patch.relationFieldId = str(prop(raw, "relationFieldId"));
     if (prop(raw, "targetFieldId") !== undefined) patch.targetFieldId = str(prop(raw, "targetFieldId"));
     if (prop(raw, "formulaOperation") !== undefined) patch.formulaOperation = prop(raw, "formulaOperation") as CollectionField["formulaOperation"];

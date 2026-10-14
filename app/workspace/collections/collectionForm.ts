@@ -1,8 +1,9 @@
 import { addRecord, type CollectionBlockPayload, type CollectionField, type CollectionView } from "./model";
+import { relationValueValid } from "./collectionRelations";
 
 /** Form values are validated before a single canonical Collection mutation. */
 export const formFields = (data: CollectionBlockPayload, view: CollectionView): CollectionField[] => {
-  const eligible = data.fields.filter(field => field.type !== "formula" && field.type !== "lookup");
+  const eligible = data.fields.filter(field => !["formula", "lookup", "rollup"].includes(field.type));
   return view.formFieldIds === undefined ? eligible :
     eligible.filter(field => view.formFieldIds!.includes(field.id));
 };
@@ -25,7 +26,7 @@ function validValue(data: CollectionBlockPayload, field: CollectionField, value:
   if (field.type === "date") return validDate(value);
   if (field.type === "checkbox") return value === "true" || value === "false";
   if (field.type === "select") return (field.options ?? []).includes(value);
-  if (field.type === "relation") return data.records.some(record => record.id === value);
+  if (field.type === "relation") return relationValueValid(data, field, value);
   if (field.type === "url") {
     try {
       const url = new URL(value);
