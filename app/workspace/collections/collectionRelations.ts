@@ -16,7 +16,7 @@ export function encodeRelationIds(ids: string[], multiple: boolean): string {
   return multiple ? JSON.stringify(unique) : (unique[0] ?? "");
 }
 export function relationValueValid(data: CollectionBlockPayload, field: CollectionField, value: string): boolean {
-  if (!value) return true;
+  if (!value || (field.relationMultiple && value === "[]")) return true;
   if (!field.relationMultiple && value.startsWith("[")) return false;
   const ids = relationIds(value);
   return ids.length > 0 && (field.relationMultiple || ids.length === 1)

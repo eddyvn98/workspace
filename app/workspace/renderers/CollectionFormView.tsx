@@ -4,6 +4,7 @@ import type { CollectionBlockPayload, CollectionField, CollectionView } from "..
 import { formFields, requiredFormFieldIds, submitCollectionForm } from "../collections/collectionForm";
 import { btnClass, inputClass } from "./CollectionFieldEditor";
 import { recordTitle } from "../collections/model";
+import { relationIds, encodeRelationIds } from "../collections/collectionRelations";
 
 interface Props { data: CollectionBlockPayload; view: CollectionView; readOnly: boolean;
   onChange: (next: CollectionBlockPayload) => void; }
@@ -13,6 +14,11 @@ function FormInput({ field, data, value, onSet, readOnly, required }: {
 }) {
   if (field.type === "checkbox") return <input type="checkbox" checked={value === "true"} required={required}
     disabled={readOnly} onChange={event => onSet(String(event.target.checked))} />;
+  if (field.type === "relation" && field.relationMultiple) return <select multiple
+    className={inputClass + " min-h-28 w-full"} value={relationIds(value)} required={required} disabled={readOnly}
+    onChange={event => onSet(encodeRelationIds(Array.from(event.currentTarget.selectedOptions, option => option.value), true))}>
+    {data.records.map(record => <option key={record.id} value={record.id}>{recordTitle(data, record)}</option>)}
+  </select>;
   if (field.type === "select" || field.type === "relation") {
     const options = field.type === "select" ? (field.options ?? []).map(option => ({ id: option, name: option })) :
       data.records.map(record => ({ id: record.id, name: recordTitle(data, record) }));
