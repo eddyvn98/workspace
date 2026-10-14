@@ -6,7 +6,7 @@ import { FieldEditor, btnClass } from "./CollectionFieldEditor";
 import { addUtcDays, timelineLayout } from "./collectionTimelineDates";
 import { parseCalendarDay } from "./collectionCalendarDates";
 import { CollectionGanttBar } from "./CollectionGanttBar";
-import { scheduleCollectionDependencies, setCollectionDependencies } from "../collections/collectionDependencies";
+import { longestCollectionDependencyChain, scheduleCollectionDependencies, setCollectionDependencies } from "../collections/collectionDependencies";
 
 interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; start?: CollectionField;
   end?: CollectionField; readOnly: boolean; onChange: (next: CollectionBlockPayload) => void;
@@ -14,6 +14,10 @@ interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; start?
 const CELL = 26;
 export function TimelineView({ rows, data, start, end, readOnly, onChange, patch }: Props) {
   const [scale, setScale] = useState<"day" | "week">("day");
+  const [highlightChain, setHighlightChain] = useState(false);
+  const longest = useMemo(() => longestCollectionDependencyChain(data, start?.id, end?.id),
+    [data, start?.id, end?.id]);
+  const highlightedIds = new Set(highlightChain ? longest.ids : []);
   const view = useMemo(() => timelineLayout(rows, start?.id, end?.id), [rows, start?.id, end?.id]);
   const span = view.days * CELL;
   const changeDates = (record: CollectionRecord, amount: number) => {
@@ -44,6 +48,11 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
         onClick={() => onChange(scheduleCollectionDependencies(data, start?.id, end?.id))}>
         Schedule dependencies
       </button>
+      <label className="flex items-center gap-1">
+        <input type="checkbox" checked={highlightChain}
+          onChange={event => setHighlightChain(event.target.checked)} />
+        Longest dependency chain ({longest.days} task-days)
+      </label>
       <label>Ruler <select className="rounded border p-1" aria-label="Timeline ruler"
         value={scale} onChange={event => setScale(event.target.value as "day" | "week")}>
         <option value="day">Days</option><option value="week">Weeks</option>
@@ -78,6 +87,7 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
               {startOffset < view.days && <CollectionGanttBar
                 left={startOffset * CELL} width={Math.min(length, view.days - startOffset) * CELL}
                 label={recordTitle(data, record)} disabled={readOnly}
+                highlighted={highlightedIds.has(record.id)}
                 onMove={days => changeDates(record, days)}
                 onResize={days => resize(record, days)} />}
             </div>

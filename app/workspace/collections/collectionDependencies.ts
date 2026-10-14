@@ -82,3 +82,41 @@ export function scheduleCollectionDependencies(data: CollectionBlockPayload,
   }
   return changed ? { ...data, records: data.records.map(row => result.get(row.id) ?? row) } : data;
 }
+
+
+/** Longest dated dependency chain by sum of task durations.
+ * This is not a full resource-constrained CPM/slack computation. */
+export function longestCollectionDependencyChain(data: CollectionBlockPayload,
+  startFieldId?: string, endFieldId?: string): { ids: string[]; days: number } {
+  if (!startFieldId) return { ids: [], days: 0 };
+  const records = new Map(data.records.map(row => [row.id, row]));
+  const memo = new Map<string, { ids: string[]; days: number }>();
+  const active = new Set<string>();
+  const visit = (id: string): { ids: string[]; days: number } => {
+    if (memo.has(id)) return memo.get(id)!;
+    if (active.has(id)) return { ids: [], days: 0 };
+    const row = records.get(id);
+    if (!row) return { ids: [], days: 0 };
+    active.add(id);
+    let longest = { ids: [] as string[], days: 0 };
+    for (const parentId of row.dependsOn ?? []) {
+      const candidate = visit(parentId);
+      if (candidate.days > longest.days) longest = candidate;
+    }
+    const start = dateMs(row.values[startFieldId] ?? "");
+    const finish = dateMs(row.values[endFieldId ?? ""] || row.values[startFieldId] || "");
+    const duration = start === null || finish === null ? 0 : Math.max(1, Math.round((finish - start) / DAY) + 1);
+    const result = duration > 0
+      ? { ids: [...longest.ids, id], days: longest.days + duration }
+      : longest;
+    active.delete(id);
+    memo.set(id, result);
+    return result;
+  };
+  let result = { ids: [] as string[], days: 0 };
+  for (const id of records.keys()) {
+    const path = visit(id);
+    if (path.days > result.days) result = path;
+  }
+  return result;
+}
