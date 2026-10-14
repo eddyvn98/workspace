@@ -59,7 +59,7 @@ export async function runCollectionScheduleBatch(
         "scheduler@workspace.internal", "schedule.tick"),
       content: {
         title: board.title,
-        blocks: next as Prisma.InputJsonValue,
+        blocks: next as unknown as Prisma.InputJsonValue,
         blockOrder: board.blockOrder as Prisma.InputJsonValue,
         connectors: board.connectors as Prisma.InputJsonValue,
         camera: board.camera as Prisma.InputJsonValue,

@@ -18,7 +18,11 @@ function authorized(request: NextRequest): boolean {
 export async function POST(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   let body: { cursor?: unknown; limit?: unknown } = {};
-  try { body = await request.json(); } catch { /* An empty body starts at the first board. */ }
+  try {
+    const raw: unknown = await request.json();
+    if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) body = raw as typeof body;
+    else return NextResponse.json({ error: "Expected JSON object" }, { status: 400 });
+  } catch { /* An empty body starts at the first board. */ }
   if (body.cursor !== undefined &&
     (typeof body.cursor !== "string" || body.cursor.length > 128)) {
     return NextResponse.json({ error: "Invalid pagination cursor" }, { status: 400 });

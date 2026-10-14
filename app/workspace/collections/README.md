@@ -123,3 +123,18 @@ Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.conf
   enabled node-dragging behaviour.
 - Per owner instruction, this code is intentionally untested until a later
   validation/repair pass.
+
+
+## Backend-driven daily Collection automation
+
+- Disabled-by-default daily rules are configured in Collection Settings.
+- Each rule has local time, one of the supported IANA timezones, an optional
+  exact-match field condition and a writable field/value to update.
+- This uses a **secured Node.js job endpoint** and the existing board revision
+  CAS commit instead of timers in the browser; a rule records its committed
+  local run date to avoid repeating the same day's action.
+- The scheduler must be deployed and invoked periodically by a real host job.
+  Rules do not run until that separate runtime setup is complete.
+- Detailed operator guide: [docs/workspace-collection-scheduler.md](../../../docs/workspace-collection-scheduler.md).
+- No external notifications or webhook delivery are implemented by this
+  scheduler. Code remains untested per the owner's current workflow.
