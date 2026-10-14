@@ -1,13 +1,15 @@
 import type { WorkspaceJson } from "./contracts";
 import { COLLECTION_COMMANDS } from "./collectionActionSchema";
 import type { CollectionBlockPayload, CollectionField, CollectionFieldType } from "@/app/workspace/collections/model";
+import { validCollectionExpression } from "@/app/workspace/collections/collectionFormulaExpression";
+import { relationValueValid } from "@/app/workspace/collections/collectionRelations";
 import { isValidFilterOperator, validOperator } from "@/app/workspace/collections/collectionFilters";
 
 const obj = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const str = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
-const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"]);
-const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap"]);
+const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"]);
+const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"]);
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 
 /** Collection cells persist strings, but a model may emit JSON numbers or booleans. */
@@ -21,8 +23,8 @@ export function normalizeCollectionValue(value: unknown): string | null {
 function validValue(field: CollectionField, value: string): boolean {
   if (value.length > 2000) return false;
   if (!value) return true;
-  if (field.type === "lookup" || field.type === "formula") return false;
-  if (field.type === "relation") return value.length <= 128;
+  if (["lookup", "formula", "rollup"].includes(field.type)) return false;
+  if (field.type === "relation") return value.length <= 2000;
   if (field.type === "checkbox") return value === "true" || value === "false";
   if (field.type === "select") return (field.options ?? []).includes(value);
   if (field.type === "number") return Number.isFinite(Number(value));
@@ -54,8 +56,8 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("options" in action && !validOptions(action.options)) return `${type}.options must contain distinct non-empty strings.`;
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
-  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds"].some((key) => key in action)) return "No Collection field changes specified.";
-  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations"].some((key) => key in action)) return "No Collection view changes specified.";
+  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds", "formulaExpression", "rollupOperation", "relationMultiple", "relationTargetBlockId"].some((key) => key in action)) return "No Collection field changes specified.";
+  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations", "galleryFieldIds", "formFieldIds", "formRequiredFieldIds"].some((key) => key in action)) return "No Collection view changes specified.";
   if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
   return null;
@@ -98,22 +100,49 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     if (nextType === "formula") {
       const op = action.formulaOperation ?? field?.formulaOperation;
       const sources = action.formulaFieldIds ?? field?.formulaFieldIds;
-      if (!["sum", "subtract", "multiply", "divide", "average", "concat"].includes(String(op)))
+      if (!["sum", "subtract", "multiply", "divide", "average", "concat", "expression"].includes(String(op)))
         return "Formula requires a supported formulaOperation.";
-      if (!Array.isArray(sources) || sources.length < 2 || sources.length > 10 ||
-        sources.some(id => !data.fields.some(f => f.id === id && f.type !== "formula")))
-        return "Formula requires 2–10 existing non-formula field IDs.";
-      if (["subtract", "divide"].includes(String(op)) && sources.length !== 2)
-        return "Formula operation requires exactly two fields.";
-      if (op !== "concat" && sources.some(id => !data.fields.some(f => f.id === id && ["number", "lookup"].includes(f.type))))
-        return "Numeric formula fields must be numbers or lookups.";
+      if (op === "expression") {
+        const expression = action.formulaExpression ?? field?.formulaExpression;
+        if (typeof expression !== "string" || !validCollectionExpression(expression, data, String(action.fieldId)))
+          return "Expression must be bounded arithmetic with numeric {fieldId} references.";
+      } else {
+        if (!Array.isArray(sources) || sources.length < 2 || sources.length > 10 ||
+          sources.some(id => !data.fields.some(f => f.id === id && f.type !== "formula")))
+          return "Formula requires 2–10 existing non-formula field IDs.";
+        if (["subtract", "divide"].includes(String(op)) && sources.length !== 2)
+          return "Formula operation requires exactly two fields.";
+        if (op !== "concat" && sources.some(id => !data.fields.some(f =>
+          f.id === id && ["number", "lookup", "rollup"].includes(f.type))))
+          return "Numeric formula fields must be numbers or computed numeric values.";
+      }
     }
-    if (nextType === "lookup") {
+    if (nextType === "lookup" || nextType === "rollup") {
       const relationId = action.relationFieldId ?? field?.relationFieldId;
       const targetId = action.targetFieldId ?? field?.targetFieldId;
+      const relation = data.fields.find(f => f.id === relationId && f.type === "relation");
+      const sourceBlock = relation?.relationTargetBlockId ? obj(obj(board.blocks)?.[relation.relationTargetBlockId]) : null;
+      const sourceData = sourceBlock?.type === "collection" ? obj(sourceBlock.data) as unknown as CollectionBlockPayload : data;
       if (!data.fields.some(f => f.id === relationId && f.type === "relation")) return "Lookup requires an existing relationFieldId.";
-      if (!data.fields.some(f => f.id === targetId && f.type !== "lookup")) return "Lookup requires an existing non-lookup targetFieldId.";
+      if (nextType !== "rollup" || (action.rollupOperation ?? field?.rollupOperation) !== "count") {
+        if (!sourceData.fields.some(f => f.id === targetId && !["lookup", "rollup", "formula", "relation"].includes(f.type)))
+          return "Computed relation requires an existing source field.";
+      }
+      if (nextType === "rollup") {
+        const op = action.rollupOperation ?? field?.rollupOperation;
+        if (!["sum", "average", "min", "max", "count"].includes(String(op))) return "Invalid rollup operation.";
+        if (op !== "count" && !sourceData.fields.some(f => f.id === targetId && f.type === "number"))
+          return "Numeric rollups require a number source field.";
+      }
     }
+    if (nextType === "relation" && (action.relationTargetBlockId || field?.relationTargetBlockId)) {
+      const targetBlockId = String(action.relationTargetBlockId ?? field?.relationTargetBlockId);
+      const targetBlock = obj(obj(board.blocks)?.[targetBlockId]);
+      if (!targetBlock || targetBlock.type !== "collection") return "Relation target must be a Collection block on this board.";
+    }
+    if (nextType === "relation" && action.relationMultiple === false && data.records.some(record =>
+      (record.values[String(action.fieldId)] ?? "").startsWith("[")))
+      return "Remove multi-link values before disabling multiple links.";
     if (type === "update_collection_field") {
       const replacement: CollectionField = { ...field!, type: nextType, options: "options" in action ? action.options as string[] : field!.options };
       if (data.records.some((r) => !validValue(replacement, r.values[field!.id] ?? ""))) return "Existing values are incompatible with the new field type/options.";
@@ -125,13 +154,38 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     const values = obj(action.values) ?? {};
     for (const [id, value] of Object.entries(values)) {
       const targetField = data.fields.find((f) => f.id === id);
-      if (!targetField || (targetField.type === "lookup" || targetField.type === "formula") || !validValue(targetField, String(value)))
+      if (!targetField || ["lookup", "formula", "rollup"].includes(targetField.type) || !validValue(targetField, String(value)))
         return `Unknown, computed or invalid fieldId/value: ${id}.`;
-      if (targetField.type === "relation" && value !== "" && !data.records.some(r => r.id === value))
+      if (targetField.type === "relation" && !relationValueValid(data, targetField, String(value),
+        Object.fromEntries(Object.entries(obj(board.blocks)).filter(([, block]) => obj(block)?.type === "collection")
+          .map(([id, block]) => [id, obj(obj(block)?.data) as unknown as CollectionBlockPayload]))))
         return `Unknown related recordId: ${String(value).slice(0, 128)}.`;
     }
   }
   if (type === "configure_collection_view") {
+    // Validate field layout changes against the proposed state, not only persisted arrays.
+    const fieldIds = ["galleryFieldIds", "formFieldIds", "formRequiredFieldIds"] as const;
+    for (const key of fieldIds) {
+      if (!(key in action)) continue;
+      const ids = action[key];
+      if (!Array.isArray(ids) || ids.length > 100 || new Set(ids).size !== ids.length ||
+        ids.some(id => typeof id !== "string" || !data.fields.some(field => field.id === id))) {
+        return "Invalid or duplicate Collection " + key + ".";
+      }
+      if (key !== "galleryFieldIds" && ids.some(id => data.fields.some(field => field.id === id
+        && (["formula", "lookup", "rollup"].includes(field.type))))) {
+        return "Form fields cannot be computed.";
+      }
+      if (key === "galleryFieldIds" && view?.kind !== "gallery") return "Gallery fields require a Gallery view.";
+      if (key !== "galleryFieldIds" && view?.kind !== "form") return "Form fields require a Form view.";
+    }
+    if (view?.kind === "form") {
+      const eligible = data.fields.filter(field => field.type !== "lookup" && field.type !== "formula").map(field => field.id);
+      const visible = action.formFieldIds ?? view.formFieldIds ?? eligible;
+      const required = action.formRequiredFieldIds ?? view.formRequiredFieldIds ?? [data.fields[0]?.id];
+      if (!Array.isArray(visible) || !Array.isArray(required) ||
+        required.some(id => !visible.includes(id))) return "Required form fields must be visible.";
+    }
     for (const [key, expectedType] of [["groupFieldId", "select"], ["dateFieldId", "date"], ["endDateFieldId", "date"]]) {
       const id = action[key];
       if (id !== undefined && id !== null && !data.fields.some((f) => f.id === id && f.type === expectedType)) return `${key} must identify an existing ${expectedType} field.`;
@@ -149,7 +203,7 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
         used.add(id);
         if (!["sum", "average", "min", "max", "count"].includes(String(item?.operation)))
           return "Invalid Collection aggregate operation.";
-        if (item?.operation !== "count" && !data.fields.some(f => f.id === id && ["number", "formula"].includes(f.type)))
+        if (item?.operation !== "count" && !data.fields.some(f => f.id === id && ["number", "formula", "rollup"].includes(f.type)))
           return "Aggregation requires numeric field or count.";
       }
     }

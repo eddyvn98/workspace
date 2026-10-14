@@ -61,3 +61,16 @@ An intermittent dev-only `Hydration failed` overlay was observed under `<Workspa
 The previous Playwright setup ran `next dev` with two workers (desktop and mobile). During concurrent reload Next Fast Refresh rebuilt modules and occasionally failed to fetch the RSC payload; the fixture remained at the server-rendered `Preparing browser test…` shell because React never hydrated. Running the mobile test alone passed, supporting a dev/HMR race rather than proven data loss. The remedy is to **build once and start immutable Next production mode**, retaining **2 workers** to detect any real concurrency bugs. The opt-in `/collection-acceptance` page is forced dynamic so `COLLECTION_BROWSER_ACCEPTANCE=true` is evaluated at request time, not frozen during build. Reusing an existing dev server is disabled. Tests now assert HTTP 200, hydrated fixture readiness, record values after reload, and absence of runtime hydration/RSC failures.
 
 Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.config.ts`. The webServer uses `pnpm exec next start -p 3137` with an isolated port. Stop any existing server on port 3137 before running. Browser fixture verifies real components and `localStorage`, **not authenticated Postgres or a deployed WebSocket room**.
+
+
+## Collection capabilities added on feature branch (October 2026)
+
+- Form View creates records in the canonical Collection, with configurable required and visible fields.
+- Gallery cards have per-view configurable columns and bounded rendering.
+- Same-Collection multi-relations are stored as JSON arrays in existing string cells; existing single-ID values still work. Relations may also target records in another Collection block on the same board.
+- Lookup and rollup are read-only projected values. Rollups count linked records or calculate sum / average / min / max over numeric source values. Foreign targets are read from sibling board blocks; records are only edited in their owning Collection.
+- Formula expressions accept numeric \`{fieldId}\` references and arithmetic operators (+, -, *, /, parentheses); parsing is bounded and never uses eval. Existing fixed-operation formulas remain supported.
+- One-pass record automation rules can change another writable field when a trigger field transitions to an exact value; model commands use the same deterministic rule function as the UI.
+- Gantt bars support direct pointer move/resize, alongside the previous keyboard-accessible controls; Mind Map nodes can be dragged near another node to change their parent.
+- Foreign-Collection links do **not** create cross-block cascade updates. Removing a target record leaves its foreign reference stale until the owner fixes it; the UI displays an empty computed value when its target is absent. Do not claim per-record Yjs realtime or global relational integrity.
+- No tests or staging acceptance were run for these new changes per user instruction. Treat this branch as unverified work-in-progress until a later repair pass.

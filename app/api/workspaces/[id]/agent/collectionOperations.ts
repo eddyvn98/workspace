@@ -1,3 +1,4 @@
+import { applyCollectionAutomations } from "@/app/workspace/collections/collectionAutomations";
 import { fromTableBlock } from "@/app/workspace/collections/io";
 import { deleteRecord, recordTitle, removeField, removeView, updateField, updateView, type CollectionBlockPayload, type CollectionField, type CollectionView } from "@/app/workspace/collections/model";
 import type { CanvasBlock } from "@/app/workspace/types/block";
@@ -41,10 +42,13 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   const normalizedValues = () => Object.fromEntries(Object.entries(prop(raw, "values") as Record<string, unknown>)
     .map(([id, value]) => [id, normalizeCollectionValue(value)!]));
   if (type === "create_collection_record") {
-    next = { ...data, records: [...data.records, { id: recordId, values: normalizedValues() }] };
+    const values = normalizedValues();
+    next = { ...data, records: [...data.records,
+      applyCollectionAutomations(data, null, { id: recordId, values }, Object.keys(values))] };
   } else if (type === "update_collection_record") {
     const values = normalizedValues();
-    next = { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, ...values } } : r) };
+    next = { ...data, records: data.records.map((r) => r.id === recordId
+      ? applyCollectionAutomations(data, r, { ...r, values: { ...r.values, ...values } }, Object.keys(values)) : r) };
   } else if (type === "delete_collection_record") {
     const recordToDelete = data.records.find((item) => item.id === recordId);
     if (recordToDelete) {
@@ -57,19 +61,27 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     const typeValue = str(prop(raw, "fieldType")) as CollectionField["type"];
     const field: CollectionField = { id: fieldId, name: str(prop(raw, "name")).trim(), type: typeValue,
       ...(typeValue === "select" ? { options: prop(raw, "options") as string[] ?? [] } : {}),
-      ...(typeValue === "lookup" ? { relationFieldId: str(prop(raw, "relationFieldId")),
+      ...(typeValue === "lookup" || typeValue === "rollup" ? { relationFieldId: str(prop(raw, "relationFieldId")),
         targetFieldId: str(prop(raw, "targetFieldId")) } : {}),
+      ...(typeValue === "relation" ? { relationMultiple: prop(raw, "relationMultiple") === true,
+        relationTargetBlockId: str(prop(raw, "relationTargetBlockId")) || undefined } : {}),
+      ...(typeValue === "rollup" ? { rollupOperation: str(prop(raw, "rollupOperation")) as CollectionField["rollupOperation"] } : {}),
       ...(typeValue === "formula" ? { formulaOperation: prop(raw, "formulaOperation") as CollectionField["formulaOperation"],
-        formulaFieldIds: prop(raw, "formulaFieldIds") as string[] } : {}) };
+        formulaFieldIds: prop(raw, "formulaFieldIds") as string[],
+        formulaExpression: str(prop(raw, "formulaExpression")) } : {}) };
     next = { ...data, fields: [...data.fields, field] };
   } else if (type === "update_collection_field") {
     const patch: Partial<CollectionField> = {};
     if (prop(raw, "name") !== undefined) patch.name = str(prop(raw, "name")).trim();
     if (prop(raw, "fieldType") !== undefined) patch.type = str(prop(raw, "fieldType")) as CollectionField["type"];
     if (prop(raw, "options") !== undefined) patch.options = prop(raw, "options") as string[];
+    if (prop(raw, "relationTargetBlockId") !== undefined) patch.relationTargetBlockId = str(prop(raw, "relationTargetBlockId"));
+    if (prop(raw, "relationMultiple") !== undefined) patch.relationMultiple = prop(raw, "relationMultiple") === true;
+    if (prop(raw, "rollupOperation") !== undefined) patch.rollupOperation = str(prop(raw, "rollupOperation")) as CollectionField["rollupOperation"];
     if (prop(raw, "relationFieldId") !== undefined) patch.relationFieldId = str(prop(raw, "relationFieldId"));
     if (prop(raw, "targetFieldId") !== undefined) patch.targetFieldId = str(prop(raw, "targetFieldId"));
     if (prop(raw, "formulaOperation") !== undefined) patch.formulaOperation = prop(raw, "formulaOperation") as CollectionField["formulaOperation"];
+    if (prop(raw, "formulaExpression") !== undefined) patch.formulaExpression = str(prop(raw, "formulaExpression"));
     if (prop(raw, "formulaFieldIds") !== undefined) patch.formulaFieldIds = prop(raw, "formulaFieldIds") as string[];
     next = updateField(data, fieldId, patch);
   } else if (type === "remove_collection_field") {
@@ -79,7 +91,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     next = { ...data, views: [...data.views, view] };
   } else if (type === "configure_collection_view") {
     const patch: Partial<CollectionView> = {};
-    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations"] as const) {
+    for (const key of ["name", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations", "galleryFieldIds", "formFieldIds", "formRequiredFieldIds"] as const) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) Object.assign(patch, { [key]: raw[key] ?? undefined });
     }
     // Test the submitted keys, not the patch keys mutated above: otherwise

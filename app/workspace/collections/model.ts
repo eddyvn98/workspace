@@ -1,10 +1,11 @@
 import { createWorkspaceId } from "../utils/workspaceId";
 import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./collectionFilters";
 import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
+import { applyCollectionAutomations, sanitizeCollectionAutomations, type CollectionAutomation } from "./collectionAutomations";
 import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
-export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "formula";
-export type CollectionViewKind = "table" | "kanban" | "calendar" | "timeline" | "gallery" | "mindmap";
+export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "rollup" | "formula";
+export type CollectionViewKind = "table" | "kanban" | "calendar" | "timeline" | "gallery" | "mindmap" | "form";
 
 export interface CollectionField {
   id: string;
@@ -14,7 +15,12 @@ export interface CollectionField {
   /** Lookup: source relation and target field, both stable field IDs. */
   relationFieldId?: string;
   targetFieldId?: string;
+  relationMultiple?: boolean;
+  /** Optional Collection block on this board; absent means this Collection. */
+  relationTargetBlockId?: string;
+  rollupOperation?: "sum" | "average" | "min" | "max" | "count";
   formulaOperation?: FormulaOperation;
+  formulaExpression?: string;
   formulaFieldIds?: string[];
 }
 export interface CollectionRecord {
@@ -36,6 +42,10 @@ export interface CollectionView {
   filterLogic?: FilterLogic;
   aggregations?: CollectionAggregation[];
   sorts?: { fieldId: string; direction: "asc" | "desc" }[];
+  /** Explicit field IDs shown on cards or form; undefined uses defaults. */
+  galleryFieldIds?: string[];
+  formFieldIds?: string[];
+  formRequiredFieldIds?: string[];
 }
 export interface CollectionBlockPayload {
   version: 1;
@@ -44,10 +54,13 @@ export interface CollectionBlockPayload {
   records: CollectionRecord[];
   views: CollectionView[];
   activeViewId: string;
+  automations?: CollectionAutomation[];
 }
 
-export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap"];
-export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"];
+export type CollectionSources = Record<string, CollectionBlockPayload>;
+
+export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"];
+export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"];
 export const newId = () => createWorkspaceId();
 
 export function createCollection(): CollectionBlockPayload {
@@ -74,7 +87,8 @@ export function normalizeCollection(input: CollectionBlockPayload | null | undef
   const views = oldViews.map(view => (view.kind === "timeline" || view.kind === "calendar")
     && dates.length >= 2 && view.dateFieldId === view.endDateFieldId
       ? { ...view, dateFieldId: dates[0].id, endDateFieldId: dates[1].id } : view);
-  return { ...input, version: 1, title: input.title || "Untitled collection", views, activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
+  return { ...input, version: 1, title: input.title || "Untitled collection", views,
+    automations: sanitizeCollectionAutomations(input), activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
 }
 export function primaryField(data: CollectionBlockPayload): CollectionField | undefined {
   return data.fields.find((f) => f.type === "text") ?? data.fields[0];
@@ -97,12 +111,13 @@ export function endDateField(data: CollectionBlockPayload, view: CollectionView)
 export const viewFilters = (view: CollectionView): CollectionFilter[] => view.filters ?? (view.filter ? [view.filter] : []);
 export const viewSorts = (view: CollectionView) => view.sorts ?? (view.sort ? [view.sort] : []);
 /** New arrays override old scalar configs, including intentionally empty arrays. */
-export function visibleRecords(data: CollectionBlockPayload, view: CollectionView, search = ""): CollectionRecord[] {
+export function visibleRecords(data: CollectionBlockPayload, view: CollectionView, search = "",
+  sources: CollectionSources = {}): CollectionRecord[] {
   // An unfinished filter row has no effect until its value is entered.
   // Keep it in the saved view so users can complete it after reload.
   const filters = viewFilters(view);
   const sorts = viewSorts(view);
-  let rows = data.records.map(record => projectCollectionFormulas(data, projectCollectionLookups(data, record)))
+  let rows = data.records.map(record => projectCollectionFormulas(data, projectCollectionLookups(data, record, sources)))
     .filter((r) => matchesViewFilters(r, data.fields, filters, view.filterLogic)
     && (!search || Object.values(r.values).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))));
   if (sorts.length) rows = [...rows].sort((a, b) => {
@@ -119,12 +134,17 @@ export function visibleRecords(data: CollectionBlockPayload, view: CollectionVie
 }
 export function setRecordValue(data: CollectionBlockPayload, recordId: string, fieldId: string, value: string): CollectionBlockPayload {
   const field = data.fields.find(f => f.id === fieldId);
-  if (!field || field.type === "lookup" || field.type === "formula") return data;
-  return { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, [fieldId]: value } } : r) };
+  if (!field || ["lookup", "formula", "rollup"].includes(field.type)) return data;
+  if (!data.records.some(r => r.id === recordId)) return data;
+  return { ...data, records: data.records.map((r) => {
+    if (r.id !== recordId || r.values[fieldId] === value) return r;
+    return applyCollectionAutomations(data, r, { ...r, values: { ...r.values, [fieldId]: value } }, [fieldId]);
+  }) };
 }
 export function addRecord(data: CollectionBlockPayload, values: Record<string, string> = {}): CollectionBlockPayload {
   const id = newId();
-  return { ...data, records: [...data.records, { id, values }] };
+  return { ...data, records: [...data.records,
+    applyCollectionAutomations(data, null, { id, values }, Object.keys(values))] };
 }
 export function deleteRecord(data: CollectionBlockPayload, recordId: string): CollectionBlockPayload {
   return { ...data, records: removeInboundRelations(data, recordId) };
@@ -140,9 +160,12 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       f.relationFieldId === fieldId || f.targetFieldId === fieldId
         ? { ...f, relationFieldId: f.relationFieldId === fieldId ? undefined : f.relationFieldId,
           targetFieldId: f.targetFieldId === fieldId ? undefined : f.targetFieldId } : f)
-      .map(f => f.formulaFieldIds?.includes(fieldId)
-        ? { ...f, formulaFieldIds: f.formulaFieldIds.filter(id => id !== fieldId) } : f),
+      .map(f => ({ ...f,
+        ...(f.formulaFieldIds?.includes(fieldId) ? { formulaFieldIds: f.formulaFieldIds.filter(id => id !== fieldId) } : {}),
+        ...(f.formulaExpression?.includes("{" + fieldId + "}") ? { formulaExpression: "" } : {}),
+      })),
     records: data.records.map(({ values, ...r }) => ({ ...r, values: Object.fromEntries(Object.entries(values).filter(([id]) => id !== fieldId)) })),
+    automations: (data.automations ?? []).filter(rule => rule.whenFieldId !== fieldId && rule.thenFieldId !== fieldId),
     views: data.views.map((v) => ({
       ...v,
       ...(v.groupFieldId === fieldId ? { groupFieldId: undefined } : {}),
@@ -153,6 +176,9 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       ...(v.filters ? { filters: v.filters.filter((item) => item.fieldId !== fieldId) } : {}),
       ...(v.sorts ? { sorts: v.sorts.filter((item) => item.fieldId !== fieldId) } : {}),
       ...(v.aggregations ? { aggregations: v.aggregations.filter(item => item.fieldId !== fieldId) } : {}),
+      ...(v.galleryFieldIds ? { galleryFieldIds: v.galleryFieldIds.filter(id => id !== fieldId) } : {}),
+      ...(v.formFieldIds ? { formFieldIds: v.formFieldIds.filter(id => id !== fieldId) } : {}),
+      ...(v.formRequiredFieldIds ? { formRequiredFieldIds: v.formRequiredFieldIds.filter(id => id !== fieldId) } : {}),
     })),
   };
 }

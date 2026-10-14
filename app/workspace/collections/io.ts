@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import type { CanvasBlock } from "../types/block";
-import { createCollection, newId, normalizeCollection, type CollectionBlockPayload, type CollectionField, type CollectionRecord } from "./model";
+import { createCollection, newId, normalizeCollection, type CollectionBlockPayload, type CollectionField, type CollectionRecord, type CollectionSources } from "./model";
 import { projectCollectionLookups } from "./collectionRelations";
 import { projectCollectionFormulas } from "./collectionFormula";
 
@@ -57,10 +57,10 @@ function csvValue(v: string): string {
   const safe = /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
   return '"' + safe.replace(/"/g, '""') + '"';
 }
-export function exportCollectionCsv(data: CollectionBlockPayload): string {
+export function exportCollectionCsv(data: CollectionBlockPayload, sources: CollectionSources = {}): string {
   return [data.fields.map((f) => csvValue(f.name)).join(","),
     ...data.records.map((r) => {
-      const computed = projectCollectionFormulas(data, projectCollectionLookups(data, r));
+      const computed = projectCollectionFormulas(data, projectCollectionLookups(data, r, sources));
       return data.fields.map((f) => csvValue(computed.values[f.id] ?? "")).join(",");
     })].join("\r\n");
 }

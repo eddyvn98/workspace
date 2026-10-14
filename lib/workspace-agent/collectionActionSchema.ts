@@ -3,12 +3,14 @@ import type { PropertySchema, RuntimeActionSchema } from "./actionSchema";
 const id: PropertySchema = { type: "string", minLength: 1, maxLength: 128 };
 const word: PropertySchema = { type: "string", minLength: 1, maxLength: 160 };
 const values: PropertySchema = { type: "object", additionalProperties: true };
-const fieldType: PropertySchema = { type: "string", enum: ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"] };
-const formulaOperation: PropertySchema = { type: "string", enum: ["sum", "subtract", "multiply", "divide", "average", "concat"] };
+const fieldType: PropertySchema = { type: "string", enum: ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"] };
+const formulaOperation: PropertySchema = { type: "string", enum: ["sum", "subtract", "multiply", "divide", "average", "concat", "expression"] };
+const formulaExpression: PropertySchema = { type: "string", minLength: 1, maxLength: 500 };
 const formulaFieldIds: PropertySchema = { type: "array", minItems: 2, maxItems: 10, items: id };
 const aggregations: PropertySchema = { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false,
   required: ["fieldId", "operation"], properties: { fieldId: id, operation: { type: "string", enum: ["sum", "average", "min", "max", "count"] } } } };
-const viewKind: PropertySchema = { type: "string", enum: ["table", "kanban", "calendar", "timeline", "gallery", "mindmap"] };
+const viewKind: PropertySchema = { type: "string", enum: ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"] };
+const viewFieldIds: PropertySchema = { type: "array", maxItems: 100, items: id };
 const options: PropertySchema = { type: "array", maxItems: 60, items: { type: "string", minLength: 1, maxLength: 160 } };
 const filterOperator: PropertySchema = { type: "string", enum: ["eq", "neq", "contains", "not_contains", "gt", "gte", "lt", "lte", "empty", "not_empty"] };
 const filterLogic: PropertySchema = { type: "string", enum: ["and", "or"] };
@@ -35,15 +37,20 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
   update_collection_record: define("update_collection_record", ["values"], { recordId: id, recordName: word, values }),
   delete_collection_record: define("delete_collection_record", [], { recordId: id, recordName: word }),
   add_collection_field: define("add_collection_field", ["fieldId", "name", "fieldType"], {
-    fieldId: id, name: word, fieldType, options, relationFieldId: id, targetFieldId: id, formulaOperation, formulaFieldIds }),
+    fieldId: id, name: word, fieldType, options, relationFieldId: id, targetFieldId: id,
+    relationMultiple: { type: "boolean" }, relationTargetBlockId: id, rollupOperation: { type: "string", enum: ["sum", "average", "min", "max", "count"] },
+    formulaOperation, formulaFieldIds, formulaExpression }),
   update_collection_field: define("update_collection_field", [], {
-    fieldId: id, fieldName: word, name: word, fieldType, options, relationFieldId: { ...id, nullable: true }, targetFieldId: { ...id, nullable: true }, formulaOperation, formulaFieldIds }),
+    fieldId: id, fieldName: word, name: word, fieldType, options, relationFieldId: { ...id, nullable: true },
+    targetFieldId: { ...id, nullable: true }, relationMultiple: { type: "boolean" },
+    rollupOperation: { type: "string", enum: ["sum", "average", "min", "max", "count"] }, formulaOperation, formulaFieldIds, formulaExpression }),
   remove_collection_field: define("remove_collection_field", [], { fieldId: id, fieldName: word }),
   add_collection_view: define("add_collection_view", ["viewId", "name", "kind"], {
     viewId: id, name: word, kind: viewKind }),
   configure_collection_view: define("configure_collection_view", [], {
     viewId: id, viewName: word, name: word, active: { type: "boolean" }, groupFieldId: { ...id, nullable: true },
-    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort, filters, sorts, filterLogic, aggregations }),
+    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort, filters, sorts, filterLogic, aggregations,
+    galleryFieldIds: viewFieldIds, formFieldIds: viewFieldIds, formRequiredFieldIds: viewFieldIds }),
   remove_collection_view: define("remove_collection_view", [], { viewId: id, viewName: word }),
   convert_table_to_collection: define("convert_table_to_collection", []),
 };

@@ -3,25 +3,28 @@ import React, { useMemo, useRef, useState } from "react";
 import { flexRender, getCoreRowModel, useReactTable,
   type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { deleteRecord, recordTitle, viewSorts, type CollectionBlockPayload,
-  type CollectionField, type CollectionRecord, type CollectionView } from "../collections/model";
+  type CollectionField, type CollectionRecord, type CollectionView, type CollectionSources } from "../collections/model";
 import { btnClass, FieldEditor } from "./CollectionFieldEditor";
 import { calculateCollectionAggregate } from "../collections/collectionFormula";
 import { COLLECTION_PAGE_SIZES, collectionTablePage, type CollectionPageSize } from "./collectionTablePaging";
 
 interface Props {
-  data: CollectionBlockPayload; view: CollectionView; rows: CollectionRecord[];
+  data: CollectionBlockPayload; sources?: CollectionSources;
+  view: CollectionView; rows: CollectionRecord[];
   readOnly: boolean; onChange: (next: CollectionBlockPayload) => void;
   patch: (record: CollectionRecord, field: CollectionField, value: string) => void;
 }
 const getRecordId = (row: CollectionRecord) => row.id;
 
-export function CollectionTableView({ data, view, rows, readOnly, onChange, patch }: Props) {
+export function CollectionTableView({ data, sources, view, rows, readOnly, onChange, patch }: Props) {
   // Keep the cell renderer identity stable while edits update Collection data.
   // Calling the latest patch via a ref avoids unmounting the focused input.
   const patchRef = useRef(patch);
   patchRef.current = patch;
   const dataRef = useRef(data);
   dataRef.current = data;
+  const sourcesRef = useRef(sources);
+  sourcesRef.current = sources;
   const [requestedPage, setRequestedPage] = useState(0);
   const [pageSize, setPageSize] = useState<CollectionPageSize>(50);
   const page = useMemo(() => collectionTablePage(rows, requestedPage, pageSize),
@@ -33,7 +36,8 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
     id: field.id, accessorFn: record => record.values[field.id] ?? "", header: () => field.name,
     sortingFn: field.type === "number" ? "basic" : "alphanumeric",
     cell: ctx => <FieldEditor field={field} value={ctx.row.original.values[field.id] ?? ""}
-      readOnly={readOnly} data={dataRef.current} recordId={ctx.row.original.id}
+      readOnly={readOnly} data={dataRef.current} sources={sourcesRef.current}
+      recordId={ctx.row.original.id}
       onSet={value => patchRef.current(ctx.row.original, field, value)} />,
   })), [data.fields, readOnly]);
   const table = useReactTable({
