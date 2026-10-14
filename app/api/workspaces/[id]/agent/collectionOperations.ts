@@ -1,3 +1,4 @@
+import { appendCollectionAudit } from "@/app/workspace/collections/collectionAudit";
 import { deletedCollectionIds, pruneDeletedCollectionLinks } from "@/app/workspace/collections/collectionBoardIntegrity";
 import { applyCollectionAutomations } from "@/app/workspace/collections/collectionAutomations";
 import { fromTableBlock } from "@/app/workspace/collections/io";
@@ -129,7 +130,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     if (type === "remove_collection_view" && oldView) confirmedSummary = `removed Collection view ${display(oldView.name)}`;
   }
   if (JSON.stringify(next) === JSON.stringify(data)) return rejected("Collection command made no changes.");
-  block.data = next as unknown as JsonMap;
+  block.data = appendCollectionAudit(data, next, "Workspace AI") as unknown as JsonMap;
   block.updatedAt = now();
   const changed = pruneDeletedCollectionLinks(state.blocks, blockId, deletedCollectionIds(data, next));
   for (const id of changed.changedBlockIds) state.blocks[id] = changed.blocks[id];

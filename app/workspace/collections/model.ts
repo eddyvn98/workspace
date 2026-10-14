@@ -2,6 +2,7 @@ import { createWorkspaceId } from "../utils/workspaceId";
 import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./collectionFilters";
 import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
 import { applyCollectionAutomations, sanitizeCollectionAutomations, type CollectionAutomation } from "./collectionAutomations";
+import type { CollectionAuditEntry } from "./collectionAudit";
 import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
 export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "rollup" | "formula";
@@ -55,6 +56,7 @@ export interface CollectionBlockPayload {
   views: CollectionView[];
   activeViewId: string;
   automations?: CollectionAutomation[];
+  auditTrail?: CollectionAuditEntry[];
 }
 
 export type CollectionSources = Record<string, CollectionBlockPayload>;

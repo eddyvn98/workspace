@@ -43,10 +43,12 @@ export function appendCollectionAudit(before: CollectionBlockPayload, after: Col
   const at = Date.now();
   const updatedActor = actor.trim().slice(0, 160) || "Editor";
   let entries = prior;
+  let changed = false;
   for (const id of new Set([...oldRows.keys(), ...newRows.keys()])) {
     const oldRow = oldRows.get(id), newRow = newRows.get(id);
     const changes = rowChanges(oldRow, newRow);
     if (oldRow && newRow && !changes.length) continue;
+    changed = true;
     const kind = !oldRow ? "create" : !newRow ? "delete" : "update";
     const entry: CollectionAuditEntry = {
       id: newId(), at, actor: updatedActor, kind, recordId: id,
@@ -62,5 +64,5 @@ export function appendCollectionAudit(before: CollectionBlockPayload, after: Col
         changes: [{ ...changes[0], before: newest.changes[0].before }] }, ...entries.slice(1)];
     } else entries = [entry, ...entries].slice(0, MAX_COLLECTION_AUDIT);
   }
-  return entries === prior ? after : { ...after, auditTrail: entries };
+  return changed ? { ...after, auditTrail: entries } : after;
 }
