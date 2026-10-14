@@ -19,9 +19,10 @@ import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FI
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
 
 interface Props { data: CollectionBlockPayload; sources?: CollectionSources;
+  revisionNotice?: { stale: boolean; refreshing: boolean; error: string; refresh: () => Promise<void> };
   onChange: (next: CollectionBlockPayload) => void; readOnly: boolean }
 
-export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Props) {
+export function CollectionSurface({ data, sources = {}, revisionNotice, onChange, readOnly }: Props) {
   const [search, setSearch] = useState("");
   const [localViewId, setLocalViewId] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
@@ -58,6 +59,13 @@ export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Pr
       <button className={btnClass} onClick={() => setSettings(!settings)}>Settings</button>
       <button className={btnClass} onClick={() => setShowHistory(!showHistory)}>{showHistory ? "Hide history" : "History"}</button>
     </div>
+    {revisionNotice?.stale && <div role="status" className="flex shrink-0 flex-wrap items-center gap-2 border-b px-2 py-1 text-xs">
+      <span>Another session has saved a newer board version.</span>
+      <button className={btnClass} disabled={revisionNotice.refreshing} onClick={() => void revisionNotice.refresh()}>
+        {revisionNotice.refreshing ? "Saving..." : "Save & refresh"}
+      </button>
+      {revisionNotice.error && <span role="alert">{revisionNotice.error}</span>}
+    </div>}
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 p-2 dark:border-slate-700">
       {data.views.map((v) => <button key={v.id} className={btnClass + (v.id === view.id ? " border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900" : "")} onClick={() => { if (readOnly) setLocalViewId(v.id); else { setLocalViewId(null); onChange({ ...data, activeViewId: v.id }); } }}>{v.name}</button>)}
       {!readOnly && <select aria-label="Add view" className={inputClass} value="" onChange={(e) => e.target.value && onChange(addView(data, e.target.value as CollectionView["kind"]))}><option value="">+ View</option>{VIEW_KINDS.map((v) => <option key={v} value={v}>{v}</option>)}</select>}
