@@ -16,6 +16,8 @@ export interface CollectionField {
   relationFieldId?: string;
   targetFieldId?: string;
   relationMultiple?: boolean;
+  /** Optional Collection block on this board; absent means this Collection. */
+  relationTargetBlockId?: string;
   rollupOperation?: "sum" | "average" | "min" | "max" | "count";
   formulaOperation?: FormulaOperation;
   formulaExpression?: string;
@@ -54,6 +56,8 @@ export interface CollectionBlockPayload {
   activeViewId: string;
   automations?: CollectionAutomation[];
 }
+
+export type CollectionSources = Record<string, CollectionBlockPayload>;
 
 export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"];
 export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"];
@@ -107,12 +111,13 @@ export function endDateField(data: CollectionBlockPayload, view: CollectionView)
 export const viewFilters = (view: CollectionView): CollectionFilter[] => view.filters ?? (view.filter ? [view.filter] : []);
 export const viewSorts = (view: CollectionView) => view.sorts ?? (view.sort ? [view.sort] : []);
 /** New arrays override old scalar configs, including intentionally empty arrays. */
-export function visibleRecords(data: CollectionBlockPayload, view: CollectionView, search = ""): CollectionRecord[] {
+export function visibleRecords(data: CollectionBlockPayload, view: CollectionView, search = "",
+  sources: CollectionSources = {}): CollectionRecord[] {
   // An unfinished filter row has no effect until its value is entered.
   // Keep it in the saved view so users can complete it after reload.
   const filters = viewFilters(view);
   const sorts = viewSorts(view);
-  let rows = data.records.map(record => projectCollectionFormulas(data, projectCollectionLookups(data, record)))
+  let rows = data.records.map(record => projectCollectionFormulas(data, projectCollectionLookups(data, record, sources)))
     .filter((r) => matchesViewFilters(r, data.fields, filters, view.filterLogic)
     && (!search || Object.values(r.values).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))));
   if (sorts.length) rows = [...rows].sort((a, b) => {

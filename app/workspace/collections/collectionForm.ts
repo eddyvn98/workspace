@@ -1,4 +1,4 @@
-import { addRecord, type CollectionBlockPayload, type CollectionField, type CollectionView } from "./model";
+import { addRecord, type CollectionBlockPayload, type CollectionField, type CollectionView, type CollectionSources } from "./model";
 import { relationValueValid } from "./collectionRelations";
 
 /** Form values are validated before a single canonical Collection mutation. */
@@ -19,14 +19,15 @@ function validDate(value: string): boolean {
   const date = new Date(value + "T00:00:00.000Z");
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
-function validValue(data: CollectionBlockPayload, field: CollectionField, value: string): boolean {
+function validValue(data: CollectionBlockPayload, field: CollectionField, value: string,
+  sources: CollectionSources): boolean {
   if (value.length > 2000) return false;
   if (!value) return true;
   if (field.type === "number") return Number.isFinite(Number(value));
   if (field.type === "date") return validDate(value);
   if (field.type === "checkbox") return value === "true" || value === "false";
   if (field.type === "select") return (field.options ?? []).includes(value);
-  if (field.type === "relation") return relationValueValid(data, field, value);
+  if (field.type === "relation") return relationValueValid(data, field, value, sources);
   if (field.type === "url") {
     try {
       const url = new URL(value);
@@ -41,7 +42,7 @@ export type CollectionFormResult =
 
 /** Hidden, unknown and computed values never enter persisted records. */
 export function submitCollectionForm(data: CollectionBlockPayload, view: CollectionView,
-  draft: Record<string, string>): CollectionFormResult {
+  draft: Record<string, string>, sources: CollectionSources = {}): CollectionFormResult {
   if (view.kind !== "form") return { ok: false, error: "This view is not a Form." };
   if (data.records.length >= 5000) return { ok: false, error: "Collection record limit reached." };
   const fields = formFields(data, view);
@@ -50,7 +51,7 @@ export function submitCollectionForm(data: CollectionBlockPayload, view: Collect
   const values: Record<string, string> = {};
   for (const field of fields) {
     const value = draft[field.id] ?? "";
-    if (typeof value !== "string" || !validValue(data, field, value)) {
+    if (typeof value !== "string" || !validValue(data, field, value, sources)) {
       return { ok: false, error: "Invalid value for " + field.name + "." };
     }
     if (required.has(field.id) && (!value.trim() || (field.type === "checkbox" && value !== "true"))) {
