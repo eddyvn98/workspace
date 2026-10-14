@@ -18,8 +18,8 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
     id: item.id, position: { x: item.x, y: item.y },
     data: { label: labels.get(item.id) ?? "Untitled" },
     sourcePosition: Position.Right, targetPosition: Position.Left,
-    draggable: false, selectable: true,
-  })), [graph, labels]);
+    draggable: !readOnly, selectable: true,
+  })), [graph, labels, readOnly]);
   const edges = useMemo<Edge[]>(() => graph.edges.map(link => ({
     id: link.source + ">" + link.target, source: link.source, target: link.target,
     type: "smoothstep", animated: false,

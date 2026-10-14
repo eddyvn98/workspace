@@ -6,6 +6,7 @@ import { FieldEditor, btnClass } from "./CollectionFieldEditor";
 import { addUtcDays, timelineLayout } from "./collectionTimelineDates";
 import { parseCalendarDay } from "./collectionCalendarDates";
 import { CollectionGanttBar } from "./CollectionGanttBar";
+import { scheduleCollectionDependencies, setCollectionDependencies } from "../collections/collectionDependencies";
 
 interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; start?: CollectionField;
   end?: CollectionField; readOnly: boolean; onChange: (next: CollectionBlockPayload) => void;
@@ -39,6 +40,10 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
     <div className="flex flex-wrap items-center gap-2">
       <strong>{view.from} – {view.to}</strong>
       <span className="text-slate-500">Drag a bar to move dates, or drag its right edge to change duration.</span>
+      <button className={btnClass} type="button" disabled={readOnly || !start}
+        onClick={() => onChange(scheduleCollectionDependencies(data, start?.id, end?.id))}>
+        Schedule dependencies
+      </button>
       <label>Ruler <select className="rounded border p-1" aria-label="Timeline ruler"
         value={scale} onChange={event => setScale(event.target.value as "day" | "week")}>
         <option value="day">Days</option><option value="week">Weeks</option>
@@ -87,6 +92,32 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
           readOnly={readOnly} onSet={value => patch(record, start, value)} />}
         {end && end.id !== start?.id && <FieldEditor field={end} value={record.values[end.id] ?? ""}
           readOnly={readOnly} onSet={value => patch(record, end, value)} />}
+        <label>Depends on
+          <select className="ml-1 max-w-44 rounded border bg-transparent p-1"
+            aria-label={"Add dependency for " + recordTitle(data, record)}
+            value="" disabled={readOnly || (record.dependsOn ?? []).length >= 20}
+            onChange={event => {
+              const dependency = event.target.value;
+              if (!dependency) return;
+              const next = setCollectionDependencies(data, record.id,
+                [...(record.dependsOn ?? []), dependency]);
+              if (next === data) window.alert("That dependency would create a cycle or is invalid.");
+              else onChange(next);
+            }}>
+            <option value="">+ Predecessor</option>
+            {data.records.filter(item => item.id !== record.id && !(record.dependsOn ?? []).includes(item.id))
+              .map(item => <option key={item.id} value={item.id}>{recordTitle(data, item)}</option>)}
+          </select>
+        </label>
+        {(record.dependsOn ?? []).map(id => <button key={id} type="button" className={btnClass}
+          disabled={readOnly} title="Remove dependency"
+          aria-label={"Remove dependency " + (data.records.find(item => item.id === id)
+            ? recordTitle(data, data.records.find(item => item.id === id)!) : id)}
+          onClick={() => onChange(setCollectionDependencies(data, record.id,
+            (record.dependsOn ?? []).filter(item => item !== id)))}>
+          {data.records.find(item => item.id === id)
+            ? recordTitle(data, data.records.find(item => item.id === id)!) : "Missing task"} ×
+        </button>)}
         <button className={btnClass} disabled={readOnly || !start}
           aria-label={"Move " + recordTitle(data, record) + " backward one day"}
           onClick={() => changeDates(record, -1)}>← 1d</button>
