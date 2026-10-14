@@ -38,7 +38,7 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
   delete_collection_record: define("delete_collection_record", [], { recordId: id, recordName: word }),
   add_collection_field: define("add_collection_field", ["fieldId", "name", "fieldType"], {
     fieldId: id, name: word, fieldType, options, relationFieldId: id, targetFieldId: id,
-    relationMultiple: { type: "boolean" }, rollupOperation: { type: "string", enum: ["sum", "average", "min", "max", "count"] },
+    relationMultiple: { type: "boolean" }, relationTargetBlockId: id, rollupOperation: { type: "string", enum: ["sum", "average", "min", "max", "count"] },
     formulaOperation, formulaFieldIds, formulaExpression }),
   update_collection_field: define("update_collection_field", [], {
     fieldId: id, fieldName: word, name: word, fieldType, options, relationFieldId: { ...id, nullable: true },

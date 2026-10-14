@@ -24,7 +24,7 @@ function validValue(field: CollectionField, value: string): boolean {
   if (value.length > 2000) return false;
   if (!value) return true;
   if (["lookup", "formula", "rollup"].includes(field.type)) return false;
-  if (field.type === "relation") return value.length <= 128;
+  if (field.type === "relation") return value.length <= 2000;
   if (field.type === "checkbox") return value === "true" || value === "false";
   if (field.type === "select") return (field.options ?? []).includes(value);
   if (field.type === "number") return Number.isFinite(Number(value));
@@ -56,7 +56,7 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("options" in action && !validOptions(action.options)) return `${type}.options must contain distinct non-empty strings.`;
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
-  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds", "formulaExpression", "rollupOperation", "relationMultiple"].some((key) => key in action)) return "No Collection field changes specified.";
+  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds", "formulaExpression", "rollupOperation", "relationMultiple", "relationTargetBlockId"].some((key) => key in action)) return "No Collection field changes specified.";
   if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations", "galleryFieldIds", "formFieldIds", "formRequiredFieldIds"].some((key) => key in action)) return "No Collection view changes specified.";
   if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
@@ -120,17 +120,25 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     if (nextType === "lookup" || nextType === "rollup") {
       const relationId = action.relationFieldId ?? field?.relationFieldId;
       const targetId = action.targetFieldId ?? field?.targetFieldId;
+      const relation = data.fields.find(f => f.id === relationId && f.type === "relation");
+      const sourceBlock = relation?.relationTargetBlockId ? obj(obj(board.blocks)?.[relation.relationTargetBlockId]) : null;
+      const sourceData = sourceBlock?.type === "collection" ? obj(sourceBlock.data) as unknown as CollectionBlockPayload : data;
       if (!data.fields.some(f => f.id === relationId && f.type === "relation")) return "Lookup requires an existing relationFieldId.";
       if (nextType !== "rollup" || (action.rollupOperation ?? field?.rollupOperation) !== "count") {
-        if (!data.fields.some(f => f.id === targetId && !["lookup", "rollup", "formula", "relation"].includes(f.type)))
+        if (!sourceData.fields.some(f => f.id === targetId && !["lookup", "rollup", "formula", "relation"].includes(f.type)))
           return "Computed relation requires an existing source field.";
       }
       if (nextType === "rollup") {
         const op = action.rollupOperation ?? field?.rollupOperation;
         if (!["sum", "average", "min", "max", "count"].includes(String(op))) return "Invalid rollup operation.";
-        if (op !== "count" && !data.fields.some(f => f.id === targetId && f.type === "number"))
+        if (op !== "count" && !sourceData.fields.some(f => f.id === targetId && f.type === "number"))
           return "Numeric rollups require a number source field.";
       }
+    }
+    if (nextType === "relation" && (action.relationTargetBlockId || field?.relationTargetBlockId)) {
+      const targetBlockId = String(action.relationTargetBlockId ?? field?.relationTargetBlockId);
+      const targetBlock = obj(obj(board.blocks)?.[targetBlockId]);
+      if (!targetBlock || targetBlock.type !== "collection") return "Relation target must be a Collection block on this board.";
     }
     if (nextType === "relation" && action.relationMultiple === false && data.records.some(record =>
       (record.values[String(action.fieldId)] ?? "").startsWith("[")))
@@ -148,7 +156,9 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
       const targetField = data.fields.find((f) => f.id === id);
       if (!targetField || ["lookup", "formula", "rollup"].includes(targetField.type) || !validValue(targetField, String(value)))
         return `Unknown, computed or invalid fieldId/value: ${id}.`;
-      if (targetField.type === "relation" && !relationValueValid(data, targetField, String(value)))
+      if (targetField.type === "relation" && !relationValueValid(data, targetField, String(value),
+        Object.fromEntries(Object.entries(obj(board.blocks)).filter(([, block]) => obj(block)?.type === "collection")
+          .map(([id, block]) => [id, obj(obj(block)?.data) as unknown as CollectionBlockPayload]))))
         return `Unknown related recordId: ${String(value).slice(0, 128)}.`;
     }
   }

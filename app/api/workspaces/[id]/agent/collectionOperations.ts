@@ -63,7 +63,8 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
       ...(typeValue === "select" ? { options: prop(raw, "options") as string[] ?? [] } : {}),
       ...(typeValue === "lookup" || typeValue === "rollup" ? { relationFieldId: str(prop(raw, "relationFieldId")),
         targetFieldId: str(prop(raw, "targetFieldId")) } : {}),
-      ...(typeValue === "relation" ? { relationMultiple: prop(raw, "relationMultiple") === true } : {}),
+      ...(typeValue === "relation" ? { relationMultiple: prop(raw, "relationMultiple") === true,
+        relationTargetBlockId: str(prop(raw, "relationTargetBlockId")) || undefined } : {}),
       ...(typeValue === "rollup" ? { rollupOperation: str(prop(raw, "rollupOperation")) as CollectionField["rollupOperation"] } : {}),
       ...(typeValue === "formula" ? { formulaOperation: prop(raw, "formulaOperation") as CollectionField["formulaOperation"],
         formulaFieldIds: prop(raw, "formulaFieldIds") as string[],
@@ -74,6 +75,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     if (prop(raw, "name") !== undefined) patch.name = str(prop(raw, "name")).trim();
     if (prop(raw, "fieldType") !== undefined) patch.type = str(prop(raw, "fieldType")) as CollectionField["type"];
     if (prop(raw, "options") !== undefined) patch.options = prop(raw, "options") as string[];
+    if (prop(raw, "relationTargetBlockId") !== undefined) patch.relationTargetBlockId = str(prop(raw, "relationTargetBlockId"));
     if (prop(raw, "relationMultiple") !== undefined) patch.relationMultiple = prop(raw, "relationMultiple") === true;
     if (prop(raw, "rollupOperation") !== undefined) patch.rollupOperation = str(prop(raw, "rollupOperation")) as CollectionField["rollupOperation"];
     if (prop(raw, "relationFieldId") !== undefined) patch.relationFieldId = str(prop(raw, "relationFieldId"));
