@@ -7,7 +7,7 @@ const obj = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const str = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const fieldTypes = new Set(["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"]);
-const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap"]);
+const viewKinds = new Set(["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"]);
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 
 /** Collection cells persist strings, but a model may emit JSON numbers or booleans. */
@@ -55,7 +55,7 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
   if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds"].some((key) => key in action)) return "No Collection field changes specified.";
-  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations"].some((key) => key in action)) return "No Collection view changes specified.";
+  if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations", "galleryFieldIds", "formFieldIds", "formRequiredFieldIds"].some((key) => key in action)) return "No Collection view changes specified.";
   if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
   return null;
@@ -132,6 +132,29 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     }
   }
   if (type === "configure_collection_view") {
+    // Validate field layout changes against the proposed state, not only persisted arrays.
+    const fieldIds = ["galleryFieldIds", "formFieldIds", "formRequiredFieldIds"] as const;
+    for (const key of fieldIds) {
+      if (!(key in action)) continue;
+      const ids = action[key];
+      if (!Array.isArray(ids) || ids.length > 100 || new Set(ids).size !== ids.length ||
+        ids.some(id => typeof id !== "string" || !data.fields.some(field => field.id === id))) {
+        return "Invalid or duplicate Collection " + key + ".";
+      }
+      if (key !== "galleryFieldIds" && ids.some(id => data.fields.some(field => field.id === id
+        && (field.type === "formula" || field.type === "lookup")))) {
+        return "Form fields cannot be computed.";
+      }
+      if (key === "galleryFieldIds" && view?.kind !== "gallery") return "Gallery fields require a Gallery view.";
+      if (key !== "galleryFieldIds" && view?.kind !== "form") return "Form fields require a Form view.";
+    }
+    if (view?.kind === "form") {
+      const eligible = data.fields.filter(field => field.type !== "lookup" && field.type !== "formula").map(field => field.id);
+      const visible = action.formFieldIds ?? view.formFieldIds ?? eligible;
+      const required = action.formRequiredFieldIds ?? view.formRequiredFieldIds ?? [data.fields[0]?.id];
+      if (!Array.isArray(visible) || !Array.isArray(required) ||
+        required.some(id => !visible.includes(id))) return "Required form fields must be visible.";
+    }
     for (const [key, expectedType] of [["groupFieldId", "select"], ["dateFieldId", "date"], ["endDateFieldId", "date"]]) {
       const id = action[key];
       if (id !== undefined && id !== null && !data.fields.some((f) => f.id === id && f.type === expectedType)) return `${key} must identify an existing ${expectedType} field.`;

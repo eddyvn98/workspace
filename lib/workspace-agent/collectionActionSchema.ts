@@ -8,7 +8,8 @@ const formulaOperation: PropertySchema = { type: "string", enum: ["sum", "subtra
 const formulaFieldIds: PropertySchema = { type: "array", minItems: 2, maxItems: 10, items: id };
 const aggregations: PropertySchema = { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false,
   required: ["fieldId", "operation"], properties: { fieldId: id, operation: { type: "string", enum: ["sum", "average", "min", "max", "count"] } } } };
-const viewKind: PropertySchema = { type: "string", enum: ["table", "kanban", "calendar", "timeline", "gallery", "mindmap"] };
+const viewKind: PropertySchema = { type: "string", enum: ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"] };
+const viewFieldIds: PropertySchema = { type: "array", maxItems: 100, items: id };
 const options: PropertySchema = { type: "array", maxItems: 60, items: { type: "string", minLength: 1, maxLength: 160 } };
 const filterOperator: PropertySchema = { type: "string", enum: ["eq", "neq", "contains", "not_contains", "gt", "gte", "lt", "lte", "empty", "not_empty"] };
 const filterLogic: PropertySchema = { type: "string", enum: ["and", "or"] };
@@ -43,7 +44,8 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
     viewId: id, name: word, kind: viewKind }),
   configure_collection_view: define("configure_collection_view", [], {
     viewId: id, viewName: word, name: word, active: { type: "boolean" }, groupFieldId: { ...id, nullable: true },
-    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort, filters, sorts, filterLogic, aggregations }),
+    dateFieldId: { ...id, nullable: true }, endDateFieldId: { ...id, nullable: true }, filter, sort, filters, sorts, filterLogic, aggregations,
+    galleryFieldIds: viewFieldIds, formFieldIds: viewFieldIds, formRequiredFieldIds: viewFieldIds }),
   remove_collection_view: define("remove_collection_view", [], { viewId: id, viewName: word }),
   convert_table_to_collection: define("convert_table_to_collection", []),
 };

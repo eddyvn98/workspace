@@ -4,7 +4,7 @@ import { projectCollectionLookups, removeInboundRelations } from "./collectionRe
 import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
 export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "formula";
-export type CollectionViewKind = "table" | "kanban" | "calendar" | "timeline" | "gallery" | "mindmap";
+export type CollectionViewKind = "table" | "kanban" | "calendar" | "timeline" | "gallery" | "mindmap" | "form";
 
 export interface CollectionField {
   id: string;
@@ -36,6 +36,10 @@ export interface CollectionView {
   filterLogic?: FilterLogic;
   aggregations?: CollectionAggregation[];
   sorts?: { fieldId: string; direction: "asc" | "desc" }[];
+  /** Explicit field IDs shown on cards or form; undefined uses defaults. */
+  galleryFieldIds?: string[];
+  formFieldIds?: string[];
+  formRequiredFieldIds?: string[];
 }
 export interface CollectionBlockPayload {
   version: 1;
@@ -46,7 +50,7 @@ export interface CollectionBlockPayload {
   activeViewId: string;
 }
 
-export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap"];
+export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"];
 export const FIELD_TYPES: CollectionFieldType[] = ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "formula"];
 export const newId = () => createWorkspaceId();
 
@@ -153,6 +157,9 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       ...(v.filters ? { filters: v.filters.filter((item) => item.fieldId !== fieldId) } : {}),
       ...(v.sorts ? { sorts: v.sorts.filter((item) => item.fieldId !== fieldId) } : {}),
       ...(v.aggregations ? { aggregations: v.aggregations.filter(item => item.fieldId !== fieldId) } : {}),
+      ...(v.galleryFieldIds ? { galleryFieldIds: v.galleryFieldIds.filter(id => id !== fieldId) } : {}),
+      ...(v.formFieldIds ? { formFieldIds: v.formFieldIds.filter(id => id !== fieldId) } : {}),
+      ...(v.formRequiredFieldIds ? { formRequiredFieldIds: v.formRequiredFieldIds.filter(id => id !== fieldId) } : {}),
     })),
   };
 }
