@@ -12,6 +12,7 @@ import { DEFAULT_WORKSPACE_CONNECTOR_LINE_TYPE, withWorkspaceConnectorDefaults, 
 import { currentMapLayout } from "../layout/mapRoot";
 import { markWorkspaceMutation } from "../utils/workspaceMutationIntent";
 import { removeAttachmentFromTables } from "../utils/tableAttachments";
+import { deletedCollectionIds, pruneDeletedCollectionLinks, unbindDeletedCollection } from "../collections/collectionBoardIntegrity";
 
 const ZERO_TRANSFORM: Transform = { x: 0, y: 0, w: 160, h: 80, rotation: 0, zIndex: 0 };
 
@@ -316,17 +317,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       if (state.isReadOnly) return state;
       const existing = state.blocks[id];
       if (!existing) return state;
-      return {
-        blocks: {
-          ...state.blocks,
-          [id]: {
-            ...existing,
-            ...patch,
-            updatedAt: Date.now(),
-            lastEditedBy: state.currentUserEmail ?? existing.lastEditedBy,
-          },
-        },
-      };
+      const updated = { ...existing, ...patch,
+        updatedAt: Date.now(), lastEditedBy: state.currentUserEmail ?? existing.lastEditedBy } as CanvasBlock;
+      const next = { ...state.blocks, [id]: updated };
+      const removed = existing.type === "collection" && updated.type === "collection"
+        ? deletedCollectionIds(existing.data, updated.data) : new Set<string>();
+      return { blocks: pruneDeletedCollectionLinks(next, id, removed).blocks };
     }),
 
   restoreBlockVersion: (id, version) =>
@@ -377,6 +373,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       if (state.isReadOnly) return state;
       const rest = { ...state.blocks };
       delete rest[id];
+      if (state.blocks[id]?.type === "collection") Object.assign(rest, unbindDeletedCollection(rest, id));
       const attachmentChanges = removeAttachmentFromTables(state.blocks, id);
       for (const [tableId, cellItems] of Object.entries(attachmentChanges)) {
         const table = rest[tableId];

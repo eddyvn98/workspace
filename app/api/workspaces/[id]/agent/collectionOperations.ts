@@ -1,3 +1,4 @@
+import { deletedCollectionIds, pruneDeletedCollectionLinks } from "@/app/workspace/collections/collectionBoardIntegrity";
 import { applyCollectionAutomations } from "@/app/workspace/collections/collectionAutomations";
 import { fromTableBlock } from "@/app/workspace/collections/io";
 import { deleteRecord, recordTitle, removeField, removeView, updateField, updateView, type CollectionBlockPayload, type CollectionField, type CollectionView } from "@/app/workspace/collections/model";
@@ -130,5 +131,8 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   if (JSON.stringify(next) === JSON.stringify(data)) return rejected("Collection command made no changes.");
   block.data = next as unknown as JsonMap;
   block.updatedAt = now();
-  return { ids: [blockId], operation: type, summary: confirmedSummary ?? `${type} (${recordId || fieldId || viewId || blockId})` };
+  const changed = pruneDeletedCollectionLinks(state.blocks, blockId, deletedCollectionIds(data, next));
+  for (const id of changed.changedBlockIds) state.blocks[id] = changed.blocks[id];
+  return { ids: [blockId, ...changed.changedBlockIds], operation: type,
+    summary: confirmedSummary ?? `${type} (${recordId || fieldId || viewId || blockId})` };
 }
