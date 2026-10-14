@@ -5,7 +5,7 @@ import { MAX_COLLECTION_AUDIT } from "../collections/collectionAudit";
 
 interface Props { data: CollectionBlockPayload; onClose: () => void }
 const label = (data: CollectionBlockPayload, fieldId: string) =>
-  fieldId === "$parent" ? "Parent" :
+  fieldId === "$parent" ? "Parent" : fieldId === "$body" ? "Record notes" :
     data.fields.find(field => field.id === fieldId)?.name ?? "Removed field";
 
 export function CollectionAuditPanel({ data, onClose }: Props) {
