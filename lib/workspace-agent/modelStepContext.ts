@@ -61,6 +61,8 @@ function summarizeTable(block: WorkspaceJson, data: WorkspaceJson, blockId: stri
 
 function summarizeBoard(snapshot: WorkspaceBoardSnapshot, canMutate: boolean, query: string): WorkspaceJson {
   const blocks = record(snapshot.blocks);
+  const sources = Object.fromEntries(Object.entries(blocks).filter(([, item]) => record(item).type === "collection")
+    .map(([id, item]) => [id, record(item).data as CollectionBlockPayload]));
   const frames = Array.isArray(snapshot.frames) ? snapshot.frames : Object.values(record(snapshot.frames));
   const orderedIds = Array.isArray(snapshot.blockOrder)
     ? snapshot.blockOrder.filter((value): value is string => typeof value === "string")
@@ -89,7 +91,7 @@ function summarizeBoard(snapshot: WorkspaceBoardSnapshot, canMutate: boolean, qu
       ...(Number.isInteger(data.cols) ? { cols: data.cols } : {}),
       ...(cells ? { cells } : {}),
       ...(block.type === "table" ? summarizeTable(block, data, id) : {}),
-      ...(includeCollection && Array.isArray(data.fields) && Array.isArray(data.records) && Array.isArray(data.views) ? { collection: summarizeCollection(data as unknown as CollectionBlockPayload) } : {}),
+      ...(includeCollection && Array.isArray(data.fields) && Array.isArray(data.records) && Array.isArray(data.views) ? { collection: summarizeCollection(data as unknown as CollectionBlockPayload, 16, "", undefined, sources) } : {}),
       ...(block.type === "slideDeck" ? summarizeRuntimeSlides(data, query) : {}),
       ...(typeof block.mapId === "string" && block.mapId ? { mapId: block.mapId } : {}),
       ...(typeof data.semanticKey === "string" ? { semanticKey: data.semanticKey.slice(0, 120) } : {}),

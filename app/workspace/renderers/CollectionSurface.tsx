@@ -121,7 +121,7 @@ export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Pr
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-t p-2 dark:border-slate-700">
       <button className={btnClass} disabled={readOnly} onClick={() => onChange(addRecord(data))}>+ Record</button>
-      <button className={btnClass} onClick={() => downloadCollection("collection.csv", exportCollectionCsv(data), "text/csv")}>Export CSV</button>
+      <button className={btnClass} onClick={() => downloadCollection("collection.csv", exportCollectionCsv(data, sources), "text/csv")}>Export CSV</button>
       <button className={btnClass} onClick={() => downloadCollection("collection.json", JSON.stringify(data, null, 2), "application/json")}>Backup JSON</button>
       <button className={btnClass} disabled={readOnly} onClick={openImport}>Import CSV/JSON</button>
       <input ref={fileInput} type="file" accept=".csv,.json" className="hidden" onChange={(e) => { void loadFile(e.target.files?.[0]); e.target.value = ""; }} />

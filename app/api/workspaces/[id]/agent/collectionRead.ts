@@ -17,8 +17,10 @@ export function handleCollectionRead(board: Board, actions: JsonMap[]): NextResp
     if (issue) return NextResponse.json({ error: issue, reason: "invalid_collection_read", revision: board.revision }, { status: 422 });
     const block = blocks[String(action.blockId)];
     const data = block.data as CollectionBlockPayload;
+    const sources = Object.fromEntries(Object.entries(blocks).filter(([, item]) => item.type === "collection")
+      .map(([id, item]) => [id, item.data as CollectionBlockPayload]));
     const selected = summarizeCollection(data, typeof action.limit === "number" ? action.limit : 16,
-      action.type === "search_collection_records" ? String(action.query) : "", typeof action.viewId === "string" ? action.viewId : undefined);
+      action.type === "search_collection_records" ? String(action.query) : "", typeof action.viewId === "string" ? action.viewId : undefined, sources);
     results.push({ blockId: action.blockId, ...selected });
   }
   return NextResponse.json({ success: true, ok: true, action: "read_collection",
