@@ -1,3 +1,4 @@
+import { applyCollectionAutomations } from "@/app/workspace/collections/collectionAutomations";
 import { fromTableBlock } from "@/app/workspace/collections/io";
 import { deleteRecord, recordTitle, removeField, removeView, updateField, updateView, type CollectionBlockPayload, type CollectionField, type CollectionView } from "@/app/workspace/collections/model";
 import type { CanvasBlock } from "@/app/workspace/types/block";
@@ -41,10 +42,13 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   const normalizedValues = () => Object.fromEntries(Object.entries(prop(raw, "values") as Record<string, unknown>)
     .map(([id, value]) => [id, normalizeCollectionValue(value)!]));
   if (type === "create_collection_record") {
-    next = { ...data, records: [...data.records, { id: recordId, values: normalizedValues() }] };
+    const values = normalizedValues();
+    next = { ...data, records: [...data.records,
+      applyCollectionAutomations(data, null, { id: recordId, values }, Object.keys(values))] };
   } else if (type === "update_collection_record") {
     const values = normalizedValues();
-    next = { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, ...values } } : r) };
+    next = { ...data, records: data.records.map((r) => r.id === recordId
+      ? applyCollectionAutomations(data, r, { ...r, values: { ...r.values, ...values } }, Object.keys(values)) : r) };
   } else if (type === "delete_collection_record") {
     const recordToDelete = data.records.find((item) => item.id === recordId);
     if (recordToDelete) {

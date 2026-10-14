@@ -1,6 +1,7 @@
 import { createWorkspaceId } from "../utils/workspaceId";
 import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./collectionFilters";
 import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
+import { applyCollectionAutomations, sanitizeCollectionAutomations, type CollectionAutomation } from "./collectionAutomations";
 import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
 export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "rollup" | "formula";
@@ -50,6 +51,7 @@ export interface CollectionBlockPayload {
   records: CollectionRecord[];
   views: CollectionView[];
   activeViewId: string;
+  automations?: CollectionAutomation[];
 }
 
 export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"];
@@ -80,7 +82,8 @@ export function normalizeCollection(input: CollectionBlockPayload | null | undef
   const views = oldViews.map(view => (view.kind === "timeline" || view.kind === "calendar")
     && dates.length >= 2 && view.dateFieldId === view.endDateFieldId
       ? { ...view, dateFieldId: dates[0].id, endDateFieldId: dates[1].id } : view);
-  return { ...input, version: 1, title: input.title || "Untitled collection", views, activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
+  return { ...input, version: 1, title: input.title || "Untitled collection", views,
+    automations: sanitizeCollectionAutomations(input), activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
 }
 export function primaryField(data: CollectionBlockPayload): CollectionField | undefined {
   return data.fields.find((f) => f.type === "text") ?? data.fields[0];
@@ -126,11 +129,16 @@ export function visibleRecords(data: CollectionBlockPayload, view: CollectionVie
 export function setRecordValue(data: CollectionBlockPayload, recordId: string, fieldId: string, value: string): CollectionBlockPayload {
   const field = data.fields.find(f => f.id === fieldId);
   if (!field || ["lookup", "formula", "rollup"].includes(field.type)) return data;
-  return { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, values: { ...r.values, [fieldId]: value } } : r) };
+  if (!data.records.some(r => r.id === recordId)) return data;
+  return { ...data, records: data.records.map((r) => {
+    if (r.id !== recordId || r.values[fieldId] === value) return r;
+    return applyCollectionAutomations(data, r, { ...r, values: { ...r.values, [fieldId]: value } }, [fieldId]);
+  }) };
 }
 export function addRecord(data: CollectionBlockPayload, values: Record<string, string> = {}): CollectionBlockPayload {
   const id = newId();
-  return { ...data, records: [...data.records, { id, values }] };
+  return { ...data, records: [...data.records,
+    applyCollectionAutomations(data, null, { id, values }, Object.keys(values))] };
 }
 export function deleteRecord(data: CollectionBlockPayload, recordId: string): CollectionBlockPayload {
   return { ...data, records: removeInboundRelations(data, recordId) };
@@ -149,6 +157,7 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       .map(f => f.formulaFieldIds?.includes(fieldId)
         ? { ...f, formulaFieldIds: f.formulaFieldIds.filter(id => id !== fieldId) } : f),
     records: data.records.map(({ values, ...r }) => ({ ...r, values: Object.fromEntries(Object.entries(values).filter(([id]) => id !== fieldId)) })),
+    automations: (data.automations ?? []).filter(rule => rule.whenFieldId !== fieldId && rule.thenFieldId !== fieldId),
     views: data.views.map((v) => ({
       ...v,
       ...(v.groupFieldId === fieldId ? { groupFieldId: undefined } : {}),
