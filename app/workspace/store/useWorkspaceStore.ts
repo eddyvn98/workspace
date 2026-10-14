@@ -326,7 +326,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       const next = { ...state.blocks, [id]: updated };
       const removed = existing.type === "collection" && updated.type === "collection"
         ? deletedCollectionIds(existing.data, updated.data) : new Set<string>();
-      return { blocks: pruneDeletedCollectionLinks(next, id, removed).blocks };
+      return { blocks: pruneDeletedCollectionLinks(next, id, removed, state.currentUserEmail ?? "Editor").blocks };
     }),
 
   restoreBlockVersion: (id, version) =>
@@ -377,7 +377,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       if (state.isReadOnly) return state;
       const rest = { ...state.blocks };
       delete rest[id];
-      if (state.blocks[id]?.type === "collection") Object.assign(rest, unbindDeletedCollection(rest, id));
+      if (state.blocks[id]?.type === "collection") Object.assign(rest, unbindDeletedCollection(rest, id, state.currentUserEmail ?? "Editor"));
       const attachmentChanges = removeAttachmentFromTables(state.blocks, id);
       for (const [tableId, cellItems] of Object.entries(attachmentChanges)) {
         const table = rest[tableId];

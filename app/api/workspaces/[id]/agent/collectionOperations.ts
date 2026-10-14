@@ -134,7 +134,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   if (JSON.stringify(next) === JSON.stringify(data)) return rejected("Collection command made no changes.");
   block.data = appendCollectionAudit(data, next, "Workspace AI") as unknown as JsonMap;
   block.updatedAt = now();
-  const changed = pruneDeletedCollectionLinks(state.blocks, blockId, deletedCollectionIds(data, next));
+  const changed = pruneDeletedCollectionLinks(state.blocks, blockId, deletedCollectionIds(data, next), "Workspace AI");
   for (const id of changed.changedBlockIds) state.blocks[id] = changed.blocks[id];
   return { ids: [blockId, ...changed.changedBlockIds], operation: type,
     summary: confirmedSummary ?? `${type} (${recordId || fieldId || viewId || blockId})` };

@@ -9,7 +9,9 @@ const label = (data: CollectionBlockPayload, fieldId: string) =>
     data.fields.find(field => field.id === fieldId)?.name ?? "Removed field";
 
 export function CollectionAuditPanel({ data, onClose }: Props) {
-  const history = (data.auditTrail ?? []).slice(0, MAX_COLLECTION_AUDIT);
+  const history = (data.auditTrail ?? []).filter(entry => entry && typeof entry.id === "string" &&
+    typeof entry.at === "number" && Number.isFinite(entry.at) &&
+    Array.isArray(entry.changes)).slice(0, MAX_COLLECTION_AUDIT);
   return <section className="max-h-64 shrink-0 overflow-y-auto border-b bg-slate-50 p-2 text-xs dark:bg-slate-900"
     aria-label="Collection record history" data-testid="collection-record-history">
     <div className="mb-2 flex items-center justify-between gap-2">

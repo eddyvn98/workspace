@@ -1,5 +1,6 @@
 import type { CollectionBlockPayload } from "./model";
 import { encodeRelationIds, relationIds } from "./collectionRelations";
+import { appendCollectionAudit } from "./collectionAudit";
 
 interface BlockLike { type?: unknown; data?: unknown; updatedAt?: number }
 const collection = (value: unknown): value is CollectionBlockPayload =>
@@ -16,7 +17,7 @@ export function deletedCollectionIds(before: unknown, after: unknown): Set<strin
 
 /** Prune foreign IDs in one board transaction, including multi-link values. */
 export function pruneDeletedCollectionLinks<T extends BlockLike>(
-  blocks: Record<string, T>, ownerId: string, deleted: ReadonlySet<string>,
+  blocks: Record<string, T>, ownerId: string, deleted: ReadonlySet<string>, actor = "System",
 ): { blocks: Record<string, T>; changedBlockIds: string[] } {
   if (!deleted.size) return { blocks, changedBlockIds: [] };
   let next = blocks;
@@ -41,14 +42,16 @@ export function pruneDeletedCollectionLinks<T extends BlockLike>(
     });
     if (!modified) continue;
     if (next === blocks) next = { ...blocks };
-    next[id] = { ...block, data: { ...data, records }, updatedAt: Date.now() } as T;
+    next[id] = { ...block, data: appendCollectionAudit(data, { ...data, records }, actor),
+      updatedAt: Date.now() } as T;
     changedBlockIds.push(id);
   }
   return { blocks: next, changedBlockIds };
 }
 
 /** Entire target block deleted: clear values and invalid computed target bindings. */
-export function unbindDeletedCollection<T extends BlockLike>(blocks: Record<string, T>, ownerId: string): Record<string, T> {
+export function unbindDeletedCollection<T extends BlockLike>(blocks: Record<string, T>, ownerId: string,
+  actor = "System"): Record<string, T> {
   let next = blocks;
   for (const [id, block] of Object.entries(blocks)) {
     if (id === ownerId || block.type !== "collection" || !collection(block.data)) continue;
@@ -66,7 +69,8 @@ export function unbindDeletedCollection<T extends BlockLike>(blocks: Record<stri
       return { ...record, values };
     });
     if (next === blocks) next = { ...blocks };
-    next[id] = { ...block, data: { ...data, fields, records }, updatedAt: Date.now() } as T;
+    next[id] = { ...block, data: appendCollectionAudit(data, { ...data, fields, records }, actor),
+      updatedAt: Date.now() } as T;
   }
   return next;
 }
