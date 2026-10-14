@@ -11,6 +11,7 @@ import { CollectionGalleryView } from "./CollectionGalleryView";
 import { CollectionFormView } from "./CollectionFormView";
 import { CollectionCardFormSettings } from "./CollectionCardFormSettings";
 import { CollectionAutomationSettings } from "./CollectionAutomationSettings";
+import { CollectionScheduledAutomationSettings } from "./CollectionScheduledAutomationSettings";
 import { CollectionAuditPanel } from "./CollectionAuditPanel";
 import { CollectionIntegrityPanel } from "./CollectionIntegrityPanel";
 import { CollectionViewConditions } from "./CollectionViewConditions";
@@ -85,6 +86,7 @@ export function CollectionSurface({ data, sources = {}, revisionNotice, onChange
       <CollectionViewConditions view={view} fields={data.fields} readOnly={readOnly} onChange={renameView} />
       <CollectionCardFormSettings view={view} fields={data.fields} readOnly={readOnly} onChange={renameView} />
       <CollectionAutomationSettings data={data} readOnly={readOnly} onChange={onChange} />
+      <CollectionScheduledAutomationSettings data={data} readOnly={readOnly} onChange={onChange} />
       <CollectionIntegrityPanel data={data} sources={sources} readOnly={readOnly} onChange={onChange} />
       <div className="flex flex-wrap gap-2 items-center">
         {data.fields.map((f) => <span key={f.id} className="flex items-center gap-1 rounded border p-1"><input aria-label={"Rename " + f.name} className="w-20 bg-transparent" value={f.name} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { name: e.target.value }))} /><select aria-label={"Type " + f.name} className={inputClass} value={f.type} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { type: e.target.value as CollectionField["type"] }))}>{FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>{(f.type === "lookup" || f.type === "rollup") && <><select aria-label={"Lookup relation " + f.name} className={inputClass} value={f.relationFieldId ?? ""} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { relationFieldId: e.target.value || undefined }))}><option value="">Choose relation</option>{data.fields.filter((x) => x.type === "relation").map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select><select aria-label={"Lookup target " + f.name} className={inputClass} value={f.targetFieldId ?? ""} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { targetFieldId: e.target.value || undefined }))}><option value="">Choose field</option>{(() => { const relation = data.fields.find(x => x.id === f.relationFieldId);
