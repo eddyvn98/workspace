@@ -35,6 +35,12 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
       whenFieldId: rule.whenFieldId, whenEquals: rule.whenEquals.slice(0, 80),
       thenFieldId: rule.thenFieldId, thenValue: rule.thenValue.slice(0, 80),
     })),
+    dailyScheduledRules: (data.scheduledAutomations ?? []).slice(0, 20).map(rule => ({
+      id: rule.id, name: rule.name.slice(0, 80), enabled: rule.enabled,
+      hour: rule.hour, minute: rule.minute, timeZone: rule.timeZone,
+      targetFieldId: rule.targetFieldId, matchFieldId: rule.matchFieldId,
+      lastRunDay: rule.lastRunDay,
+    })),
     records: rows.map((row) => ({ id: row.id, parentId: row.parentId,
       dependsOn: (row.dependsOn ?? []).slice(0, 20),
       bodyPreview: typeof row.body === "string" ? row.body.slice(0, 400) : "",
