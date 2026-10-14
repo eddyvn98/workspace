@@ -137,3 +137,19 @@ describe("compacted Collection reads keep every field", () => {
     expect(answer).toContain('Computed: {"Total":"5"}');
   });
 });
+
+describe("verified Collection relation labels", () => {
+  it("renders a linked record's confirmed name rather than an internal UUID", () => {
+    const data = createCollection();
+    const relation = { id: "parent-field", name: "Parent", type: "relation" as const };
+    data.fields.push(relation);
+    data.records.push(
+      { id: "record-a", values: { [data.fields[0].id]: "Task A", [relation.id]: "record-c" } },
+      { id: "record-c", values: { [data.fields[0].id]: "Task C" } },
+    );
+    const read = compactWorkspaceReadResult("read_collection", summarizeCollection(data));
+    const answer = verifiedCollectionReadAnswer([read], "Show the parent of Task A");
+    expect(answer).toContain('"Parent":"Task C"');
+    expect(answer).not.toContain('"Parent":"record-c"');
+  });
+});
