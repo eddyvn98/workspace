@@ -1,11 +1,12 @@
 "use client";
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { flexRender, getCoreRowModel, useReactTable,
   type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { deleteRecord, recordTitle, viewSorts, type CollectionBlockPayload,
   type CollectionField, type CollectionRecord, type CollectionView } from "../collections/model";
 import { btnClass, FieldEditor } from "./CollectionFieldEditor";
 import { calculateCollectionAggregate } from "../collections/collectionFormula";
+import { COLLECTION_PAGE_SIZES, collectionTablePage, type CollectionPageSize } from "./collectionTablePaging";
 
 interface Props {
   data: CollectionBlockPayload; view: CollectionView; rows: CollectionRecord[];
@@ -21,6 +22,10 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
   patchRef.current = patch;
   const dataRef = useRef(data);
   dataRef.current = data;
+  const [requestedPage, setRequestedPage] = useState(0);
+  const [pageSize, setPageSize] = useState<CollectionPageSize>(50);
+  const page = useMemo(() => collectionTablePage(rows, requestedPage, pageSize),
+    [rows, requestedPage, pageSize]);
   // Stable controlled state: one sorting array per saved View configuration.
   const sorting = useMemo<SortingState>(() => viewSorts(view).map(s =>
     ({ id: s.fieldId, desc: s.direction === "desc" })), [view]);
@@ -32,7 +37,8 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
       onSet={value => patchRef.current(ctx.row.original, field, value)} />,
   })), [data.fields, readOnly]);
   const table = useReactTable({
-    data: rows, columns, getRowId: getRecordId,
+    // Bind TanStack only to the visible page, not thousands of input editors.
+    data: page.rows, columns, getRowId: getRecordId,
     getCoreRowModel: getCoreRowModel(),
     // visibleRecords already applies all saved sorts. Do not sort twice or
     // auto-reset table state in response to a controlled input keystroke.
@@ -45,7 +51,8 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
       onChange({ ...data, views: data.views.map(v => v.id === view.id ? { ...v, sorts, sort: undefined } : v) });
     },
   });
-  return <table className="w-full border-collapse text-left text-xs" data-testid="collection-tanstack-table">
+  return <div className="space-y-2" data-testid="collection-paged-table">
+    <table className="w-full border-collapse text-left text-xs" data-testid="collection-tanstack-table">
     <thead>{table.getHeaderGroups().map(group => <tr key={group.id}>
       {group.headers.map(header => <th key={header.id} className="sticky top-0 whitespace-nowrap border-b bg-slate-100 p-2 dark:bg-slate-800">
         <button type="button" disabled={readOnly} onClick={header.column.getToggleSortingHandler()}
@@ -69,5 +76,26 @@ export function CollectionTableView({ data, view, rows, readOnly, onChange, patc
       return <td key={field.id} className="border-t bg-slate-50 p-2 text-xs font-semibold dark:bg-slate-900">
         {aggregate ? aggregate.operation + ": " + calculateCollectionAggregate(rows, aggregate) : ""}</td>;
     })}<td className="border-t text-xs">Visible totals</td></tr></tfoot>}
-  </table>;
+  </table>
+    <nav aria-label="Collection Table pagination" className="flex flex-wrap items-center gap-2 text-xs">
+      <span role="status" aria-live="polite" data-testid="collection-page-summary">
+        {page.total ? page.start + 1 : 0}–{page.end} of {page.total} matching records
+      </span>
+      <label>Rows per page <select aria-label="Rows per page" className="rounded border p-1"
+        value={pageSize} onChange={event => { setPageSize(Number(event.target.value) as CollectionPageSize); setRequestedPage(0); }}>
+        {COLLECTION_PAGE_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
+      </select></label>
+      <button type="button" className={btnClass} aria-label="First collection page" disabled={page.pageIndex === 0}
+        onClick={() => setRequestedPage(0)}>«</button>
+      <button type="button" className={btnClass} aria-label="Previous collection page" disabled={page.pageIndex === 0}
+        onClick={() => setRequestedPage(page.pageIndex - 1)}>‹</button>
+      <span data-testid="collection-page-number">Page {page.pageIndex + 1} of {page.pageCount}</span>
+      <button type="button" className={btnClass} aria-label="Next collection page"
+        disabled={page.pageIndex >= page.pageCount - 1}
+        onClick={() => setRequestedPage(page.pageIndex + 1)}>›</button>
+      <button type="button" className={btnClass} aria-label="Last collection page"
+        disabled={page.pageIndex >= page.pageCount - 1}
+        onClick={() => setRequestedPage(page.pageCount - 1)}>»</button>
+    </nav>
+  </div>;
 }

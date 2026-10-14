@@ -46,7 +46,8 @@ export function verifiedCollectionReadAnswer(readResults: WorkspaceJson[], query
       for (const [fieldId, value] of Object.entries(object(row.values)).slice(0, 8)) {
         const label = names.get(fieldId);
         if (!label) continue; // Unknown field IDs must not be mislabeled or exposed.
-        values[label] = String(value ?? "").slice(0, 160);
+        const display = object(row.relationDisplayValues)[fieldId];
+        values[label] = typeof display === "string" ? display.slice(0, 160) : String(value ?? "").slice(0, 160);
       }
       // Formula/lookup projections are computed by Workspace, so they are labelled separately.
       const computed: WorkspaceJson = {};

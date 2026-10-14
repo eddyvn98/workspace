@@ -26,6 +26,11 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
     records: rows.map((row) => ({ id: row.id, parentId: row.parentId,
       values: Object.fromEntries(Object.entries(row.values)
         .filter(([id]) => fieldIds.has(id)).map(([id, value]) => [id, value.slice(0, 400)])),
+      relationDisplayValues: Object.fromEntries(data.fields.filter((field) => field.type === "relation").map((field) => {
+        const linked = data.records.find((candidate) => candidate.id === row.values[field.id]);
+        const primary = data.fields.find((candidate) => candidate.type === "text") ?? data.fields[0];
+        return [field.id, linked ? (linked.values[primary?.id ?? ""] || "Untitled").slice(0, 160) : ""];
+      })),
       computedValues: Object.fromEntries(data.fields
         .filter((field) => field.type === "formula" || field.type === "lookup")
         .map((field) => [field.id, (row.values[field.id] ?? "").slice(0, 400)])),
