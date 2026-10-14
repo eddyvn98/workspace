@@ -36,6 +36,7 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
       thenFieldId: rule.thenFieldId, thenValue: rule.thenValue.slice(0, 80),
     })),
     records: rows.map((row) => ({ id: row.id, parentId: row.parentId,
+      bodyPreview: typeof row.body === "string" ? row.body.slice(0, 400) : "",
       values: Object.fromEntries(Object.entries(row.values)
         .filter(([id]) => fieldIds.has(id)).map(([id, value]) => [id, value.slice(0, 400)])),
       relationDisplayValues: Object.fromEntries(data.fields.filter((field) => field.type === "relation").map((field) => {

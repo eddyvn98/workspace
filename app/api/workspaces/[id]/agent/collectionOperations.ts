@@ -41,16 +41,18 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   let next = data;
   let confirmedSummary: string | undefined;
   const display = (value: string) => JSON.stringify(value.replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 120));
-  const normalizedValues = () => Object.fromEntries(Object.entries(prop(raw, "values") as Record<string, unknown>)
+  const normalizedValues = () => Object.fromEntries(Object.entries((prop(raw, "values") ?? {}) as Record<string, unknown>)
     .map(([id, value]) => [id, normalizeCollectionValue(value)!]));
   if (type === "create_collection_record") {
     const values = normalizedValues();
     next = { ...data, records: [...data.records,
-      applyCollectionAutomations(data, null, { id: recordId, values }, Object.keys(values))] };
+      applyCollectionAutomations(data, null, { id: recordId, values,
+        ...(typeof prop(raw, "body") === "string" ? { body: prop(raw, "body") as string } : {}) }, Object.keys(values))] };
   } else if (type === "update_collection_record") {
     const values = normalizedValues();
     next = { ...data, records: data.records.map((r) => r.id === recordId
-      ? applyCollectionAutomations(data, r, { ...r, values: { ...r.values, ...values } }, Object.keys(values)) : r) };
+      ? applyCollectionAutomations(data, r, { ...r, values: { ...r.values, ...values },
+        ...(typeof prop(raw, "body") === "string" ? { body: prop(raw, "body") as string } : {}) }, Object.keys(values)) : r) };
   } else if (type === "delete_collection_record") {
     const recordToDelete = data.records.find((item) => item.id === recordId);
     if (recordToDelete) {
@@ -120,7 +122,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
         const field = next.fields.find((item) => item.id === id);
         return field ? `${field.name.slice(0, 80)} = ${display(value)}` : "";
       }).filter(Boolean).join(", ");
-      confirmedSummary = `updated Collection record ${display(recordTitle(next, oldRecord ?? savedRecord))}: ${changes}`;
+      confirmedSummary = `updated Collection record ${display(recordTitle(next, oldRecord ?? savedRecord))}: ${changes || (typeof prop(raw, "body") === "string" ? "body edited" : "record edited")}`;
     }
     if (type === "add_collection_field" && savedField) confirmedSummary = `added Collection field ${display(savedField.name)}`;
     if (type === "update_collection_field" && savedField) confirmedSummary = `updated Collection field ${display(savedField.name)}`;

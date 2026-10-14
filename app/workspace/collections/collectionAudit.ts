@@ -28,6 +28,9 @@ function rowChanges(before: CollectionRecord | undefined, after: CollectionRecor
       before: cell(oldValues[fieldId]), after: cell(newValues[fieldId]) });
     if (changes.length >= 15) break;
   }
+  if ((before?.body ?? "") !== (after?.body ?? "")) {
+    changes.push({ fieldId: "$body", before: cell(before?.body), after: cell(after?.body) });
+  }
   if ((before?.parentId ?? null) !== (after?.parentId ?? null)) {
     changes.push({ fieldId: "$parent", before: cell(before?.parentId), after: cell(after?.parentId) });
   }

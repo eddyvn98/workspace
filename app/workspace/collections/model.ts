@@ -28,6 +28,8 @@ export interface CollectionRecord {
   id: string;
   values: Record<string, string>;
   parentId?: string | null;
+  /** Long-form record notes, shared by every view. */
+  body?: string;
 }
 export interface CollectionView {
   id: string;
@@ -147,6 +149,11 @@ export function addRecord(data: CollectionBlockPayload, values: Record<string, s
   const id = newId();
   return { ...data, records: [...data.records,
     applyCollectionAutomations(data, null, { id, values }, Object.keys(values))] };
+}
+export function updateRecordBody(data: CollectionBlockPayload, recordId: string, body: string): CollectionBlockPayload {
+  if (body.length > 20000 || !data.records.some(record => record.id === recordId)) return data;
+  return { ...data, records: data.records.map(record => record.id === recordId
+    ? { ...record, body } : record) };
 }
 export function deleteRecord(data: CollectionBlockPayload, recordId: string): CollectionBlockPayload {
   return { ...data, records: removeInboundRelations(data, recordId) };
