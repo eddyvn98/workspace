@@ -3,13 +3,16 @@ import React, { useState } from "react";
 import { recordTitle, type CollectionBlockPayload, type CollectionField, type CollectionRecord,
   type CollectionView, type CollectionSources } from "../collections/model";
 import { btnClass, FieldEditor } from "./CollectionFieldEditor";
+import { CollectionRecordDetails } from "./CollectionRecordDetails";
 interface Props { data: CollectionBlockPayload; sources?: CollectionSources;
   view: CollectionView; rows: CollectionRecord[];
   titleField?: CollectionField; readOnly: boolean;
-  patch: (record: CollectionRecord, field: CollectionField, value: string) => void; }
+  patch: (record: CollectionRecord, field: CollectionField, value: string) => void;
+  onChange: (data: CollectionBlockPayload) => void; }
 const PAGE = 24;
-export function CollectionGalleryView({ data, sources, view, rows, titleField, readOnly, patch }: Props) {
+export function CollectionGalleryView({ data, sources, view, rows, titleField, readOnly, patch, onChange }: Props) {
   const [limit, setLimit] = useState(PAGE);
+  const [openRecordId, setOpenRecordId] = useState<string | null>(null);
   const eligible = data.fields.filter(field => field.id !== titleField?.id && field.type !== "image");
   const fieldIds = view.galleryFieldIds ?? eligible.slice(0, 3).map(field => field.id);
   const details = eligible.filter(field => fieldIds.includes(field.id));
@@ -25,6 +28,8 @@ export function CollectionGalleryView({ data, sources, view, rows, titleField, r
             : <div className="h-28 bg-slate-100 dark:bg-slate-800" />}
           <div className="space-y-2 p-3 text-xs">
             <strong className="block truncate" title={recordTitle(data, record)}>{recordTitle(data, record)}</strong>
+            <button type="button" className={btnClass} onClick={() => setOpenRecordId(record.id)}
+              aria-label={"Open " + recordTitle(data, record)}>Open record</button>
             {titleField && <FieldEditor field={titleField} value={record.values[titleField.id] ?? ""}
               readOnly={readOnly} onSet={value => patch(record, titleField, value)} />}
             {details.map(field => <label key={field.id} className="block space-y-1">
@@ -37,6 +42,8 @@ export function CollectionGalleryView({ data, sources, view, rows, titleField, r
         </article>;
       })}
     </div>
+    {openRecordId && <CollectionRecordDetails data={data} sources={sources} recordId={openRecordId}
+      readOnly={readOnly} onChange={onChange} onClose={() => setOpenRecordId(null)} />}
     {rows.length > limit && <button type="button" className={btnClass}
       onClick={() => setLimit(current => current + PAGE)}>Show more cards ({rows.length - limit} remaining)</button>}
   </div>;
