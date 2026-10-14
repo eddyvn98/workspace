@@ -18,6 +18,7 @@ export interface CollectionField {
   relationMultiple?: boolean;
   rollupOperation?: "sum" | "average" | "min" | "max" | "count";
   formulaOperation?: FormulaOperation;
+  formulaExpression?: string;
   formulaFieldIds?: string[];
 }
 export interface CollectionRecord {
@@ -154,8 +155,10 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       f.relationFieldId === fieldId || f.targetFieldId === fieldId
         ? { ...f, relationFieldId: f.relationFieldId === fieldId ? undefined : f.relationFieldId,
           targetFieldId: f.targetFieldId === fieldId ? undefined : f.targetFieldId } : f)
-      .map(f => f.formulaFieldIds?.includes(fieldId)
-        ? { ...f, formulaFieldIds: f.formulaFieldIds.filter(id => id !== fieldId) } : f),
+      .map(f => ({ ...f,
+        ...(f.formulaFieldIds?.includes(fieldId) ? { formulaFieldIds: f.formulaFieldIds.filter(id => id !== fieldId) } : {}),
+        ...(f.formulaExpression?.includes("{" + fieldId + "}") ? { formulaExpression: "" } : {}),
+      })),
     records: data.records.map(({ values, ...r }) => ({ ...r, values: Object.fromEntries(Object.entries(values).filter(([id]) => id !== fieldId)) })),
     automations: (data.automations ?? []).filter(rule => rule.whenFieldId !== fieldId && rule.thenFieldId !== fieldId),
     views: data.views.map((v) => ({

@@ -1,6 +1,7 @@
 import type { WorkspaceJson } from "./contracts";
 import { COLLECTION_COMMANDS } from "./collectionActionSchema";
 import type { CollectionBlockPayload, CollectionField, CollectionFieldType } from "@/app/workspace/collections/model";
+import { validCollectionExpression } from "@/app/workspace/collections/collectionFormulaExpression";
 import { relationValueValid } from "@/app/workspace/collections/collectionRelations";
 import { isValidFilterOperator, validOperator } from "@/app/workspace/collections/collectionFilters";
 
@@ -55,7 +56,7 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   if ("options" in action && !validOptions(action.options)) return `${type}.options must contain distinct non-empty strings.`;
   if ("fieldType" in action && !fieldTypes.has(String(action.fieldType))) return `${type}.fieldType is invalid.`;
   if ("kind" in action && !viewKinds.has(String(action.kind))) return `${type}.kind is invalid.`;
-  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds", "rollupOperation", "relationMultiple"].some((key) => key in action)) return "No Collection field changes specified.";
+  if (type === "update_collection_field" && !["name", "fieldType", "options", "relationFieldId", "targetFieldId", "formulaOperation", "formulaFieldIds", "formulaExpression", "rollupOperation", "relationMultiple"].some((key) => key in action)) return "No Collection field changes specified.";
   if (type === "configure_collection_view" && !["name", "active", "groupFieldId", "dateFieldId", "endDateFieldId", "filter", "sort", "filters", "sorts", "filterLogic", "aggregations", "galleryFieldIds", "formFieldIds", "formRequiredFieldIds"].some((key) => key in action)) return "No Collection view changes specified.";
   if ("filterLogic" in action && action.filterLogic !== "and" && action.filterLogic !== "or") return "Invalid Collection filterLogic.";
   if ("name" in action && (!str(action.name) || String(action.name).length > 160)) return `${type}.name must be non-empty.`;
@@ -99,15 +100,22 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
     if (nextType === "formula") {
       const op = action.formulaOperation ?? field?.formulaOperation;
       const sources = action.formulaFieldIds ?? field?.formulaFieldIds;
-      if (!["sum", "subtract", "multiply", "divide", "average", "concat"].includes(String(op)))
+      if (!["sum", "subtract", "multiply", "divide", "average", "concat", "expression"].includes(String(op)))
         return "Formula requires a supported formulaOperation.";
-      if (!Array.isArray(sources) || sources.length < 2 || sources.length > 10 ||
-        sources.some(id => !data.fields.some(f => f.id === id && f.type !== "formula")))
-        return "Formula requires 2–10 existing non-formula field IDs.";
-      if (["subtract", "divide"].includes(String(op)) && sources.length !== 2)
-        return "Formula operation requires exactly two fields.";
-      if (op !== "concat" && sources.some(id => !data.fields.some(f => f.id === id && ["number", "lookup"].includes(f.type))))
-        return "Numeric formula fields must be numbers or lookups.";
+      if (op === "expression") {
+        const expression = action.formulaExpression ?? field?.formulaExpression;
+        if (typeof expression !== "string" || !validCollectionExpression(expression, data, String(action.fieldId)))
+          return "Expression must be bounded arithmetic with numeric {fieldId} references.";
+      } else {
+        if (!Array.isArray(sources) || sources.length < 2 || sources.length > 10 ||
+          sources.some(id => !data.fields.some(f => f.id === id && f.type !== "formula")))
+          return "Formula requires 2–10 existing non-formula field IDs.";
+        if (["subtract", "divide"].includes(String(op)) && sources.length !== 2)
+          return "Formula operation requires exactly two fields.";
+        if (op !== "concat" && sources.some(id => !data.fields.some(f =>
+          f.id === id && ["number", "lookup", "rollup"].includes(f.type))))
+          return "Numeric formula fields must be numbers or computed numeric values.";
+      }
     }
     if (nextType === "lookup" || nextType === "rollup") {
       const relationId = action.relationFieldId ?? field?.relationFieldId;

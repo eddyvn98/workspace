@@ -1,6 +1,7 @@
 import type { CollectionBlockPayload, CollectionField, CollectionRecord } from "./model";
 
-export const FORMULA_OPERATIONS = ["sum", "subtract", "multiply", "divide", "average", "concat"] as const;
+import { evaluateCollectionExpression } from "./collectionFormulaExpression";
+export const FORMULA_OPERATIONS = ["sum", "subtract", "multiply", "divide", "average", "concat", "expression"] as const;
 export type FormulaOperation = typeof FORMULA_OPERATIONS[number];
 export const AGGREGATE_OPERATIONS = ["sum", "average", "min", "max", "count"] as const;
 export type AggregateOperation = typeof AGGREGATE_OPERATIONS[number];
@@ -8,6 +9,7 @@ export interface CollectionAggregation { fieldId: string; operation: AggregateOp
 export function evaluateCollectionFormula(data: CollectionBlockPayload, record: CollectionRecord,
   field: CollectionField): string {
   if (field.type !== "formula" || !field.formulaOperation) return "";
+  if (field.formulaOperation === "expression") return evaluateCollectionExpression(field.formulaExpression ?? "", data, record);
   const ids = field.formulaFieldIds ?? [];
   if (ids.length < 2 || ids.length > 10) return "";
   const sources = ids.map(id => data.fields.find(candidate => candidate.id === id && candidate.type !== "formula"));

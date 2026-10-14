@@ -4,7 +4,8 @@ const id: PropertySchema = { type: "string", minLength: 1, maxLength: 128 };
 const word: PropertySchema = { type: "string", minLength: 1, maxLength: 160 };
 const values: PropertySchema = { type: "object", additionalProperties: true };
 const fieldType: PropertySchema = { type: "string", enum: ["text", "number", "date", "select", "checkbox", "url", "image", "relation", "lookup", "rollup", "formula"] };
-const formulaOperation: PropertySchema = { type: "string", enum: ["sum", "subtract", "multiply", "divide", "average", "concat"] };
+const formulaOperation: PropertySchema = { type: "string", enum: ["sum", "subtract", "multiply", "divide", "average", "concat", "expression"] };
+const formulaExpression: PropertySchema = { type: "string", minLength: 1, maxLength: 500 };
 const formulaFieldIds: PropertySchema = { type: "array", minItems: 2, maxItems: 10, items: id };
 const aggregations: PropertySchema = { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false,
   required: ["fieldId", "operation"], properties: { fieldId: id, operation: { type: "string", enum: ["sum", "average", "min", "max", "count"] } } } };
@@ -38,11 +39,11 @@ export const WORKSPACE_RUNTIME_COLLECTION_ACTION_SCHEMAS: Record<string, Runtime
   add_collection_field: define("add_collection_field", ["fieldId", "name", "fieldType"], {
     fieldId: id, name: word, fieldType, options, relationFieldId: id, targetFieldId: id,
     relationMultiple: { type: "boolean" }, rollupOperation: { type: "string", enum: ["sum", "average", "min", "max", "count"] },
-    formulaOperation, formulaFieldIds }),
+    formulaOperation, formulaFieldIds, formulaExpression }),
   update_collection_field: define("update_collection_field", [], {
     fieldId: id, fieldName: word, name: word, fieldType, options, relationFieldId: { ...id, nullable: true },
     targetFieldId: { ...id, nullable: true }, relationMultiple: { type: "boolean" },
-    rollupOperation: { type: "string", enum: ["sum", "average", "min", "max", "count"] }, formulaOperation, formulaFieldIds }),
+    rollupOperation: { type: "string", enum: ["sum", "average", "min", "max", "count"] }, formulaOperation, formulaFieldIds, formulaExpression }),
   remove_collection_field: define("remove_collection_field", [], { fieldId: id, fieldName: word }),
   add_collection_view: define("add_collection_view", ["viewId", "name", "kind"], {
     viewId: id, name: word, kind: viewKind }),

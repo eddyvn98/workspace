@@ -13,6 +13,7 @@ export function summarizeCollection(data: CollectionBlockPayload, limit = 16, qu
       relationFieldId: field.relationFieldId, targetFieldId: field.targetFieldId,
       relationMultiple: field.relationMultiple, rollupOperation: field.rollupOperation,
       formulaOperation: field.formulaOperation, formulaFieldIds: field.formulaFieldIds,
+      formulaExpression: field.formulaExpression,
       ...(field.type === "select" ? { options: field.options?.slice(0, 60) } : {}),
     })),
     views: data.views.slice(0, 100).map((item) => ({

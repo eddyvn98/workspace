@@ -66,7 +66,8 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
       ...(typeValue === "relation" ? { relationMultiple: prop(raw, "relationMultiple") === true } : {}),
       ...(typeValue === "rollup" ? { rollupOperation: str(prop(raw, "rollupOperation")) as CollectionField["rollupOperation"] } : {}),
       ...(typeValue === "formula" ? { formulaOperation: prop(raw, "formulaOperation") as CollectionField["formulaOperation"],
-        formulaFieldIds: prop(raw, "formulaFieldIds") as string[] } : {}) };
+        formulaFieldIds: prop(raw, "formulaFieldIds") as string[],
+        formulaExpression: str(prop(raw, "formulaExpression")) } : {}) };
     next = { ...data, fields: [...data.fields, field] };
   } else if (type === "update_collection_field") {
     const patch: Partial<CollectionField> = {};
@@ -78,6 +79,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     if (prop(raw, "relationFieldId") !== undefined) patch.relationFieldId = str(prop(raw, "relationFieldId"));
     if (prop(raw, "targetFieldId") !== undefined) patch.targetFieldId = str(prop(raw, "targetFieldId"));
     if (prop(raw, "formulaOperation") !== undefined) patch.formulaOperation = prop(raw, "formulaOperation") as CollectionField["formulaOperation"];
+    if (prop(raw, "formulaExpression") !== undefined) patch.formulaExpression = str(prop(raw, "formulaExpression"));
     if (prop(raw, "formulaFieldIds") !== undefined) patch.formulaFieldIds = prop(raw, "formulaFieldIds") as string[];
     next = updateField(data, fieldId, patch);
   } else if (type === "remove_collection_field") {
