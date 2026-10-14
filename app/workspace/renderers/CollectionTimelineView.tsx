@@ -5,6 +5,7 @@ import { recordTitle, setRecordValue } from "../collections/model";
 import { FieldEditor, btnClass } from "./CollectionFieldEditor";
 import { addUtcDays, timelineLayout } from "./collectionTimelineDates";
 import { parseCalendarDay } from "./collectionCalendarDates";
+import { CollectionGanttBar } from "./CollectionGanttBar";
 
 interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; start?: CollectionField;
   end?: CollectionField; readOnly: boolean; onChange: (next: CollectionBlockPayload) => void;
@@ -37,6 +38,7 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
     {!start && <p className="text-amber-600">Add a date field for Timeline.</p>}
     <div className="flex flex-wrap items-center gap-2">
       <strong>{view.from} – {view.to}</strong>
+      <span className="text-slate-500">Drag a bar to move dates, or drag its right edge to change duration.</span>
       <label>Ruler <select className="rounded border p-1" aria-label="Timeline ruler"
         value={scale} onChange={event => setScale(event.target.value as "day" | "week")}>
         <option value="day">Days</option><option value="week">Weeks</option>
@@ -68,9 +70,11 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
               {recordTitle(data, record)}
             </div>
             <div className="relative h-11" style={{ width: span }}>
-              {startOffset < view.days && <div className="absolute top-2 h-7 rounded bg-blue-600 text-white"
-                role="img" aria-label={"Timeline duration " + recordTitle(data, record) + " " + length + " days"}
-                style={{ left: startOffset * CELL, width: Math.min(length, view.days - startOffset) * CELL }} />}
+              {startOffset < view.days && <CollectionGanttBar
+                left={startOffset * CELL} width={Math.min(length, view.days - startOffset) * CELL}
+                label={recordTitle(data, record)} disabled={readOnly}
+                onMove={days => changeDates(record, days)}
+                onResize={days => resize(record, days)} />}
             </div>
           </div>)}
       </div>

@@ -27,9 +27,19 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
   const selected = rows.find(item => item.id === selectedId) ?? rows[0];
   const parentChoice = selected?.parentId && graph.nodes.some(item => item.id === selected.parentId)
     ? selected.parentId : "";
+  const dropParent = (movedId: string, x: number, y: number) => {
+    if (readOnly) return;
+    const targets = graph.nodes.filter(item => item.id !== movedId).map(item => ({
+      id: item.id, distance: Math.hypot(item.x - x, item.y - y),
+    })).sort((a, b) => a.distance - b.distance);
+    // Reparent only on an intentional near-node drop. The engine prevents cycles.
+    if ((targets[0]?.distance ?? Infinity) > 130) return;
+    const next = setParent(data, movedId, targets[0].id);
+    if (next !== data) onChange(next);
+  };
   return <div className="flex h-full min-h-[420px] flex-col gap-2" data-testid="collection-mindmap">
     <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs">
-      <span>Drag to pan or scroll to zoom. Select a record to change its parent.</span>
+      <span>Drag background to pan, scroll to zoom, or drop a node near another node to change its parent.</span>
       <select aria-label="Mind Map selected record" className={inputClass} value={selected?.id ?? ""}
         onChange={event => setSelectedId(event.target.value)}>
         {graph.nodes.map(node => <option key={node.id} value={node.id}>{labels.get(node.id) ?? "Untitled"}</option>)}
@@ -53,7 +63,8 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
     </div>
     <div className="min-h-[380px] flex-1 overflow-hidden rounded border" data-testid="collection-mindmap-graph">
       <ReactFlow nodes={nodes} edges={edges} fitView minZoom={0.15} maxZoom={2}
-        nodesDraggable={false} nodesConnectable={false} selectNodesOnDrag={false}
+        nodesDraggable={!readOnly} nodesConnectable={false} selectNodesOnDrag={false}
+        onNodeDragStop={(_event, node) => dropParent(node.id, node.position.x, node.position.y)}
         onNodeClick={(_event, node) => setSelectedId(node.id)}
         proOptions={{ hideAttribution: true }}>
         <Background />
