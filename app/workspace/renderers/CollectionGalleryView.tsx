@@ -1,13 +1,14 @@
 "use client";
 import React, { useState } from "react";
 import { recordTitle, type CollectionBlockPayload, type CollectionField, type CollectionRecord,
-  type CollectionView } from "../collections/model";
+  type CollectionView, type CollectionSources } from "../collections/model";
 import { btnClass, FieldEditor } from "./CollectionFieldEditor";
-interface Props { data: CollectionBlockPayload; view: CollectionView; rows: CollectionRecord[];
+interface Props { data: CollectionBlockPayload; sources?: CollectionSources;
+  view: CollectionView; rows: CollectionRecord[];
   titleField?: CollectionField; readOnly: boolean;
   patch: (record: CollectionRecord, field: CollectionField, value: string) => void; }
 const PAGE = 24;
-export function CollectionGalleryView({ data, view, rows, titleField, readOnly, patch }: Props) {
+export function CollectionGalleryView({ data, sources, view, rows, titleField, readOnly, patch }: Props) {
   const [limit, setLimit] = useState(PAGE);
   const eligible = data.fields.filter(field => field.id !== titleField?.id && field.type !== "image");
   const fieldIds = view.galleryFieldIds ?? eligible.slice(0, 3).map(field => field.id);
@@ -29,7 +30,7 @@ export function CollectionGalleryView({ data, view, rows, titleField, readOnly, 
             {details.map(field => <label key={field.id} className="block space-y-1">
               <span className="text-slate-500">{field.name}</span>
               <FieldEditor field={field} value={record.values[field.id] ?? ""}
-                readOnly={readOnly} data={data} recordId={record.id}
+                readOnly={readOnly} data={data} sources={sources} recordId={record.id}
                 onSet={value => patch(record, field, value)} />
             </label>)}
           </div>

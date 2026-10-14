@@ -1,15 +1,17 @@
 "use client";
 import React, { useState } from "react";
-import type { CollectionBlockPayload, CollectionField, CollectionView } from "../collections/model";
+import type { CollectionBlockPayload, CollectionField, CollectionView, CollectionSources } from "../collections/model";
 import { formFields, requiredFormFieldIds, submitCollectionForm } from "../collections/collectionForm";
 import { btnClass, inputClass } from "./CollectionFieldEditor";
 import { recordTitle } from "../collections/model";
 import { relationIds, encodeRelationIds } from "../collections/collectionRelations";
 
-interface Props { data: CollectionBlockPayload; view: CollectionView; readOnly: boolean;
+interface Props { data: CollectionBlockPayload; sources?: CollectionSources;
+  view: CollectionView; readOnly: boolean;
   onChange: (next: CollectionBlockPayload) => void; }
-function FormInput({ field, data, value, onSet, readOnly, required }: {
-  field: CollectionField; data: CollectionBlockPayload; value: string; onSet: (v: string) => void;
+function FormInput({ field, data, sources, value, onSet, readOnly, required }: {
+  field: CollectionField; data: CollectionBlockPayload; sources?: CollectionSources;
+  value: string; onSet: (v: string) => void;
   readOnly: boolean; required: boolean;
 }) {
   if (field.type === "checkbox") return <input type="checkbox" checked={value === "true"} required={required}
@@ -17,11 +19,15 @@ function FormInput({ field, data, value, onSet, readOnly, required }: {
   if (field.type === "relation" && field.relationMultiple) return <select multiple
     className={inputClass + " min-h-28 w-full"} value={relationIds(value)} required={required} disabled={readOnly}
     onChange={event => onSet(encodeRelationIds(Array.from(event.currentTarget.selectedOptions, option => option.value), true))}>
-    {data.records.map(record => <option key={record.id} value={record.id}>{recordTitle(data, record)}</option>)}
+    {(field.relationTargetBlockId ? sources?.[field.relationTargetBlockId] : data)?.records.map(record =>
+      <option key={record.id} value={record.id}>{recordTitle((field.relationTargetBlockId
+        ? sources?.[field.relationTargetBlockId] : data)!, record)}</option>)}
   </select>;
   if (field.type === "select" || field.type === "relation") {
     const options = field.type === "select" ? (field.options ?? []).map(option => ({ id: option, name: option })) :
-      data.records.map(record => ({ id: record.id, name: recordTitle(data, record) }));
+      (field.relationTargetBlockId ? sources?.[field.relationTargetBlockId] : data)?.records.map(record => ({
+        id: record.id, name: recordTitle((field.relationTargetBlockId ? sources?.[field.relationTargetBlockId] : data)!, record),
+      })) ?? [];
     return <select className={inputClass + " w-full"} value={value} disabled={readOnly} required={required}
       onChange={event => onSet(event.target.value)}>
       <option value="">Choose...</option>
@@ -34,7 +40,7 @@ function FormInput({ field, data, value, onSet, readOnly, required }: {
       : field.type === "url" ? "url" : "text"}
     onChange={event => onSet(event.target.value)} />;
 }
-export function CollectionFormView({ data, view, readOnly, onChange }: Props) {
+export function CollectionFormView({ data, sources, view, readOnly, onChange }: Props) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");
   const fields = formFields(data, view);
@@ -42,7 +48,7 @@ export function CollectionFormView({ data, view, readOnly, onChange }: Props) {
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (readOnly) return;
-    const result = submitCollectionForm(data, view, draft);
+    const result = submitCollectionForm(data, view, draft, sources);
     if (!result.ok) { setFeedback(result.error); return; }
     onChange(result.data);
     setDraft({});
@@ -54,7 +60,7 @@ export function CollectionFormView({ data, view, readOnly, onChange }: Props) {
     <p className="text-xs text-slate-500">Responses become records in {data.title}.</p>
     {fields.map(field => <label key={field.id} className="block space-y-1 text-xs">
       <span className="font-semibold">{field.name}{required.has(field.id) ? " *" : ""}</span>
-      <FormInput field={field} data={data} readOnly={readOnly} required={required.has(field.id)}
+      <FormInput field={field} data={data} sources={sources} readOnly={readOnly} required={required.has(field.id)}
         value={draft[field.id] ?? ""} onSet={value => { setDraft(previous => ({ ...previous, [field.id]: value })); setFeedback(""); }} />
     </label>)}
     <button type="submit" className={btnClass} disabled={readOnly || !fields.length || data.records.length >= 5000}>Submit record</button>
