@@ -30,6 +30,8 @@ export interface CollectionRecord {
   parentId?: string | null;
   /** Long-form record notes, shared by every view. */
   body?: string;
+  /** Stable record IDs that must finish before this task starts. */
+  dependsOn?: string[];
 }
 export interface CollectionView {
   id: string;
@@ -156,7 +158,8 @@ export function updateRecordBody(data: CollectionBlockPayload, recordId: string,
     ? { ...record, body } : record) };
 }
 export function deleteRecord(data: CollectionBlockPayload, recordId: string): CollectionBlockPayload {
-  return { ...data, records: removeInboundRelations(data, recordId) };
+  return { ...data, records: removeInboundRelations(data, recordId).map(row => row.dependsOn?.includes(recordId)
+    ? { ...row, dependsOn: row.dependsOn.filter(id => id !== recordId) } : row) };
 }
 export function addField(data: CollectionBlockPayload, name: string, type: CollectionFieldType): CollectionBlockPayload {
   if (!name.trim()) return data;

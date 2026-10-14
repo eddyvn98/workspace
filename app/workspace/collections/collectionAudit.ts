@@ -28,6 +28,10 @@ function rowChanges(before: CollectionRecord | undefined, after: CollectionRecor
       before: cell(oldValues[fieldId]), after: cell(newValues[fieldId]) });
     if (changes.length >= 15) break;
   }
+  if (JSON.stringify(before?.dependsOn ?? []) !== JSON.stringify(after?.dependsOn ?? [])) {
+    changes.push({ fieldId: "$dependencies", before: cell((before?.dependsOn ?? []).join(", ")),
+      after: cell((after?.dependsOn ?? []).join(", ")) });
+  }
   if ((before?.body ?? "") !== (after?.body ?? "")) {
     changes.push({ fieldId: "$body", before: cell(before?.body), after: cell(after?.body) });
   }

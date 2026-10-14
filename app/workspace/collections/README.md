@@ -103,3 +103,23 @@ Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.conf
   follow-up, as expressly requested by the owner. Regressions may still exist.
 - Background scheduled automations, authenticated external webhooks and
   record-level collaborative CRDTs still require dedicated implementations.
+
+
+## Gantt dependencies (subsequent follow-up)
+
+- Records can save a bounded list of \`dependsOn\` stable record IDs.
+  Self-links, missing IDs and circular chains are rejected.
+- Timeline allows adding/removing predecessors and explicitly applying
+  finish-to-start scheduling. Scheduling shifts a task and its end date later
+  when needed, preserves its duration, and does not move tasks earlier.
+- Deleting a task clears inbound predecessor links from other tasks.
+- Optional longest dependency chain highlighting uses the sum of dated
+  task durations. This is a **simple longest-chain visual**, not resource-aware
+  critical path scheduling, free/total float, or a full project management engine.
+- Workspace AI reads/writes dependency lists using the existing authenticated
+  Collection action executor and exact record IDs.
+- Mind Map nodes are no longer individually marked nondraggable, so the
+  previously configured drag-to-reparent gesture can use React Flow's
+  enabled node-dragging behaviour.
+- Per owner instruction, this code is intentionally untested until a later
+  validation/repair pass.

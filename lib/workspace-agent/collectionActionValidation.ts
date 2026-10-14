@@ -1,6 +1,7 @@
 import type { WorkspaceJson } from "./contracts";
 import { COLLECTION_COMMANDS } from "./collectionActionSchema";
 import type { CollectionBlockPayload, CollectionField, CollectionFieldType } from "@/app/workspace/collections/model";
+import { validCollectionDependencies } from "@/app/workspace/collections/collectionDependencies";
 import { validCollectionExpression } from "@/app/workspace/collections/collectionFormulaExpression";
 import { relationValueValid } from "@/app/workspace/collections/collectionRelations";
 import { isValidFilterOperator, validOperator } from "@/app/workspace/collections/collectionFilters";
@@ -47,7 +48,8 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
     if (key in action && (!str(action[key]) || (action[key] as string).length > 128)) return `${type} requires exact ${key}.`;
   }
   if (["create_collection_record", "update_collection_record"].includes(type)) {
-    if (!("values" in action) && !("body" in action)) return "Record edit requires values or body.";
+    if (!("values" in action) && !("body" in action) && !("dependsOn" in action))
+      return "Record edit requires values, body or dependsOn.";
     if ("body" in action && (typeof action.body !== "string" || action.body.length > 20000))
       return "Record body must be text of at most 20000 characters.";
   }
@@ -155,6 +157,9 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
   }
   if (type === "add_collection_view" && data.views.some((v) => v.name.toLowerCase() === String(action.name).toLowerCase())) return "View name is ambiguous.";
   if (type === "configure_collection_view" && "name" in action && data.views.some((v) => v.id !== view?.id && v.name.toLowerCase() === String(action.name).toLowerCase())) return "View name is ambiguous.";
+  if (type === "update_collection_record" && "dependsOn" in action &&
+    (!Array.isArray(action.dependsOn) || !validCollectionDependencies(data,
+      String(action.recordId), action.dependsOn))) return "Dependencies must reference existing records without cycles.";
   if ("values" in action) {
     const values = obj(action.values) ?? {};
     for (const [id, value] of Object.entries(values)) {

@@ -20,7 +20,9 @@ export function compactCollectionReadResult(value: unknown): WorkspaceJson {
     }),
     records: (Array.isArray(data.records) ? data.records : []).slice(0, 30).map((raw) => {
       const row = record(raw);
-      return { id: text(row.id, 128), values: valueMap(row.values), computedValues: valueMap(row.computedValues), relationDisplayValues: valueMap(row.relationDisplayValues) };
+      return { id: text(row.id, 128), values: valueMap(row.values),
+        dependsOn: (Array.isArray(row.dependsOn) ? row.dependsOn : []).slice(0, 20).map(id => text(id, 128)),
+        computedValues: valueMap(row.computedValues), relationDisplayValues: valueMap(row.relationDisplayValues) };
     }),
   };
 }
