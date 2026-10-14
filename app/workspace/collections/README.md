@@ -74,3 +74,32 @@ Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.conf
 - Gantt bars support direct pointer move/resize, alongside the previous keyboard-accessible controls; Mind Map nodes can be dragged near another node to change their parent.
 - Foreign-Collection links do **not** create cross-block cascade updates. Removing a target record leaves its foreign reference stale until the owner fixes it; the UI displays an empty computed value when its target is absent. Do not claim per-record Yjs realtime or global relational integrity.
 - No tests or staging acceptance were run for these new changes per user instruction. Treat this branch as unverified work-in-progress until a later repair pass.
+
+
+## Integrity, history, and record pages (follow-up)
+
+- Record deletes from the Workspace editor and AI now remove inbound links from
+  other Collection blocks on the **same board**, in the same board-save transaction.
+  Removing a target Collection block also unbinds source fields and clears their
+  now-orphaned values; existing valid links to other blocks are untouched.
+- Collection Settings includes a dangling-link diagnostic and an explicit
+  "Repair dangling links" action. Repair removes only IDs no longer present in
+  the linked Collection; it is never automatic on a passive read.
+- Each Collection stores a capped (120) record-level change history covering
+  create/edit/delete and long-form notes. Consecutive typing edits to the same
+  record field coalesce, reducing noise. History lives inside the board JSON and
+  is **not a tamper-proof regulatory audit log**.
+- Table, Kanban and Gallery can open a shared record detail drawer with editable
+  fields and a 20,000-character notes body. AI can read a bounded notes preview,
+  and create/update the notes with the same authenticated record commands.
+- A lightweight authenticated revision-only endpoint alerts Collection users
+  when another session has saved a newer board. It **does not** change the local
+  CAS base revision. "Save & refresh" uses the existing persistence-flush path
+  and avoids reloading when the pending save could not be confirmed. It is not
+  realtime editing, nor does it merge active editors' cursors.
+- The existing REST three-way merge now merges per-record history entries by
+  their event IDs. The same-field concurrent edit conflict policy remains.
+- No tests, builds, staging checks, or deployment were performed for this
+  follow-up, as expressly requested by the owner. Regressions may still exist.
+- Background scheduled automations, authenticated external webhooks and
+  record-level collaborative CRDTs still require dedicated implementations.
