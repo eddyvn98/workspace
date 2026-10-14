@@ -46,6 +46,11 @@ export function validateCollectionAction(action: Record<string, unknown>): strin
   for (const key of ["recordId", "fieldId", "viewId"]) {
     if (key in action && (!str(action[key]) || (action[key] as string).length > 128)) return `${type} requires exact ${key}.`;
   }
+  if (["create_collection_record", "update_collection_record"].includes(type)) {
+    if (!("values" in action) && !("body" in action)) return "Record edit requires values or body.";
+    if ("body" in action && (typeof action.body !== "string" || action.body.length > 20000))
+      return "Record body must be text of at most 20000 characters.";
+  }
   if ("values" in action) {
     const values = obj(action.values);
     if (!values || Object.keys(values).length < 1 || Object.keys(values).length > 100

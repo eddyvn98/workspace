@@ -2,6 +2,7 @@ import { createWorkspaceId } from "../utils/workspaceId";
 import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./collectionFilters";
 import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
 import { applyCollectionAutomations, sanitizeCollectionAutomations, type CollectionAutomation } from "./collectionAutomations";
+import type { CollectionAuditEntry } from "./collectionAudit";
 import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
 export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "rollup" | "formula";
@@ -27,6 +28,8 @@ export interface CollectionRecord {
   id: string;
   values: Record<string, string>;
   parentId?: string | null;
+  /** Long-form record notes, shared by every view. */
+  body?: string;
 }
 export interface CollectionView {
   id: string;
@@ -55,6 +58,7 @@ export interface CollectionBlockPayload {
   views: CollectionView[];
   activeViewId: string;
   automations?: CollectionAutomation[];
+  auditTrail?: CollectionAuditEntry[];
 }
 
 export type CollectionSources = Record<string, CollectionBlockPayload>;
@@ -145,6 +149,11 @@ export function addRecord(data: CollectionBlockPayload, values: Record<string, s
   const id = newId();
   return { ...data, records: [...data.records,
     applyCollectionAutomations(data, null, { id, values }, Object.keys(values))] };
+}
+export function updateRecordBody(data: CollectionBlockPayload, recordId: string, body: string): CollectionBlockPayload {
+  if (body.length > 20000 || !data.records.some(record => record.id === recordId)) return data;
+  return { ...data, records: data.records.map(record => record.id === recordId
+    ? { ...record, body } : record) };
 }
 export function deleteRecord(data: CollectionBlockPayload, recordId: string): CollectionBlockPayload {
   return { ...data, records: removeInboundRelations(data, recordId) };

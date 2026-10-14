@@ -63,7 +63,7 @@ export function projectCollectionLookups(data: CollectionBlockPayload, record: C
   return { ...record, values };
 }
 export function removeInboundRelations(data: CollectionBlockPayload, deletedId: string): CollectionRecord[] {
-  const relations = data.fields.filter(field => field.type === "relation");
+  const relations = data.fields.filter(field => field.type === "relation" && !field.relationTargetBlockId);
   return data.records.filter(record => record.id !== deletedId).map(record => {
     const values = { ...record.values };
     for (const field of relations) {

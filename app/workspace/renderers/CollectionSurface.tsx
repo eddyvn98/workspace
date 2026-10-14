@@ -11,6 +11,8 @@ import { CollectionGalleryView } from "./CollectionGalleryView";
 import { CollectionFormView } from "./CollectionFormView";
 import { CollectionCardFormSettings } from "./CollectionCardFormSettings";
 import { CollectionAutomationSettings } from "./CollectionAutomationSettings";
+import { CollectionAuditPanel } from "./CollectionAuditPanel";
+import { CollectionIntegrityPanel } from "./CollectionIntegrityPanel";
 import { CollectionViewConditions } from "./CollectionViewConditions";
 import { createPortal } from "react-dom";
 import type { CollectionBlockPayload, CollectionSources, CollectionField, CollectionRecord, CollectionView } from "../collections/model";
@@ -18,12 +20,14 @@ import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FI
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
 
 interface Props { data: CollectionBlockPayload; sources?: CollectionSources;
+  revisionNotice?: { stale: boolean; refreshing: boolean; error: string; refresh: () => Promise<void> };
   onChange: (next: CollectionBlockPayload) => void; readOnly: boolean }
 
-export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Props) {
+export function CollectionSurface({ data, sources = {}, revisionNotice, onChange, readOnly }: Props) {
   const [search, setSearch] = useState("");
   const [localViewId, setLocalViewId] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [full, setFull] = useState(false);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const fileInput = useRef<HTMLInputElement>(null);
@@ -54,12 +58,21 @@ export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Pr
       <span className="text-xs text-slate-400">{data.records.length} records</span>
       <button className={btnClass} onClick={() => setFull(!full)}>{full ? "Exit full screen" : "Expand"}</button>
       <button className={btnClass} onClick={() => setSettings(!settings)}>Settings</button>
+      <button className={btnClass} onClick={() => setShowHistory(!showHistory)}>{showHistory ? "Hide history" : "History"}</button>
     </div>
+    {revisionNotice?.stale && <div role="status" className="flex shrink-0 flex-wrap items-center gap-2 border-b px-2 py-1 text-xs">
+      <span>Another session has saved a newer board version.</span>
+      <button className={btnClass} disabled={revisionNotice.refreshing} onClick={() => void revisionNotice.refresh()}>
+        {revisionNotice.refreshing ? "Saving..." : "Save & refresh"}
+      </button>
+      {revisionNotice.error && <span role="alert">{revisionNotice.error}</span>}
+    </div>}
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 p-2 dark:border-slate-700">
       {data.views.map((v) => <button key={v.id} className={btnClass + (v.id === view.id ? " border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900" : "")} onClick={() => { if (readOnly) setLocalViewId(v.id); else { setLocalViewId(null); onChange({ ...data, activeViewId: v.id }); } }}>{v.name}</button>)}
       {!readOnly && <select aria-label="Add view" className={inputClass} value="" onChange={(e) => e.target.value && onChange(addView(data, e.target.value as CollectionView["kind"]))}><option value="">+ View</option>{VIEW_KINDS.map((v) => <option key={v} value={v}>{v}</option>)}</select>}
       <input aria-label="Search records" className={inputClass + " ml-auto w-32"} placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
     </div>
+    {showHistory && <CollectionAuditPanel data={data} onClose={() => setShowHistory(false)} />}
     {settings && <div role="region" aria-label="Collection settings" tabIndex={0} data-testid="collection-settings"
       className="max-h-[min(55vh,28rem)] min-h-0 shrink-0 space-y-2 overflow-y-scroll overscroll-contain border-b bg-slate-50 p-2 text-xs dark:bg-slate-900">
       <div className="flex flex-wrap items-center gap-2"><label>View name <input className={inputClass} value={view.name} disabled={readOnly} onChange={(e) => renameView({ name: e.target.value })} /></label>
@@ -72,6 +85,7 @@ export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Pr
       <CollectionViewConditions view={view} fields={data.fields} readOnly={readOnly} onChange={renameView} />
       <CollectionCardFormSettings view={view} fields={data.fields} readOnly={readOnly} onChange={renameView} />
       <CollectionAutomationSettings data={data} readOnly={readOnly} onChange={onChange} />
+      <CollectionIntegrityPanel data={data} sources={sources} readOnly={readOnly} onChange={onChange} />
       <div className="flex flex-wrap gap-2 items-center">
         {data.fields.map((f) => <span key={f.id} className="flex items-center gap-1 rounded border p-1"><input aria-label={"Rename " + f.name} className="w-20 bg-transparent" value={f.name} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { name: e.target.value }))} /><select aria-label={"Type " + f.name} className={inputClass} value={f.type} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { type: e.target.value as CollectionField["type"] }))}>{FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>{(f.type === "lookup" || f.type === "rollup") && <><select aria-label={"Lookup relation " + f.name} className={inputClass} value={f.relationFieldId ?? ""} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { relationFieldId: e.target.value || undefined }))}><option value="">Choose relation</option>{data.fields.filter((x) => x.type === "relation").map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select><select aria-label={"Lookup target " + f.name} className={inputClass} value={f.targetFieldId ?? ""} disabled={readOnly} onChange={(e) => onChange(updateField(data, f.id, { targetFieldId: e.target.value || undefined }))}><option value="">Choose field</option>{(() => { const relation = data.fields.find(x => x.id === f.relationFieldId);
           const target = relation?.relationTargetBlockId ? sources[relation.relationTargetBlockId] : data;
@@ -112,7 +126,7 @@ export function CollectionSurface({ data, sources = {}, onChange, readOnly }: Pr
     <div className="min-h-0 flex-1 overflow-auto p-2">
       {view.kind === "table" && <CollectionTableView data={data} sources={sources} view={view} rows={rows} readOnly={readOnly} onChange={onChange} patch={patch} />}
       {view.kind === "kanban" && <CollectionKanbanView data={data} rows={rows} group={group} titleField={titleField} groupOptions={groupOptions} readOnly={readOnly} onChange={onChange} patch={patch} />}
-      {view.kind === "gallery" && <CollectionGalleryView data={data} sources={sources} view={view} rows={rows} titleField={titleField} readOnly={readOnly} patch={patch} />}
+      {view.kind === "gallery" && <CollectionGalleryView data={data} sources={sources} view={view} rows={rows} titleField={titleField} readOnly={readOnly} patch={patch} onChange={onChange} />}
       {view.kind === "calendar" && <CalendarView month={month} setMonth={setMonth} rows={rows} data={data} field={date} readOnly={readOnly} patch={patch} />}
       {view.kind === "timeline" && <TimelineView rows={rows} data={data} start={date} end={end} readOnly={readOnly} patch={patch} onChange={onChange} />}
       {view.kind === "mindmap" && <MindMapView rows={rows} data={data} readOnly={readOnly} onChange={onChange} />}

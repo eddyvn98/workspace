@@ -69,15 +69,26 @@ function isCollection(value: unknown): boolean {
   return b.type === "collection" && d.version === 1 &&
     Array.isArray(d.records) && Array.isArray(d.fields) && Array.isArray(d.views);
 }
+function mergeAuditTrail(mine: unknown, theirs: unknown): unknown[] {
+  const entries = new Map<string, Record<string, unknown>>();
+  for (const candidate of [...(Array.isArray(theirs) ? theirs : []), ...(Array.isArray(mine) ? mine : [])]) {
+    const item = object(candidate);
+    if (typeof item.id === "string" && !entries.has(item.id)) entries.set(item.id, item);
+  }
+  return [...entries.values()].sort((a, b) => Number(b.at ?? 0) - Number(a.at ?? 0)).slice(0, 120);
+}
 function mergeCollectionBlock(base: unknown, mine: unknown, theirs: unknown): Merged {
   if (![base, mine, theirs].every(isCollection)) return choose(base, mine, theirs);
   const b = object(base), m = object(mine), t = object(theirs);
   const props = mergeProps({ ...b, data: undefined }, { ...m, data: undefined }, { ...t, data: undefined });
   const bd = object(b.data), md = object(m.data), td = object(t.data);
-  const meta = mergeProps({ ...bd, records: undefined }, { ...md, records: undefined }, { ...td, records: undefined });
+  const meta = mergeProps({ ...bd, records: undefined, auditTrail: undefined },
+    { ...md, records: undefined, auditTrail: undefined },
+    { ...td, records: undefined, auditTrail: undefined });
   const records = mergeRecords(bd.records as unknown[], md.records as unknown[], td.records as unknown[]);
   return {
-    value: { ...props.value, data: { ...meta.value, records: records.value } },
+    value: { ...props.value, data: { ...meta.value, records: records.value,
+      auditTrail: mergeAuditTrail(md.auditTrail, td.auditTrail) } },
     conflicts: props.conflicts + meta.conflicts + records.conflicts,
   };
 }

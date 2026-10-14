@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, TouchSensor,
   useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -7,6 +7,7 @@ import { dropCollectionCard } from "./collectionKanbanDrop";
 import { addRecord, recordTitle,
   type CollectionBlockPayload, type CollectionField, type CollectionRecord } from "../collections/model";
 import { btnClass, inputClass, FieldEditor } from "./CollectionFieldEditor";
+import { CollectionRecordDetails } from "./CollectionRecordDetails";
 
 interface Props { data: CollectionBlockPayload; rows: CollectionRecord[]; group?: CollectionField;
   titleField?: CollectionField; groupOptions: string[]; readOnly: boolean;
@@ -14,10 +15,10 @@ interface Props { data: CollectionBlockPayload; rows: CollectionRecord[]; group?
   patch: (record: CollectionRecord, field: CollectionField, value: string) => void; }
 const columnId = (status: string) => "collection-column:" + status;
 
-function Card({ data, record, titleField, group, groupOptions, readOnly, patch }: {
+function Card({ data, record, titleField, group, groupOptions, readOnly, patch, onOpen }: {
   data: CollectionBlockPayload; record: CollectionRecord; titleField?: CollectionField;
   group?: CollectionField; groupOptions: string[]; readOnly: boolean;
-  patch: Props["patch"];
+  patch: Props["patch"]; onOpen: (id: string) => void;
 }) {
   const drag = useDraggable({ id: record.id, disabled: readOnly || !group });
   return <div ref={drag.setNodeRef} className="mb-2 rounded border bg-white p-2 text-xs shadow-sm dark:bg-slate-800"
@@ -27,6 +28,8 @@ function Card({ data, record, titleField, group, groupOptions, readOnly, patch }
       <button type="button" aria-label={"Drag " + recordTitle(data, record)} className={btnClass}
         disabled={readOnly || !group} {...drag.attributes} {...drag.listeners}>⠿</button>
       <strong>{recordTitle(data, record)}</strong>
+      <button type="button" className={btnClass} aria-label={"Open " + recordTitle(data, record)}
+        onClick={() => onOpen(record.id)}>Open</button>
     </div>
     {titleField && <FieldEditor field={titleField} value={record.values[titleField.id] ?? ""}
       readOnly={readOnly} onSet={value => patch(record, titleField, value)} />}
@@ -38,7 +41,8 @@ function Card({ data, record, titleField, group, groupOptions, readOnly, patch }
   </div>;
 }
 
-function Column({ status, rows, data, group, titleField, groupOptions, readOnly, onChange, patch }: Props & { status: string }) {
+function Column({ status, rows, data, group, titleField, groupOptions, readOnly, onChange, patch, onOpen }:
+  Props & { status: string; onOpen: (id: string) => void }) {
   const drop = useDroppable({ id: columnId(status), disabled: readOnly || !group });
   const cards = rows.filter(record => (record.values[group?.id ?? ""] ?? "") === status);
   return <div ref={drop.setNodeRef} data-testid="collection-kanban-column" data-status={status}
@@ -47,7 +51,7 @@ function Column({ status, rows, data, group, titleField, groupOptions, readOnly,
     <div className="mb-2 text-xs font-semibold">{status || "Unassigned"} · {cards.length}</div>
     {cards.map(record => <Card key={record.id} data={data} record={record}
       titleField={titleField} group={group} groupOptions={groupOptions}
-      readOnly={readOnly} patch={patch} />)}
+      readOnly={readOnly} patch={patch} onOpen={onOpen} />)}
     <button className={btnClass} disabled={readOnly}
       onClick={() => onChange(addRecord(data, group ? { [group.id]: status } : {}))}>+ Card</button>
   </div>;
@@ -55,6 +59,7 @@ function Column({ status, rows, data, group, titleField, groupOptions, readOnly,
 
 export function CollectionKanbanView(props: Props) {
   const { data, rows, group, groupOptions, readOnly, onChange } = props;
+  const [openRecordId, setOpenRecordId] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
@@ -70,7 +75,10 @@ export function CollectionKanbanView(props: Props) {
   };
   return <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
     <div className="flex h-full min-w-max gap-3" data-testid="collection-kanban">
-      {["", ...groupOptions].map(status => <Column key={status} {...props} status={status} />)}
+      {["", ...groupOptions].map(status => <Column key={status} {...props} status={status}
+        onOpen={setOpenRecordId} />)}
+      {openRecordId && <CollectionRecordDetails data={data} recordId={openRecordId}
+        readOnly={readOnly} onChange={onChange} onClose={() => setOpenRecordId(null)} />}
     </div>
   </DndContext>;
 }

@@ -1,3 +1,5 @@
+import { appendCollectionAudit } from "@/app/workspace/collections/collectionAudit";
+import { deletedCollectionIds, pruneDeletedCollectionLinks } from "@/app/workspace/collections/collectionBoardIntegrity";
 import { applyCollectionAutomations } from "@/app/workspace/collections/collectionAutomations";
 import { fromTableBlock } from "@/app/workspace/collections/io";
 import { deleteRecord, recordTitle, removeField, removeView, updateField, updateView, type CollectionBlockPayload, type CollectionField, type CollectionView } from "@/app/workspace/collections/model";
@@ -39,16 +41,18 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
   let next = data;
   let confirmedSummary: string | undefined;
   const display = (value: string) => JSON.stringify(value.replace(/[\r\n\u0000-\u001f]/g, " ").slice(0, 120));
-  const normalizedValues = () => Object.fromEntries(Object.entries(prop(raw, "values") as Record<string, unknown>)
+  const normalizedValues = () => Object.fromEntries(Object.entries((prop(raw, "values") ?? {}) as Record<string, unknown>)
     .map(([id, value]) => [id, normalizeCollectionValue(value)!]));
   if (type === "create_collection_record") {
     const values = normalizedValues();
     next = { ...data, records: [...data.records,
-      applyCollectionAutomations(data, null, { id: recordId, values }, Object.keys(values))] };
+      applyCollectionAutomations(data, null, { id: recordId, values,
+        ...(typeof prop(raw, "body") === "string" ? { body: prop(raw, "body") as string } : {}) }, Object.keys(values))] };
   } else if (type === "update_collection_record") {
     const values = normalizedValues();
     next = { ...data, records: data.records.map((r) => r.id === recordId
-      ? applyCollectionAutomations(data, r, { ...r, values: { ...r.values, ...values } }, Object.keys(values)) : r) };
+      ? applyCollectionAutomations(data, r, { ...r, values: { ...r.values, ...values },
+        ...(typeof prop(raw, "body") === "string" ? { body: prop(raw, "body") as string } : {}) }, Object.keys(values)) : r) };
   } else if (type === "delete_collection_record") {
     const recordToDelete = data.records.find((item) => item.id === recordId);
     if (recordToDelete) {
@@ -118,7 +122,7 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
         const field = next.fields.find((item) => item.id === id);
         return field ? `${field.name.slice(0, 80)} = ${display(value)}` : "";
       }).filter(Boolean).join(", ");
-      confirmedSummary = `updated Collection record ${display(recordTitle(next, oldRecord ?? savedRecord))}: ${changes}`;
+      confirmedSummary = `updated Collection record ${display(recordTitle(next, oldRecord ?? savedRecord))}: ${changes || (typeof prop(raw, "body") === "string" ? "body edited" : "record edited")}`;
     }
     if (type === "add_collection_field" && savedField) confirmedSummary = `added Collection field ${display(savedField.name)}`;
     if (type === "update_collection_field" && savedField) confirmedSummary = `updated Collection field ${display(savedField.name)}`;
@@ -128,7 +132,10 @@ export function applyCollectionAction(state: AgentBoardState, raw: JsonMap): Res
     if (type === "remove_collection_view" && oldView) confirmedSummary = `removed Collection view ${display(oldView.name)}`;
   }
   if (JSON.stringify(next) === JSON.stringify(data)) return rejected("Collection command made no changes.");
-  block.data = next as unknown as JsonMap;
+  block.data = appendCollectionAudit(data, next, "Workspace AI") as unknown as JsonMap;
   block.updatedAt = now();
-  return { ids: [blockId], operation: type, summary: confirmedSummary ?? `${type} (${recordId || fieldId || viewId || blockId})` };
+  const changed = pruneDeletedCollectionLinks(state.blocks, blockId, deletedCollectionIds(data, next), "Workspace AI");
+  for (const id of changed.changedBlockIds) state.blocks[id] = changed.blocks[id];
+  return { ids: [blockId, ...changed.changedBlockIds], operation: type,
+    summary: confirmedSummary ?? `${type} (${recordId || fieldId || viewId || blockId})` };
 }

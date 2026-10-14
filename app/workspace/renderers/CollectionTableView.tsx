@@ -5,6 +5,7 @@ import { flexRender, getCoreRowModel, useReactTable,
 import { deleteRecord, recordTitle, viewSorts, type CollectionBlockPayload,
   type CollectionField, type CollectionRecord, type CollectionView, type CollectionSources } from "../collections/model";
 import { btnClass, FieldEditor } from "./CollectionFieldEditor";
+import { CollectionRecordDetails } from "./CollectionRecordDetails";
 import { calculateCollectionAggregate } from "../collections/collectionFormula";
 import { COLLECTION_PAGE_SIZES, collectionTablePage, type CollectionPageSize } from "./collectionTablePaging";
 
@@ -26,6 +27,7 @@ export function CollectionTableView({ data, sources, view, rows, readOnly, onCha
   const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
   const [requestedPage, setRequestedPage] = useState(0);
+  const [openRecordId, setOpenRecordId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<CollectionPageSize>(50);
   const page = useMemo(() => collectionTablePage(rows, requestedPage, pageSize),
     [rows, requestedPage, pageSize]);
@@ -72,7 +74,9 @@ export function CollectionTableView({ data, sources, view, rows, readOnly, onCha
       {row.getVisibleCells().map(cell => <td className="min-w-28 border-b p-1" key={cell.id}>
         {flexRender(cell.column.columnDef.cell, cell.getContext())}
       </td>)}
-      <td><button aria-label={"Delete " + recordTitle(data, row.original)} className={btnClass}
+      <td><button className={btnClass} aria-label={"Open " + recordTitle(data, row.original)}
+        onClick={() => setOpenRecordId(row.original.id)}>Open</button>
+        <button aria-label={"Delete " + recordTitle(data, row.original)} className={btnClass}
         disabled={readOnly} onClick={() => onChange(deleteRecord(data, row.original.id))}>×</button></td>
     </tr>)}</tbody>
     {!!view.aggregations?.length && <tfoot><tr>{data.fields.map(field => {
@@ -101,5 +105,7 @@ export function CollectionTableView({ data, sources, view, rows, readOnly, onCha
         disabled={page.pageIndex >= page.pageCount - 1}
         onClick={() => setRequestedPage(page.pageCount - 1)}>»</button>
     </nav>
+    {openRecordId && <CollectionRecordDetails data={data} sources={sources} recordId={openRecordId}
+      readOnly={readOnly} onChange={onChange} onClose={() => setOpenRecordId(null)} />}
   </div>;
 }

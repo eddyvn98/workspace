@@ -75,7 +75,8 @@ export function importCollectionJson(text: string): CollectionBlockPayload {
   const fields = value.fields;
   const records = value.records;
   if (!fields.every((f) => f && typeof f.id === "string" && typeof f.name === "string" && typeof f.type === "string")
-    || !records.every((r) => r && typeof r.id === "string" && r.values && typeof r.values === "object")) {
+    || !records.every((r) => r && typeof r.id === "string" && r.values && typeof r.values === "object"
+      && (r.body === undefined || (typeof r.body === "string" && r.body.length <= 20000)))) {
     throw new Error("Invalid collection fields or records");
   }
   return normalizeCollection(value as CollectionBlockPayload);
