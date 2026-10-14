@@ -11,7 +11,7 @@ export interface CollectionAutomation {
 }
 export const automationWritable = (field: CollectionField | undefined): field is CollectionField =>
   !!field && !["lookup", "formula", "rollup", "relation"].includes(field.type);
-function validTarget(field: CollectionField, value: string): boolean {
+export function validAutomationTarget(field: CollectionField, value: string): boolean {
   if (value.length > 2000) return false;
   if (field.type === "checkbox") return ["true", "false"].includes(value);
   if (field.type === "select") return (field.options ?? []).includes(value);
@@ -29,7 +29,7 @@ export function applyCollectionAutomations(data: CollectionBlockPayload,
     if (!rule.enabled || !changed.has(rule.whenFieldId) || rule.whenFieldId === rule.thenFieldId) continue;
     const trigger = data.fields.find(f => f.id === rule.whenFieldId);
     const target = data.fields.find(f => f.id === rule.thenFieldId);
-    if (!trigger || !automationWritable(target) || !validTarget(target, rule.thenValue)) continue;
+    if (!trigger || !automationWritable(target) || !validAutomationTarget(target, rule.thenValue)) continue;
     if ((previous?.values[rule.whenFieldId] ?? "") === rule.whenEquals) continue;
     if ((record.values[rule.whenFieldId] ?? "") !== rule.whenEquals) continue;
     values[rule.thenFieldId] = rule.thenValue;

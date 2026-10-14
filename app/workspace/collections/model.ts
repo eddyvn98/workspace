@@ -3,6 +3,7 @@ import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./c
 import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
 import { applyCollectionAutomations, sanitizeCollectionAutomations, type CollectionAutomation } from "./collectionAutomations";
 import type { CollectionAuditEntry } from "./collectionAudit";
+import { sanitizeCollectionSchedules, type CollectionScheduledRule } from "./collectionSchedules";
 import { projectCollectionFormulas, type CollectionAggregation, type FormulaOperation } from "./collectionFormula";
 
 export type CollectionFieldType = "text" | "number" | "date" | "select" | "checkbox" | "url" | "image" | "relation" | "lookup" | "rollup" | "formula";
@@ -61,6 +62,7 @@ export interface CollectionBlockPayload {
   activeViewId: string;
   automations?: CollectionAutomation[];
   auditTrail?: CollectionAuditEntry[];
+  scheduledAutomations?: CollectionScheduledRule[];
 }
 
 export type CollectionSources = Record<string, CollectionBlockPayload>;
@@ -94,7 +96,8 @@ export function normalizeCollection(input: CollectionBlockPayload | null | undef
     && dates.length >= 2 && view.dateFieldId === view.endDateFieldId
       ? { ...view, dateFieldId: dates[0].id, endDateFieldId: dates[1].id } : view);
   return { ...input, version: 1, title: input.title || "Untitled collection", views,
-    automations: sanitizeCollectionAutomations(input), activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
+    automations: sanitizeCollectionAutomations(input),
+    scheduledAutomations: sanitizeCollectionSchedules(input), activeViewId: views.some((v) => v.id === input.activeViewId) ? input.activeViewId : views[0].id };
 }
 export function primaryField(data: CollectionBlockPayload): CollectionField | undefined {
   return data.fields.find((f) => f.type === "text") ?? data.fields[0];
@@ -178,6 +181,7 @@ export function removeField(data: CollectionBlockPayload, fieldId: string): Coll
       })),
     records: data.records.map(({ values, ...r }) => ({ ...r, values: Object.fromEntries(Object.entries(values).filter(([id]) => id !== fieldId)) })),
     automations: (data.automations ?? []).filter(rule => rule.whenFieldId !== fieldId && rule.thenFieldId !== fieldId),
+    scheduledAutomations: (data.scheduledAutomations ?? []).filter(rule => rule.targetFieldId !== fieldId && rule.matchFieldId !== fieldId),
     views: data.views.map((v) => ({
       ...v,
       ...(v.groupFieldId === fieldId ? { groupFieldId: undefined } : {}),
