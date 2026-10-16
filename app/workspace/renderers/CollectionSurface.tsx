@@ -16,6 +16,8 @@ import { CollectionAuditPanel } from "./CollectionAuditPanel";
 import { CollectionIntegrityPanel } from "./CollectionIntegrityPanel";
 import { CollectionViewConditions } from "./CollectionViewConditions";
 import { createPortal } from "react-dom";
+import { useWorkspaceStore } from "../store/useWorkspaceStore";
+import { normalizeCollection } from "../collections/model";
 import type { CollectionBlockPayload, CollectionSources, CollectionField, CollectionRecord, CollectionView } from "../collections/model";
 import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FIELD_TYPES, newId, primaryField, recordTitle, removeField, removeView, selectField, setParent, setRecordValue, updateField, updateView, VIEW_KINDS, visibleRecords } from "../collections/model";
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
@@ -90,7 +92,15 @@ export function CollectionSurface({ blockId, data, sources = {}, revisionNotice,
   const group = selectField(data, view);
   const date = dateField(data, view);
   const end = endDateField(data, view);
-  const patch = (record: CollectionRecord, field: CollectionField, value: string) => onChange(setRecordValue(data, record.id, field.id, value));
+  const patch = (record: CollectionRecord, field: CollectionField, value: string) => {
+    // Read the latest Collection from the store rather than this render's snapshot.
+    // Two edits in one render/save window must never replay stale record values.
+    const state = useWorkspaceStore.getState();
+    const current = state.blocks[blockId];
+    if (readOnly || current?.type !== "collection") return;
+    const next = setRecordValue(normalizeCollection(current.data), record.id, field.id, value);
+    if (next !== current.data) state.updateBlock(blockId, { data: next });
+  };
   const renameView = (change: Partial<CollectionView>) => onChange(updateView(data, view.id, change));
   const options = group?.options ?? [];
   const groupOptions = [...options, ...new Set(rows.map((r) => r.values[group?.id ?? ""] || "").filter((o) => o && !options.includes(o)))];
