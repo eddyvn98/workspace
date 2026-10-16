@@ -17,7 +17,7 @@ import { CollectionIntegrityPanel } from "./CollectionIntegrityPanel";
 import { CollectionViewConditions } from "./CollectionViewConditions";
 import { createPortal } from "react-dom";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
-import { normalizeCollection } from "../collections/model";
+import { isCollectionBlockPayload, normalizeCollection } from "../collections/model";
 import type { CollectionBlockPayload, CollectionSources, CollectionField, CollectionRecord, CollectionView } from "../collections/model";
 import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FIELD_TYPES, newId, primaryField, recordTitle, removeField, removeView, selectField, setParent, setRecordValue, updateField, updateView, VIEW_KINDS, visibleRecords } from "../collections/model";
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
@@ -97,7 +97,7 @@ export function CollectionSurface({ blockId, data, sources = {}, revisionNotice,
     // Two edits in one render/save window must never replay stale record values.
     const state = useWorkspaceStore.getState();
     const current = state.blocks[blockId];
-    if (readOnly || current?.type !== "collection") return;
+    if (readOnly || current?.type !== "collection" || !isCollectionBlockPayload(current.data)) return;
     const next = setRecordValue(normalizeCollection(current.data), record.id, field.id, value);
     if (next !== current.data) state.updateBlock(blockId, { data: next });
   };
