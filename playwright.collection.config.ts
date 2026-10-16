@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./__tests__/browser",
-  testMatch: ["collection-acceptance.spec.ts", "collection-engine-acceptance.spec.ts", "collection-relations-acceptance.spec.ts", "collection-formulas-acceptance.spec.ts"],
+  testMatch: ["collection-acceptance.spec.ts", "collection-focused-screen.spec.ts", "collection-engine-acceptance.spec.ts", "collection-relations-acceptance.spec.ts", "collection-formulas-acceptance.spec.ts", "collection-form-acceptance.spec.ts", "collection-table-paging-acceptance.spec.ts"],
   timeout: 45_000,
   retries: 0,
   // Keep both projects concurrent to catch cross-browser races, but serve
@@ -27,6 +27,7 @@ export default defineConfig({
       NEXTAUTH_SECRET: "browser-acceptance-test-only",
       DATABASE_URL: "postgresql://workspace:workspace@localhost:5432/workspace",
       MONGODB_URI: "mongodb://127.0.0.1:27017/workspace",
+      NEXT_DIST_DIR: process.env.NEXT_DIST_DIR || ".next",
     },
   },
 });

@@ -20,7 +20,18 @@ export interface CollectionScheduledRule {
   /** Last successfully committed local calendar day. Owned by the board revision CAS. */
   lastRunDay?: string;
 }
+function validLocalDay(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00.000Z");
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
 export function validScheduledRule(data: CollectionBlockPayload, rule: CollectionScheduledRule): boolean {
+  if (!rule || typeof rule !== "object" || typeof rule.id !== "string" || !rule.id.trim() ||
+    typeof rule.name !== "string" || !rule.name.trim() || typeof rule.enabled !== "boolean" ||
+    typeof rule.targetFieldId !== "string" || typeof rule.targetValue !== "string" ||
+    (rule.matchFieldId !== undefined && typeof rule.matchFieldId !== "string") ||
+    (rule.matchEquals !== undefined && typeof rule.matchEquals !== "string") ||
+    (rule.lastRunDay !== undefined && !validLocalDay(rule.lastRunDay))) return false;
   const target = data.fields.find(field => field.id === rule.targetFieldId);
   const match = data.fields.find(field => field.id === rule.matchFieldId);
   return !!rule.id && rule.id.length <= 128 && rule.name.length <= 80

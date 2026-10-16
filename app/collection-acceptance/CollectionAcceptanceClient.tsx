@@ -64,7 +64,7 @@ export default function CollectionAcceptanceClient() {
         toolbarRef={toolbarRef} style={{ left: 0, top: 0 }} position="absolute" onCellCommand={() => {}} />
     </div>}
     <div data-testid="table-source" className="text-xs">Source remains: {(blocks[SOURCE_TABLE.id] as CanvasBlock<"table">).data.cells[1][0]}</div>
-    {collection ? <div className="h-[650px] w-full min-w-0 overflow-hidden rounded-lg border" data-testid="collection-block">
+    {collection ? <div className="h-[220px] w-[380px] max-w-full min-w-0 overflow-hidden rounded-lg border" data-testid="collection-host">
       <CollectionBlock key={collection.id} block={collection} isSelected readOnly={isReadOnly} onChange={(data) =>
         updateBlock(collection.id, { data: { ...collection.data, ...data } })} />
     </div> : <p>No collection. Use Insert / Add Collection or convert the source table.</p>}

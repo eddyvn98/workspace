@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { normalizeCollection, type CollectionSources } from "../collections/model";
+import { resolveTransform } from "../types/block";
 import { CollectionSurface } from "./CollectionSurface";
 import { useCollectionRevisionNotice } from "../hooks/useCollectionRevisionNotice";
 import { registerBlockRenderer, type BlockRendererProps } from "./registry";
 
 export const CollectionBlock: React.FC<BlockRendererProps<"collection">> = ({ block, onChange, readOnly }) => {
   const isReadOnly = useWorkspaceStore((state) => state.isReadOnly);
+  const updateBlockTransform = useWorkspaceStore((state) => state.updateBlockTransform);
   const boardId = useWorkspaceStore((state) => state.boardId);
   const revisionNotice = useCollectionRevisionNotice(boardId);
   const blocks = useWorkspaceStore((state) => state.blocks);
@@ -16,10 +18,17 @@ export const CollectionBlock: React.FC<BlockRendererProps<"collection">> = ({ bl
     .filter(([id, item]) => id !== block.id && item.type === "collection")
     .map(([id, item]) => [id, normalizeCollection(item.data as never)])), [blocks, block.id]);
   const data = normalizeCollection(block.data);
+  useEffect(() => {
+    if (readOnly || isReadOnly) return;
+    const transform = resolveTransform(block.transform, { x: 0, y: 0, w: 380, h: 220, rotation: 0, zIndex: 0 });
+    if (transform.w === 900 && transform.h === 540) {
+      updateBlockTransform(block.id, { w: 380, h: 220 }, block.transform.override ? "override" : "computed");
+    }
+  }, [block.id, block.transform, isReadOnly, readOnly, updateBlockTransform]);
   return <div className="h-full w-full" onPointerDownCapture={() => {
     const state = useWorkspaceStore.getState();
     if (!state.selectedBlockIds.includes(block.id)) state.setSelection([block.id]);
-  }}><CollectionSurface data={data} sources={sources} revisionNotice={revisionNotice} readOnly={Boolean(readOnly) || isReadOnly || Boolean(block.style?.isLocked)} onChange={(next) => onChange(next)} /></div>;
+  }}><CollectionSurface blockId={block.id} data={data} sources={sources} revisionNotice={revisionNotice} readOnly={Boolean(readOnly) || isReadOnly || Boolean(block.style?.isLocked)} onChange={(next) => onChange(next)} /></div>;
 };
 
 registerBlockRenderer("collection", CollectionBlock);

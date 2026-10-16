@@ -54,7 +54,7 @@ export function WorkspaceTableSelectionToolbar({
     const now = Date.now();
     const collection: CanvasBlock<"collection"> = {
       id: createBlockId(), type: "collection",
-      transform: createDualTransform({ ...frame, x: frame.x + frame.w + 80, w: 900, h: 540 }),
+      transform: createDualTransform({ ...frame, x: frame.x + frame.w + 80, w: 380, h: 220 }),
       data: fromTableBlock(block), createdAt: now, updatedAt: now,
     };
     setWorkspaceRealtimeLive(null);

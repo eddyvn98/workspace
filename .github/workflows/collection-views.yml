@@ -9,7 +9,12 @@ on:
       - 'app/workspace/types/block.ts'
       - 'app/workspace/components/WorkspaceInsertPanel.tsx'
       - 'app/workspace/components/WorkspaceTableSelectionToolbar.tsx'
+      - 'app/workspace/store/useWorkspaceStore.ts'
+      - 'app/workspace/store/workspaceStoreTypes.ts'
+      - 'lib/workspace-agent/collectionActionValidation.ts'
       - '__tests__/workspace/collection-views.test.ts'
+      - '__tests__/workspace/collection-schedules.test.ts'
+      - '__tests__/workspace/collection-store-updates.test.ts'
       - '__tests__/workspace/collection-conflicts.test.ts'
       - '__tests__/workspace/collection-multi-filter-sort.test.ts'
       - '__tests__/workspace/collection-kanban-dnd.test.ts'
@@ -55,7 +60,7 @@ jobs:
       - run: pnpm prisma:generate
         env:
           DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
-      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/collection-multi-filter-sort.test.ts __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-kanban-dnd.test.ts __tests__/workspace/collection-calendar-dates.test.ts __tests__/workspace/collection-timeline-dates.test.ts __tests__/workspace/collection-mindmap-layout.test.ts __tests__/workspace/collection-filter-engine.test.ts __tests__/workspace/collection-relations.test.ts __tests__/workspace/collection-formulas.test.ts
+      - run: pnpm exec vitest run __tests__/workspace/collection-views.test.ts __tests__/workspace/collection-conflicts.test.ts __tests__/workspace/collection-multi-filter-sort.test.ts __tests__/workspace/collection-ai-commands.test.ts __tests__/workspace/collection-kanban-dnd.test.ts __tests__/workspace/collection-calendar-dates.test.ts __tests__/workspace/collection-timeline-dates.test.ts __tests__/workspace/collection-mindmap-layout.test.ts __tests__/workspace/collection-filter-engine.test.ts __tests__/workspace/collection-relations.test.ts __tests__/workspace/collection-formulas.test.ts __tests__/workspace/collection-schedules.test.ts __tests__/workspace/collection-store-updates.test.ts
       - run: pnpm exec tsc --noEmit
       - run: pnpm build
         env:

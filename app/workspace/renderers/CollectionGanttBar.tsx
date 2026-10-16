@@ -1,13 +1,13 @@
 "use client";
 import React, { useRef, useState } from "react";
 interface Props {
-  left: number; width: number; label: string; disabled: boolean; highlighted?: boolean;
+  left: number; width: number; label: string; durationDays: number; disabled: boolean; highlighted?: boolean;
   onMove: (days: number) => void; onResize: (days: number) => void;
 }
 type Gesture = { kind: "move" | "resize"; x: number };
 const STEP = 26;
 /** Pointer capture makes editing work with mouse, pen and touch; buttons remain keyboard fallback. */
-export function CollectionGanttBar({ left, width, label, disabled, highlighted, onMove, onResize }: Props) {
+export function CollectionGanttBar({ left, width, label, durationDays, disabled, highlighted, onMove, onResize }: Props) {
   const gesture = useRef<Gesture | null>(null);
   const [preview, setPreview] = useState(0);
   const start = (event: React.PointerEvent<HTMLElement>, kind: Gesture["kind"]) => {
@@ -32,7 +32,7 @@ export function CollectionGanttBar({ left, width, label, disabled, highlighted, 
     else onResize(days);
   };
   return <div className={"absolute top-2 h-7 rounded text-white " + (highlighted ? "bg-amber-600" : "bg-blue-600")}
-    role="img" aria-label={label} data-testid="collection-gantt-bar"
+    role="img" aria-label={`Timeline duration ${label} ${durationDays} days`} data-testid="collection-gantt-bar"
     style={{ left: left + (gesture.current?.kind === "move" ? preview * STEP : 0),
       width: Math.max(STEP, width + (gesture.current?.kind === "resize" ? preview * STEP : 0)),
       touchAction: disabled ? undefined : "none", cursor: disabled ? "default" : "grab" }}
