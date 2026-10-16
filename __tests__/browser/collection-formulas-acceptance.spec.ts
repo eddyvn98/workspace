@@ -4,6 +4,7 @@ test("computed formula cells and visible totals persist through reload", async (
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "+ Record" }).click();
   await block.getByRole("textbox", { name: "Name", exact: true }).fill("Budget");
@@ -29,7 +30,9 @@ test("computed formula cells and visible totals persist through reload", async (
   await expect(reopened.getByTestId("collection-tanstack-table").locator("tfoot")).toContainText("sum: 15");
   await reopened.getByRole("button", { name: "Settings" }).click();
   await expect(reopened.getByRole("combobox", { name: "Formula operation Field 9" })).toHaveValue("sum");
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("button", { name: "+ Aggregate" })).toBeDisabled();
   await expect(reopened.getByRole("combobox", { name: "Formula source 1 Field 9" })).toBeDisabled();
 });

@@ -86,7 +86,7 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
             <div className="relative h-11" style={{ width: span }}>
               {startOffset < view.days && <CollectionGanttBar
                 left={startOffset * CELL} width={Math.min(length, view.days - startOffset) * CELL}
-                label={recordTitle(data, record)} disabled={readOnly}
+                label={recordTitle(data, record)} durationDays={length} disabled={readOnly}
                 highlighted={highlightedIds.has(record.id)}
                 onMove={days => changeDates(record, days)}
                 onResize={days => resize(record, days)} />}

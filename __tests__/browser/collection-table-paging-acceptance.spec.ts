@@ -4,6 +4,7 @@ test("Table keeps 501 stable records usable without rendering 501 editors", asyn
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   const data = {
     version: 1, title: "Large Collection fixture",
@@ -41,9 +42,12 @@ test("Table keeps 501 stable records usable without rendering 501 editors", asyn
   await reopened.getByRole("button", { name: "Last collection page" }).click();
   await expect(reopened.getByTestId("collection-tanstack-table").locator('tr[data-record-id="stable-500"]')
     .getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Updated final task");
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
-  await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true }))
+  await page.getByRole("button", { name: "Open collection" }).click();
+  await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true }).first())
     .toBeDisabled();
-  await reopened.getByRole("button", { name: "First collection page" }).click();
   await expect(reopened.getByTestId("collection-tanstack-table").locator("tr[data-record-id]")).toHaveCount(50);
+  await expect(reopened.getByRole("button", { name: "First collection page" })).toBeDisabled();
+  await expect(reopened.getByRole("button", { name: "Next collection page" })).toBeEnabled();
 });

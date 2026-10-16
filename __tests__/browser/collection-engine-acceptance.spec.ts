@@ -5,6 +5,7 @@ test("compound Collection filters, OR/AND, persistence and read-only controls", 
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   await page.getByRole("button", { name: "Table conversion controls" }).click();
   await page.getByRole("button", { name: "To Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   const cells = block.getByTestId("collection-tanstack-table");
   const names = cells.getByRole("textbox", { name: "Name", exact: true });
@@ -31,7 +32,9 @@ test("compound Collection filters, OR/AND, persistence and read-only controls", 
   await expect(reopened.getByRole("textbox", { name: "Filter value 1" })).toHaveValue("Done");
   await expect(reopened.getByRole("textbox", { name: "Filter value 2" })).toHaveValue("Other");
   await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true })).toHaveCount(2);
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("combobox", { name: "Filter logic" })).toBeDisabled();
   await expect(reopened.getByRole("combobox", { name: "Filter operator 1" })).toBeDisabled();
 });

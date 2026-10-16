@@ -85,7 +85,7 @@ export function WorkspaceInsertPanel() {
 
   const handleAddCollection = useCallback(() => {
     const now = Date.now();
-    const transform = createDualTransform({ ...getLegacyTableTransform(blocks), w: 900, h: 540 });
+    const transform = createDualTransform({ ...getLegacyTableTransform(blocks), w: 380, h: 220 });
     const block: CanvasBlock<"collection"> = { id: createBlockId(), type: "collection", transform, data: createCollection(), createdAt: now, updatedAt: now };
     setWorkspaceRealtimeLive(null);
     addBlock(block);

@@ -65,6 +65,14 @@ export interface CollectionBlockPayload {
   scheduledAutomations?: CollectionScheduledRule[];
 }
 
+export function isCollectionBlockPayload(value: unknown): value is CollectionBlockPayload {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.version === 1 && typeof candidate.title === "string" &&
+    Array.isArray(candidate.fields) && Array.isArray(candidate.records) &&
+    Array.isArray(candidate.views) && typeof candidate.activeViewId === "string";
+}
+
 export type CollectionSources = Record<string, CollectionBlockPayload>;
 
 export const VIEW_KINDS: CollectionViewKind[] = ["table", "kanban", "calendar", "timeline", "gallery", "mindmap", "form"];

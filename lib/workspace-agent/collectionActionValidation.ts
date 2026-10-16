@@ -167,7 +167,7 @@ export function validateCollectionTarget(action: WorkspaceJson, board: Workspace
       if (!targetField || ["lookup", "formula", "rollup"].includes(targetField.type) || !validValue(targetField, String(value)))
         return `Unknown, computed or invalid fieldId/value: ${id}.`;
       if (targetField.type === "relation" && !relationValueValid(data, targetField, String(value),
-        Object.fromEntries(Object.entries(obj(board.blocks)).filter(([, block]) => obj(block)?.type === "collection")
+        Object.fromEntries(Object.entries(obj(board.blocks) ?? {}).filter(([, block]) => obj(block)?.type === "collection")
           .map(([id, block]) => [id, obj(obj(block)?.data) as unknown as CollectionBlockPayload]))))
         return `Unknown related recordId: ${String(value).slice(0, 128)}.`;
     }

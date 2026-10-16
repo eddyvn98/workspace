@@ -5,6 +5,7 @@ test("Form View submits to the same records, reloads, and enforces read-only", a
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "Form", exact: true }).click();
   const form = block.getByTestId("collection-form");
@@ -20,7 +21,9 @@ test("Form View submits to the same records, reloads, and enforces read-only", a
   const reopened = page.getByTestId("collection-block");
   await expect(reopened.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Submitted through Form");
   await reopened.getByRole("button", { name: "Form", exact: true }).click();
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByTestId("collection-form").getByRole("button", { name: "Submit record" })).toBeDisabled();
 });
 
@@ -28,6 +31,7 @@ test("Gallery settings persist selected card fields across reload", async ({ pag
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Table conversion controls" }).click();
   await page.getByRole("button", { name: "To Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "Gallery", exact: true }).click();
   await block.getByRole("button", { name: "Settings" }).click();
@@ -38,6 +42,8 @@ test("Gallery settings persist selected card fields across reload", async ({ pag
   const reopened = page.getByTestId("collection-block");
   await reopened.getByRole("button", { name: "Settings" }).click();
   await expect(reopened.getByRole("checkbox", { name: "Show Status in Gallery" })).not.toBeChecked();
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("checkbox", { name: "Show Status in Gallery" })).toBeDisabled();
 });

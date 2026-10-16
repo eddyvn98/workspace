@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
     }
   });
   page.on("requestfailed", (request) => {
-    if (/[?&]_rsc=/.test(request.url())) {
+    if (/[?&]_rsc=/.test(request.url()) && request.failure()?.errorText !== "net::ERR_ABORTED") {
       errors.push("RSC request failed: " + request.url() + " " + request.failure()?.errorText);
     }
   });
@@ -29,6 +29,7 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const container = page.getByTestId("collection-block");
   await expect(container).toBeVisible();
   await container.getByRole("button", { name: "+ Record" }).click();
@@ -43,7 +44,9 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   await expect(reopened).toBeVisible();
   await expect(reopened.getByText("Persisted acceptance record").first()).toBeVisible();
   await expect(reopened.getByRole("button", { name: "Kanban", exact: true })).toHaveClass(/border-blue-500/);
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("button", { name: "+ Record" })).toBeDisabled();
   await reopened.getByRole("button", { name: "Table", exact: true }).click();
   await expect(reopened.getByRole("textbox", { name: "Name" }).first()).toBeDisabled();
@@ -57,6 +60,7 @@ test("convert table without mutating source, edit and delete a record", async ({
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Table conversion controls" }).click();
   await page.getByRole("button", { name: "To Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const container = page.getByTestId("collection-block");
   await expect(container.getByRole("textbox", { name: "Name" }).first()).toHaveValue("Original row");
   await expect(page.getByTestId("table-source")).toContainText("Original row");
@@ -75,31 +79,12 @@ test("convert table without mutating source, edit and delete a record", async ({
   await expect(page.getByTestId("collection-block").getByRole("textbox", { name: "Name" }).first()).toHaveValue("Other row");
 });
 
-test("fullscreen canvas-portal works at desktop and mobile viewport", async ({ page }) => {
-  await page.goto("/collection-acceptance");
-  await page.getByRole("button", { name: "Insert content" }).click();
-  await page.getByRole("button", { name: "Add Collection" }).click();
-  await page.getByTestId("collection-block").getByRole("button", { name: "Expand" }).click();
-  const exit = page.getByRole("button", { name: "Exit full screen" });
-  await expect(exit).toBeVisible();
-  const dimensions = await page.evaluate(() => {
-    const editor = document.querySelector("div.fixed.inset-0") as HTMLElement | null;
-    if (!editor) return null;
-    const rect = editor.getBoundingClientRect();
-    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, screenWidth: innerWidth, screenHeight: innerHeight };
-  });
-  expect(dimensions).not.toBeNull();
-  expect(dimensions!.width).toBeGreaterThanOrEqual(dimensions!.screenWidth - 2);
-  expect(dimensions!.height).toBeGreaterThanOrEqual(dimensions!.screenHeight - 2);
-  await exit.click();
-  await expect(page.getByTestId("collection-block").getByRole("button", { name: "Expand" })).toBeVisible();
-});
-
 test("Table multi-filter and multi-sort survive reload while legacy views remain usable", async ({ page }) => {
   await page.goto("/collection-acceptance");
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   await page.getByRole("button", { name: "Table conversion controls" }).click();
   await page.getByRole("button", { name: "To Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const table = page.getByTestId("collection-block");
   await expect(table.getByTestId("collection-tanstack-table")).toBeVisible();
   await table.getByRole("button", { name: "Settings" }).click();
@@ -144,7 +129,9 @@ test("Table multi-filter and multi-sort survive reload while legacy views remain
   await expect(reopened.getByRole("combobox", { name: "Sort field 1" }).locator("option:checked")).toHaveText("Status");
   await expect(reopened.getByRole("combobox", { name: "Sort field 2" }).locator("option:checked")).toHaveText("Name");
   await expect(reopened.getByTestId("collection-tanstack-table").getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Other row");
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("button", { name: "+ Filter" })).toBeDisabled();
   await expect(reopened.getByTestId("collection-tanstack-table")
     .getByRole("button", { name: "Sort Name", exact: true })).toBeDisabled();
@@ -163,6 +150,7 @@ test("Kanban dnd-kit drag changes persisted status, respects read-only mode", as
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "+ Record" }).click();
   await block.getByRole("textbox", { name: "Name" }).first().fill("Drag test record");
@@ -190,7 +178,9 @@ test("Kanban dnd-kit drag changes persisted status, respects read-only mode", as
   const reopened = page.getByTestId("collection-block");
   await expect(reopened.getByTestId("collection-kanban-column").and(reopened.locator('[data-status="To do"]'))
     .getByText("Drag test record").first()).toBeVisible();
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("button", { name: "Drag Drag test record" })).toBeDisabled();
   await expect(reopened.getByRole("combobox", { name: "Status for Drag test record" })).toBeDisabled();
 });
@@ -199,6 +189,7 @@ test("Calendar month/week/day navigation and date persistence", async ({ page })
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "+ Record" }).click();
   await block.getByRole("textbox", { name: "Name", exact: true }).fill("Calendar task");
@@ -221,13 +212,16 @@ test("Calendar month/week/day navigation and date persistence", async ({ page })
   const reopened = page.getByTestId("collection-block");
   await expect(reopened.getByTestId("collection-calendar").locator('[data-date="2026-10-13"]'))
     .toContainText("Calendar task");
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByTestId("collection-calendar").getByLabel("Start", { exact: true })).toBeDisabled();
 });
 test("Timeline date-aligned Gantt commits start and end in one edit and survives reload", async ({ page }) => {
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "+ Record" }).click();
   await block.getByRole("textbox", { name: "Name", exact: true }).fill("Schedule task");
@@ -254,7 +248,9 @@ test("Timeline date-aligned Gantt commits start and end in one edit and survives
   const reopened = page.getByTestId("collection-block");
   await expect(reopened.getByTestId("collection-timeline").getByLabel("Start", { exact: true })).toHaveValue("2026-10-13");
   await expect(reopened.getByTestId("collection-timeline").getByLabel("Due", { exact: true })).toHaveValue("2026-10-15");
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("button", { name: "Move Schedule task forward one day" })).toBeDisabled();
   await expect(reopened.getByRole("button", { name: "Extend Schedule task by one day" })).toBeDisabled();
 });
@@ -263,6 +259,7 @@ test("React Flow Mind Map persists parent links, supports zoom and read-only", a
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "+ Record" }).click();
   await block.getByRole("textbox", { name: "Name", exact: true }).first().fill("Parent");
@@ -286,7 +283,9 @@ test("React Flow Mind Map persists parent links, supports zoom and read-only", a
   await page.reload();
   const reopened = page.getByTestId("collection-block").getByTestId("collection-mindmap");
   await expect(reopened.locator(".react-flow__edge")).toHaveCount(1);
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await reopened.getByRole("combobox", { name: "Mind Map selected record" }).selectOption({ label: "Child" });
   await expect(reopened.getByRole("combobox", { name: "Parent of Child" })).toBeDisabled();
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { btnClass, inputClass, FieldEditor } from "./CollectionFieldEditor";
 import { CalendarView } from "./CollectionCalendarView";
 import { TimelineView } from "./CollectionTimelineView";
@@ -20,11 +20,11 @@ import type { CollectionBlockPayload, CollectionSources, CollectionField, Collec
 import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FIELD_TYPES, newId, primaryField, recordTitle, removeField, removeView, selectField, setParent, setRecordValue, updateField, updateView, VIEW_KINDS, visibleRecords } from "../collections/model";
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
 
-interface Props { data: CollectionBlockPayload; sources?: CollectionSources;
+interface Props { blockId: string; data: CollectionBlockPayload; sources?: CollectionSources;
   revisionNotice?: { stale: boolean; refreshing: boolean; error: string; refresh: () => Promise<void> };
   onChange: (next: CollectionBlockPayload) => void; readOnly: boolean }
 
-export function CollectionSurface({ data, sources = {}, revisionNotice, onChange, readOnly }: Props) {
+export function CollectionSurface({ blockId, data, sources = {}, revisionNotice, onChange, readOnly }: Props) {
   const [search, setSearch] = useState("");
   const [localViewId, setLocalViewId] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
@@ -32,6 +32,58 @@ export function CollectionSurface({ data, sources = {}, revisionNotice, onChange
   const [full, setFull] = useState(false);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const fileInput = useRef<HTMLInputElement>(null);
+  const openCollectionButton = useRef<HTMLButtonElement>(null);
+  const backToWorkspaceButton = useRef<HTMLButtonElement>(null);
+  const wasFull = useRef(false);
+  const closeFull = useCallback(() => {
+    if (window.history.state?.collectionFullscreen === blockId) {
+      window.history.back();
+      return;
+    }
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("collectionScreen") === blockId) url.searchParams.delete("collectionScreen");
+    window.history.replaceState(window.history.state, "", url);
+    setFull(false);
+  }, [blockId]);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("collectionScreen") === blockId) setFull(true);
+  }, [blockId]);
+  useEffect(() => {
+    const syncFocusedRoute = () => setFull(new URLSearchParams(window.location.search).get("collectionScreen") === blockId);
+    window.addEventListener("popstate", syncFocusedRoute);
+    return () => window.removeEventListener("popstate", syncFocusedRoute);
+  }, [blockId]);
+  useEffect(() => {
+    if (full) { wasFull.current = true; return; }
+    if (wasFull.current) {
+      wasFull.current = false;
+      openCollectionButton.current?.focus();
+    }
+  }, [full]);
+  useEffect(() => {
+    if (!full) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusFrame = window.requestAnimationFrame(() => backToWorkspaceButton.current?.focus());
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeFull();
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.cancelAnimationFrame(focusFrame);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [blockId, closeFull, full]);
+  const openFull = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("collectionScreen", blockId);
+    window.history.pushState({ ...window.history.state, collectionFullscreen: blockId }, "", url);
+    setFull(true);
+  };
   const view = data.views.find((v) => v.id === (localViewId ?? data.activeViewId)) ?? data.views[0];
   const rows = useMemo(() => visibleRecords(data, view, search, sources), [data, view, search, sources]);
   const titleField = primaryField(data);
@@ -51,13 +103,35 @@ export function CollectionSurface({ data, sources = {}, revisionNotice, onChange
       if (window.confirm("Replace this collection with imported records?")) onChange(next);
     } catch (error) { window.alert(error instanceof Error ? error.message : "Import failed"); }
   };
-  const content = <div className={"flex h-full w-full flex-col overflow-hidden bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 " + (full ? "fixed inset-0 z-[9999] p-2 sm:p-6" : "")}
+  const keepFocusInScreen = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!full || event.key !== "Tab") return;
+    const focusable = [...event.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])',
+    )].filter(element => element.getClientRects().length > 0);
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) {
+      event.preventDefault(); last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first?.focus();
+    }
+  };
+  const content = <div data-testid="collection-block" role={full ? "dialog" : undefined} aria-modal={full ? true : undefined}
+    aria-label={full ? `${data.title || "Untitled collection"} Collection screen` : undefined}
+    tabIndex={full ? -1 : undefined} onKeyDown={keepFocusInScreen}
+    className={"flex h-full w-full flex-col overflow-hidden bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 " + (full ? "fixed inset-0 z-[9999] p-0" : "")}
     onPointerDown={(e) => { if (!(e.target as HTMLElement).closest("[data-collection-drag-handle]")) e.stopPropagation(); }} onDoubleClick={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
+    {full && <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-900 sm:px-8">
+      <button ref={backToWorkspaceButton} type="button" className={btnClass} aria-label="Back to Workspace" onClick={closeFull}>← Workspace</button>
+      <span className="hidden text-slate-400 sm:inline">/</span>
+      <input aria-label="Collection title" className="min-w-0 flex-1 bg-transparent truncate text-sm font-semibold outline-none" title={data.title} value={data.title} disabled={readOnly} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+      <span className="hidden text-xs text-slate-500 sm:inline">Focused collection screen</span>
+      <button type="button" className={btnClass} aria-label="Exit collection screen" onClick={closeFull}>Exit</button>
+    </div>}
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 p-2 dark:border-slate-700">
-      <span data-collection-drag-handle title="Drag collection on canvas" className="cursor-move select-none rounded border px-2 py-1 text-xs text-slate-400">⋮⋮</span>
-      <input aria-label="Collection title" className="min-w-24 flex-1 bg-transparent text-sm font-semibold outline-none" value={data.title} disabled={readOnly} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+      {!full && <span data-collection-drag-handle title="Drag collection on canvas" className="cursor-move select-none rounded border px-2 py-1 text-xs text-slate-400">⋮⋮</span>}
+      {!full && <input aria-label="Collection title" className="min-w-24 flex-1 bg-transparent text-sm font-semibold outline-none" value={data.title} disabled={readOnly} onChange={(e) => onChange({ ...data, title: e.target.value })} />}
       <span className="text-xs text-slate-400">{data.records.length} records</span>
-      <button className={btnClass} onClick={() => setFull(!full)}>{full ? "Exit full screen" : "Expand"}</button>
+      {!full && <button ref={openCollectionButton} className={btnClass} onClick={openFull}>Open collection</button>}
       <button className={btnClass} onClick={() => setSettings(!settings)}>Settings</button>
       <button className={btnClass} onClick={() => setShowHistory(!showHistory)}>{showHistory ? "Hide history" : "History"}</button>
     </div>
@@ -143,5 +217,22 @@ export function CollectionSurface({ data, sources = {}, revisionNotice, onChange
       <input ref={fileInput} type="file" accept=".csv,.json" className="hidden" onChange={(e) => { void loadFile(e.target.files?.[0]); e.target.value = ""; }} />
     </div>
   </div>;
-  return full && typeof document !== "undefined" ? createPortal(content, document.body) : content;
+  if (full && typeof document !== "undefined") return createPortal(content, document.body);
+  const previewRecords = visibleRecords(data, view, "", sources).slice(0, 3);
+  return <section data-testid="collection-block" aria-label={`${data.title || "Untitled collection"} preview`}
+    className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+    onPointerDown={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+    <header className="flex min-w-0 items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">Collection · Workspace</div>
+        <h2 className="mt-1 truncate text-sm font-semibold" title={data.title}>{data.title || "Untitled collection"}</h2>
+        <p className="mt-0.5 text-xs text-slate-500">{data.records.length} records · {view.name}</p>
+      </div>
+      <button ref={openCollectionButton} type="button" className={btnClass + " shrink-0"} onClick={openFull}>Open collection</button>
+    </header>
+    <ul className="mt-3 min-h-0 flex-1 space-y-1 overflow-hidden text-xs text-slate-600 dark:text-slate-300" aria-label="Recent records">
+      {previewRecords.map((record) => <li key={record.id} className="truncate rounded bg-slate-50 px-2 py-1.5 dark:bg-slate-900">{recordTitle(data, record) || "Untitled record"}</li>)}
+      {!previewRecords.length && <li className="rounded border border-dashed px-2 py-2 text-slate-400">No records yet</li>}
+    </ul>
+  </section>;
 }

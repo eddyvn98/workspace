@@ -4,6 +4,7 @@ test("Collection relation IDs and live lookup projections survive edit and reloa
   await page.goto("/collection-acceptance");
   await page.getByRole("button", { name: "Insert content" }).click();
   await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
   const block = page.getByTestId("collection-block");
   await block.getByRole("button", { name: "+ Record" }).click();
   await block.getByRole("textbox", { name: "Name", exact: true }).first().fill("Parent");
@@ -28,6 +29,8 @@ test("Collection relation IDs and live lookup projections survive edit and reloa
   const reopened = page.getByTestId("collection-block").getByTestId("collection-tanstack-table");
   await expect(reopened.locator("tr[data-record-id]").nth(1)).toHaveAttribute("data-record-id", stableId!);
   await expect(reopened.locator('output[aria-label="Field 8"]').nth(1)).toHaveText("Updated Parent");
+  await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
+  await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("combobox", { name: "Field 7" }).nth(1)).toBeDisabled();
 });

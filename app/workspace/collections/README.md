@@ -3,10 +3,11 @@
 ## Functionality and persistence
 
 - **Insert → Add Collection** creates a collection canvas block. Table, Kanban, Calendar, Timeline, Gallery and hierarchical Mind Map use the same records with stable IDs.
+- On the canvas, a Collection shows a compact preview with its title, active view, record count, and recent records. **Open collection** enters its focused screen for editing; the collection remains attached to the same board. New blocks use a compact default size, and legacy blocks with the previous default size are resized once.
 - Editing a record updates the board block and flows through the existing Workspace local cache + authenticated Postgres board REST autosave. The active editable View ID is persisted in the block. A VIEWER may browse tabs locally without saving changes.
 - **To Collection** on the existing Table toolbar copies its values to a new independent Collection; the source Table is unchanged.
 - CSV/JSON import and CSV/JSON export are available. CSV export neutralizes spreadsheet formula injection; JSON import checks the format and caps records. Spreadsheet formula cells are copied as display text, not live formulas.
-- Fullscreen uses a DOM portal rather than a CSS fixed element inside the canvas transform. Small viewports use scrollable columns and responsive toolbars.
+- The focused screen uses a DOM portal rather than a CSS fixed element inside the canvas transform. Small viewports use scrollable columns and responsive toolbars.
 
 ## Concurrent editing safety boundary
 
@@ -66,14 +67,15 @@ Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.conf
 ## Collection capabilities added on feature branch (October 2026)
 
 - Form View creates records in the canonical Collection, with configurable required and visible fields.
+- "Open collection" enters a focused screen while keeping the same board-backed data. Its `collectionScreen` URL state survives reload; Escape, browser Back, and the Workspace control return to the board.
 - Gallery cards have per-view configurable columns and bounded rendering.
 - Same-Collection multi-relations are stored as JSON arrays in existing string cells; existing single-ID values still work. Relations may also target records in another Collection block on the same board.
 - Lookup and rollup are read-only projected values. Rollups count linked records or calculate sum / average / min / max over numeric source values. Foreign targets are read from sibling board blocks; records are only edited in their owning Collection.
 - Formula expressions accept numeric \`{fieldId}\` references and arithmetic operators (+, -, *, /, parentheses); parsing is bounded and never uses eval. Existing fixed-operation formulas remain supported.
 - One-pass record automation rules can change another writable field when a trigger field transitions to an exact value; model commands use the same deterministic rule function as the UI.
 - Gantt bars support direct pointer move/resize, alongside the previous keyboard-accessible controls; Mind Map nodes can be dragged near another node to change their parent.
-- Foreign-Collection links do **not** create cross-block cascade updates. Removing a target record leaves its foreign reference stale until the owner fixes it; the UI displays an empty computed value when its target is absent. Do not claim per-record Yjs realtime or global relational integrity.
-- No tests or staging acceptance were run for these new changes per user instruction. Treat this branch as unverified work-in-progress until a later repair pass.
+- Foreign links do not cascade arbitrary edits. Record deletion through Workspace or an AI command removes inbound IDs in the same board save; the diagnostic can repair dangling IDs left by older or imported data. This is not per-record realtime collaboration or a relational database with global constraints.
+- The feature-branch verification note above is historical; use the current local and CI results for release decisions.
 
 
 ## Integrity, history, and record pages (follow-up)
@@ -99,10 +101,8 @@ Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.conf
   realtime editing, nor does it merge active editors' cursors.
 - The existing REST three-way merge now merges per-record history entries by
   their event IDs. The same-field concurrent edit conflict policy remains.
-- No tests, builds, staging checks, or deployment were performed for this
-  follow-up, as expressly requested by the owner. Regressions may still exist.
-- Background scheduled automations, authenticated external webhooks and
-  record-level collaborative CRDTs still require dedicated implementations.
+- Daily scheduled field updates are implemented by the [secured runner](../../../docs/workspace-collection-scheduler.md). They require an external cron invocation and do not send messages or webhooks.
+- Authenticated external webhooks and record-level collaborative CRDT editing still require dedicated implementations.
 
 
 ## Gantt dependencies (subsequent follow-up)
@@ -137,4 +137,6 @@ Run `pnpm build` before `pnpm exec playwright test -c playwright.collection.conf
   Rules do not run until that separate runtime setup is complete.
 - Detailed operator guide: [docs/workspace-collection-scheduler.md](../../../docs/workspace-collection-scheduler.md).
 - No external notifications or webhook delivery are implemented by this
-  scheduler. Code remains untested per the owner's current workflow.
+  scheduler. Focused tests cover schedule validation, local-time cutoff,
+  matching, and once-per-day behavior; a live cron host still requires separate
+  environment setup and runtime verification.
