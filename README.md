@@ -21,3 +21,14 @@ Workspace uses a local-only development identity configured by `WORKSPACE_DEV_US
 ## Configuration
 
 See `.env.example` for the supported environment variables. No tenant, organization, or hosted Dify endpoint is hard-coded in this repository.
+
+## Implementation blueprint
+
+The complete production-readiness plan is documented separately from implemented behavior:
+
+- [00 — Master plan: architecture, phases, dependencies and definition of done](docs/implementation/00-master-plan.md)
+- [01 — Library capability matrix and integration audit](docs/implementation/01-library-capability-matrix.md)
+- [02 — Implementation backlog with work item IDs and acceptance criteria](docs/implementation/02-implementation-backlog.md)
+- [03 — Release/staging E2E, security, operations and rollback runbook](docs/implementation/03-release-acceptance.md)
+
+**Documentation does not mark features as delivered.** Check the linked PRs, CI runs, authenticated staging tests and restore evidence before marking a milestone complete.
