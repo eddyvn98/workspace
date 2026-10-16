@@ -2,6 +2,7 @@
 import React from "react";
 import type { CollectionBlockPayload } from "../collections/model";
 import { MAX_COLLECTION_AUDIT } from "../collections/collectionAudit";
+import { btnClass } from "./CollectionFieldEditor";
 
 interface Props { data: CollectionBlockPayload; onClose: () => void }
 const label = (data: CollectionBlockPayload, fieldId: string) =>
@@ -12,15 +13,17 @@ const label = (data: CollectionBlockPayload, fieldId: string) =>
 export function CollectionAuditPanel({ data, onClose }: Props) {
   const history = (data.auditTrail ?? []).filter(entry => entry && typeof entry.id === "string" &&
     typeof entry.at === "number" && Number.isFinite(entry.at) &&
-    Array.isArray(entry.changes)).slice(0, MAX_COLLECTION_AUDIT);
-  return <section className="max-h-64 shrink-0 overflow-y-auto border-b bg-slate-50 p-2 text-xs dark:bg-slate-900"
+    Array.isArray(entry.changes)).map(entry => ({ ...entry,
+      changes: entry.kind === "update" ? entry.changes.filter(change => change.before !== change.after) : entry.changes,
+    })).filter(entry => entry.kind !== "update" || entry.changes.length > 0).slice(0, MAX_COLLECTION_AUDIT);
+  return <section className="text-xs"
     aria-label="Collection record history" data-testid="collection-record-history">
     <div className="mb-2 flex items-center justify-between gap-2">
       <strong>Record change history · {history.length}</strong>
-      <button type="button" className="rounded border px-2 py-1" onClick={onClose}>Close history</button>
+      <button type="button" className={btnClass} onClick={onClose}>Close history</button>
     </div>
     {!history.length && <p className="text-slate-500">No recorded changes yet.</p>}
-    {history.map(entry => <article key={entry.id} className="mb-2 rounded border bg-white p-2 dark:bg-slate-950">
+    {history.map(entry => <article key={entry.id} className="border-b border-slate-200 py-3 last:border-0 dark:border-slate-700">
       <div className="flex flex-wrap items-center gap-2">
         <strong>{entry.kind.toUpperCase()} · {entry.title}</strong>
         <time dateTime={new Date(entry.at).toISOString()} className="text-slate-500">

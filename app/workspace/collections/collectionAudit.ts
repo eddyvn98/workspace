@@ -67,8 +67,9 @@ export function appendCollectionAudit(before: CollectionBlockPayload, after: Col
       newest.actor === entry.actor && newest.recordId === id && newest.changes.length === 1 &&
       newest.changes[0].fieldId === changes[0].fieldId && at - newest.at >= 0 && at - newest.at < 30_000;
     if (coalesce) {
-      entries = [{ ...newest, at, title: entry.title,
-        changes: [{ ...changes[0], before: newest.changes[0].before }] }, ...entries.slice(1)];
+      const mergedChange = { ...changes[0], before: newest.changes[0].before };
+      entries = mergedChange.before === mergedChange.after ? entries.slice(1) :
+        [{ ...newest, at, title: entry.title, changes: [mergedChange] }, ...entries.slice(1)];
     } else entries = [entry, ...entries].slice(0, MAX_COLLECTION_AUDIT);
   }
   return changed ? { ...after, auditTrail: entries } : after;

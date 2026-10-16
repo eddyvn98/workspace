@@ -46,7 +46,7 @@ function Column({ status, rows, data, group, titleField, groupOptions, readOnly,
   const drop = useDroppable({ id: columnId(status), disabled: readOnly || !group });
   const cards = rows.filter(record => (record.values[group?.id ?? ""] ?? "") === status);
   return <div ref={drop.setNodeRef} data-testid="collection-kanban-column" data-status={status}
-    className={"w-52 shrink-0 rounded-lg bg-slate-100 p-2 dark:bg-slate-900 " +
+    className={"min-w-52 flex-1 rounded-lg bg-slate-100 p-2 dark:bg-slate-900 " +
       (drop.isOver ? "ring-2 ring-blue-500" : "")}>
     <div className="mb-2 text-xs font-semibold">{status || "Unassigned"} · {cards.length}</div>
     {cards.map(record => <Card key={record.id} data={data} record={record}
@@ -74,11 +74,14 @@ export function CollectionKanbanView(props: Props) {
     if (next !== data) onChange(next);
   };
   return <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-    <div className="flex h-full min-w-max gap-3" data-testid="collection-kanban">
-      {["", ...groupOptions].map(status => <Column key={status} {...props} status={status}
-        onOpen={setOpenRecordId} />)}
-      {openRecordId && <CollectionRecordDetails data={data} recordId={openRecordId}
-        readOnly={readOnly} onChange={onChange} onClose={() => setOpenRecordId(null)} />}
+    <div className="flex h-full min-w-0 flex-col">
+      <p className="mb-2 text-xs text-slate-500 sm:hidden">Swipe horizontally to see the other columns.</p>
+      <div className="flex min-h-0 w-full min-w-0 flex-1 gap-3" data-testid="collection-kanban">
+        {["", ...groupOptions].map(status => <Column key={status} {...props} status={status}
+          onOpen={setOpenRecordId} />)}
+        {openRecordId && <CollectionRecordDetails data={data} recordId={openRecordId}
+          readOnly={readOnly} onChange={onChange} onClose={() => setOpenRecordId(null)} />}
+      </div>
     </div>
   </DndContext>;
 }

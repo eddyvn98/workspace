@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from "react";
 import type { CollectionBlockPayload, CollectionField, CollectionRecord } from "../collections/model";
 import { recordTitle, setRecordValue } from "../collections/model";
-import { FieldEditor, btnClass } from "./CollectionFieldEditor";
+import { FieldEditor, btnClass, hintClass } from "./CollectionFieldEditor";
 import { addUtcDays, timelineLayout } from "./collectionTimelineDates";
 import { parseCalendarDay } from "./collectionCalendarDates";
 import { CollectionGanttBar } from "./CollectionGanttBar";
@@ -43,7 +43,7 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
     {!start && <p className="text-amber-600">Add a date field for Timeline.</p>}
     <div className="flex flex-wrap items-center gap-2">
       <strong>{view.from} – {view.to}</strong>
-      <span className="text-slate-500">Drag a bar to move dates, or drag its right edge to change duration.</span>
+      <span className={hintClass}>Drag a bar to move dates, or drag its right edge to change duration.</span>
       <button className={btnClass} type="button" disabled={readOnly || !start}
         onClick={() => onChange(scheduleCollectionDependencies(data, start?.id, end?.id))}>
         Schedule dependencies
@@ -57,8 +57,8 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
         value={scale} onChange={event => setScale(event.target.value as "day" | "week")}>
         <option value="day">Days</option><option value="week">Weeks</option>
       </select></label>
-      {view.undated > 0 && <span>{view.undated} undated records (edit in Table)</span>}
-      {view.beyondWindow > 0 && <span>Showing first 180 days; {view.beyondWindow} records outside window</span>}
+      {view.undated > 0 && <span className={hintClass}>{view.undated} undated records (edit in Table)</span>}
+      {view.beyondWindow > 0 && <span className={hintClass}>Showing first 180 days; {view.beyondWindow} records outside window</span>}
     </div>
     <div className="max-w-full overflow-x-auto rounded border" data-testid="collection-timeline-scroll">
       <div style={{ minWidth: 150 + span }}>

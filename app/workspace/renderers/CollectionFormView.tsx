@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import type { CollectionBlockPayload, CollectionField, CollectionView, CollectionSources } from "../collections/model";
 import { formFields, requiredFormFieldIds, submitCollectionForm } from "../collections/collectionForm";
-import { btnClass, inputClass } from "./CollectionFieldEditor";
+import { btnClass, emptyValueClass, hintClass, inputClass } from "./CollectionFieldEditor";
 import { recordTitle } from "../collections/model";
 import { relationIds, encodeRelationIds } from "../collections/collectionRelations";
 
@@ -28,13 +28,13 @@ function FormInput({ field, data, sources, value, onSet, readOnly, required }: {
       (field.relationTargetBlockId ? sources?.[field.relationTargetBlockId] : data)?.records.map(record => ({
         id: record.id, name: recordTitle((field.relationTargetBlockId ? sources?.[field.relationTargetBlockId] : data)!, record),
       })) ?? [];
-    return <select className={inputClass + " w-full"} value={value} disabled={readOnly} required={required}
+    return <select className={inputClass + " w-full" + (!value ? " " + emptyValueClass : "")} value={value} disabled={readOnly} required={required}
       onChange={event => onSet(event.target.value)}>
       <option value="">Choose...</option>
       {options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
     </select>;
   }
-  return <input className={inputClass + " w-full"} value={value} required={required}
+  return <input className={inputClass + " w-full" + (field.type === "date" && !value ? " " + emptyValueClass : "")} value={value} required={required}
     maxLength={field.type === "number" ? undefined : 2000}
     disabled={readOnly} type={field.type === "number" ? "number" : field.type === "date" ? "date"
       : field.type === "url" ? "url" : "text"}
@@ -57,14 +57,14 @@ export function CollectionFormView({ data, sources, view, readOnly, onChange }: 
   return <form key={view.id} className="mx-auto max-w-lg space-y-4 rounded-xl border p-4"
     aria-label="Collection form" data-testid="collection-form" onSubmit={submit}>
     <h3 className="text-base font-semibold">{view.name}</h3>
-    <p className="text-xs text-slate-500">Responses become records in {data.title}.</p>
+    <p className={hintClass}>Responses become records in {data.title}.</p>
     {fields.map(field => <label key={field.id} className="block space-y-1 text-xs">
       <span className="font-semibold">{field.name}{required.has(field.id) ? " *" : ""}</span>
       <FormInput field={field} data={data} sources={sources} readOnly={readOnly} required={required.has(field.id)}
         value={draft[field.id] ?? ""} onSet={value => { setDraft(previous => ({ ...previous, [field.id]: value })); setFeedback(""); }} />
     </label>)}
     <button type="submit" className={btnClass} disabled={readOnly || !fields.length || data.records.length >= 5000}>Submit record</button>
-    {readOnly && <p className="text-xs text-slate-500">Read-only access: submissions are disabled.</p>}
+    {readOnly && <p className={hintClass}>Read-only access: submissions are disabled.</p>}
     {feedback && <p role="status" className="text-xs">{feedback}</p>}
   </form>;
 }

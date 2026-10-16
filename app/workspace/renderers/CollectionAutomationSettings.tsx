@@ -2,7 +2,7 @@
 import React from "react";
 import { newId, type CollectionBlockPayload } from "../collections/model";
 import { automationWritable, type CollectionAutomation } from "../collections/collectionAutomations";
-import { btnClass, inputClass } from "./CollectionFieldEditor";
+import { btnClass, emptyValueClass, hintClass, inputClass } from "./CollectionFieldEditor";
 interface Props { data: CollectionBlockPayload; readOnly: boolean;
   onChange: (data: CollectionBlockPayload) => void; }
 export function CollectionAutomationSettings({ data, readOnly, onChange }: Props) {
@@ -22,20 +22,20 @@ export function CollectionAutomationSettings({ data, readOnly, onChange }: Props
     const field = fields.find(f => f.id === id);
     const choices = field?.type === "select" ? (field.options ?? [])
       : field?.type === "checkbox" ? ["true", "false"] : [];
-    return choices.length ? <select className={inputClass} disabled={readOnly} value={value}
+    return choices.length ? <select className={inputClass + (!value ? " " + emptyValueClass : "")} disabled={readOnly} value={value}
       onChange={e => onSet(e.target.value)}>
       <option value="">Empty</option>{choices.map(choice => <option key={choice} value={choice}>{choice}</option>)}
     </select> : <input className={inputClass} disabled={readOnly}
       value={value} maxLength={2000} onChange={e => onSet(e.target.value)} />;
   };
-  return <section className="space-y-2 rounded border p-2" data-testid="collection-automations">
+  return <section className="space-y-2 border-b border-slate-200 py-3 dark:border-slate-700" data-testid="collection-automations">
     <div className="flex items-center gap-2">
       <strong>Record automations</strong>
       <button className={btnClass} type="button" disabled={readOnly || fields.length < 2 || rules.length >= 20}
         onClick={add}>+ Rule</button>
     </div>
-    <p>When a value changes to the trigger, update another field in the same record. Runs for manual and AI edits.</p>
-    {rules.map(rule => <div key={rule.id} className="flex flex-wrap items-center gap-2 rounded border p-2">
+    <p className={hintClass}>When a value changes to the trigger, update another field in the same record. Runs for manual and AI edits.</p>
+    {rules.map(rule => <div key={rule.id} className="flex flex-wrap items-center gap-2 border-l-2 border-slate-200 py-2 pl-3 dark:border-slate-700">
       <input type="checkbox" aria-label={"Enable rule " + rule.name} disabled={readOnly}
         checked={rule.enabled} onChange={e => edit(rule.id, { enabled: e.target.checked })} />
       <input className={inputClass} aria-label="Rule name" value={rule.name} disabled={readOnly} maxLength={80}

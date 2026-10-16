@@ -1,8 +1,8 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { CollectionBlockPayload, CollectionField, CollectionRecord } from "../collections/model";
 import { recordTitle } from "../collections/model";
-import { btnClass, FieldEditor, inputClass } from "./CollectionFieldEditor";
+import { btnClass, FieldEditor, hintClass, inputClass } from "./CollectionFieldEditor";
 import { calendarDays, shiftCalendarDay, type CalendarMode } from "./collectionCalendarDates";
 
 interface Props {
@@ -18,6 +18,17 @@ interface Props {
 export function CalendarView({ month, setMonth, rows, data, field, readOnly, patch }: Props) {
   const [mode, setMode] = useState<CalendarMode>("month");
   const [anchor, setAnchor] = useState(() => month + "-01");
+  const mobileDefaulted = useRef(false);
+  useEffect(() => {
+    if (mobileDefaulted.current || !window.matchMedia("(max-width: 640px)").matches) return;
+    const firstScheduledDate = field && rows.map(record => record.values[field.id] ?? "")
+      .filter(Boolean).sort()[0];
+    const selectedDay = firstScheduledDate ?? new Date().toISOString().slice(0, 10);
+    setAnchor(selectedDay);
+    setMonth(selectedDay.slice(0, 7));
+    setMode("day");
+    mobileDefaulted.current = true;
+  }, [field, rows, setMonth]);
   const days = useMemo(() => calendarDays(anchor, mode), [anchor, mode]);
   const byDate = useMemo(() => {
     const index = new Map<string, CollectionRecord[]>();
@@ -64,7 +75,7 @@ export function CalendarView({ month, setMonth, rows, data, field, readOnly, pat
         const outside = mode === "month" && !day.startsWith(anchor.slice(0, 7));
         return <section key={day} data-testid="collection-calendar-day" data-date={day}
           aria-label={"Date " + day}
-          className={"min-h-20 min-w-0 rounded border p-1 dark:border-slate-700 " + (outside ? "opacity-50" : "")}
+          className={"min-h-20 min-w-0 rounded border p-1 text-xs dark:border-slate-700 " + (outside ? "opacity-50" : "")}
           onDragOver={event => { if (!readOnly && field) event.preventDefault(); }}
           onDrop={event => onDrop(event, day)}>
           <button type="button" className="text-slate-500 underline" aria-label={"Select " + day}
@@ -80,7 +91,7 @@ export function CalendarView({ month, setMonth, rows, data, field, readOnly, pat
         </section>;
       })}
     </div>
-    <p className="text-xs text-slate-500">
+    <p className={hintClass}>
       Drag a card to change its date, or edit the date directly. Undated records remain in Table view.
     </p>
   </div>;
