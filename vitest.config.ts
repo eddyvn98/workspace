@@ -7,6 +7,8 @@ import { defineConfig } from "vitest/config";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // Next.js uses jsx=preserve; Vitest/Vite must lower TSX before import analysis.
+  esbuild: { jsx: "automatic", jsxImportSource: "react" },
   resolve: {
     alias: {
       "@": projectRoot,
