@@ -6,7 +6,6 @@ export function workspaceRuntimeChatStream(upstream: ReadableStream<Uint8Array>)
   let buffer = "";
   return new ReadableStream<Uint8Array>({
     async start(controller) {
-      let finished = false;
       const emit = (line: string) => {
         if (!line.startsWith("data:")) return;
         const raw = line.slice(5).trim();
@@ -18,7 +17,6 @@ export function workspaceRuntimeChatStream(upstream: ReadableStream<Uint8Array>)
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event: "text_chunk", data: { text: data.text } })}\n\n`));
         }
         if (event.event === "workflow_finished" && typeof (data.outputs as Record<string, unknown> | undefined)?.answer === "string") {
-          finished = true;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event: "workflow_finished", data: { outputs: { answer: (data.outputs as Record<string, unknown>).answer } } })}\n\n`));
         }
       };
@@ -32,7 +30,6 @@ export function workspaceRuntimeChatStream(upstream: ReadableStream<Uint8Array>)
           if (done) break;
         }
         if (buffer) emit(buffer);
-        void finished;
         controller.close();
       } catch (error) { controller.error(error); }
       finally { reader.releaseLock(); }
