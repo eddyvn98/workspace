@@ -30,6 +30,12 @@ export function useWorkspaceBoardId(): string | null {
   const id = searchParams.get("id");
   const isExplicitlyEmpty = searchParams.get("empty") === "1";
   const bareRouteResolutionRef = useRef<Promise<void> | null>(null);
+  const navigateResolvedBoard = (board: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("empty");
+    url.searchParams.set("id", board);
+    router.replace(`${url.pathname}${url.search}${url.hash}`);
+  };
 
   useEffect(() => {
     if (id || isExplicitlyEmpty) {
@@ -67,7 +73,7 @@ export function useWorkspaceBoardId(): string | null {
       const lastOpenedId = readLastOpenedWorkspaceBoard();
       const existingBoard = knownBoards.find((board) => board.id === lastOpenedId) ?? knownBoards[0];
       if (existingBoard) {
-        router.replace(`/workspace?id=${encodeURIComponent(existingBoard.id)}`);
+        navigateResolvedBoard(existingBoard.id);
         return;
       }
       if (migrationFailed) throw new Error("Legacy mindmap migration unavailable");
@@ -87,7 +93,7 @@ export function useWorkspaceBoardId(): string | null {
       );
       const remoteBoard = remoteBoards.find((board) => board.id === lastOpenedId) ?? remoteBoards[0];
       if (remoteBoard) {
-        router.replace(`/workspace?id=${encodeURIComponent(remoteBoard.id)}`);
+        navigateResolvedBoard(remoteBoard.id);
         return;
       }
 
@@ -101,13 +107,13 @@ export function useWorkspaceBoardId(): string | null {
       if (!isStillBareWorkspaceRoute()) return;
       const sharedBoard = pickSharedBoardToOpen(sharedBoards, hiddenIds);
       if (sharedBoard) {
-        router.replace(`/workspace?id=${encodeURIComponent(sharedBoard.id)}`);
+        navigateResolvedBoard(sharedBoard.id);
         return;
       }
 
       const newId = createWorkspaceId();
       markBoardSelfCreated(newId);
-      router.replace(`/workspace?id=${newId}`);
+      navigateResolvedBoard(newId);
     })().catch(() => {
         if (isStillBareWorkspaceRoute()) router.replace("/workspace?empty=1");
     });
