@@ -3,7 +3,7 @@ import React from "react";
 import { AGGREGATE_OPERATIONS } from "../collections/collectionFormula";
 import { FILTER_OPERATORS, isUnaryFilter, type FilterOperator } from "../collections/collectionFilters";
 import { viewFilters, viewSorts, type CollectionField, type CollectionView } from "../collections/model";
-import { btnClass, inputClass } from "./CollectionFieldEditor";
+import { btnClass, hintClass, inputClass } from "./CollectionFieldEditor";
 
 interface Props { view: CollectionView; fields: CollectionField[]; readOnly: boolean;
   onChange: (patch: Partial<CollectionView>) => void; }
@@ -55,7 +55,7 @@ export function CollectionViewConditions({ view, fields, readOnly, onChange }: P
             value={entry.value} onChange={event => setFilters(filters.map((item, i) =>
               i === index ? { ...item, value: event.target.value } : item))} />
           {!isUnaryFilter(operator) && !entry.value.trim() &&
-            <span className="text-slate-500" role="status">Inactive until value is entered</span>}
+            <span className={hintClass} role="status">Inactive until value is entered</span>}
           <button className={btnClass} aria-label={"Remove filter " + (index + 1)} disabled={readOnly}
             onClick={() => setFilters(filters.filter((_, i) => i !== index))}>×</button>
         </div>;

@@ -28,7 +28,11 @@ export function useWorkspaceFocusLineFromUrl(boardId: string | null) {
     useWorkspaceStore.getState().setSelection([focusBlock]);
     useWorkspaceStore.getState().setPendingEditBlockId(focusBlock);
     useWorkspaceStore.getState().setPendingFocusLineId(focusLine);
-    router.replace(`/workspace?id=${boardId}`);
+    const url = new URL(window.location.href);
+    url.searchParams.set("id", boardId);
+    url.searchParams.delete("focusBlock");
+    url.searchParams.delete("focusLine");
+    router.replace(`${url.pathname}${url.search}${url.hash}`);
   }, [boardId, focusBlock, focusLine, router]);
 }
 

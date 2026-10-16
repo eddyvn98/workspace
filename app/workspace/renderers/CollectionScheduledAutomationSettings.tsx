@@ -4,7 +4,7 @@ import { newId, type CollectionBlockPayload, type CollectionField } from "../col
 import { automationWritable } from "../collections/collectionAutomations";
 import { SCHEDULE_TIMEZONES, validScheduledRule, type CollectionScheduledRule,
   type ScheduleTimeZone } from "../collections/collectionSchedules";
-import { btnClass, inputClass } from "./CollectionFieldEditor";
+import { btnClass, emptyValueClass, hintClass, inputClass } from "./CollectionFieldEditor";
 
 interface Props { data: CollectionBlockPayload; readOnly: boolean;
   onChange: (data: CollectionBlockPayload) => void; }
@@ -31,27 +31,27 @@ export function CollectionScheduledAutomationSettings({ data, readOnly, onChange
     set: (value: string) => void, label: string) => {
     if (field?.type === "select" || field?.type === "checkbox") {
       const options = field.type === "select" ? field.options ?? [] : ["false", "true"];
-      return <select className={inputClass} aria-label={label} disabled={readOnly}
+      return <select className={inputClass + (!value ? " " + emptyValueClass : "")} aria-label={label} disabled={readOnly}
         value={value} onChange={event => set(event.target.value)}>
         {options.map(option => <option key={option} value={option}>{option}</option>)}
       </select>;
     }
-    return <input aria-label={label} className={inputClass} disabled={readOnly}
+    return <input aria-label={label} className={inputClass + (field?.type === "date" && !value ? " " + emptyValueClass : "")} disabled={readOnly}
       type={field?.type === "number" ? "number" : field?.type === "date" ? "date" : "text"}
       maxLength={2000} value={value} onChange={event => set(event.target.value)} />;
   };
-  return <section className="space-y-2 rounded border p-2" data-testid="collection-scheduled-automations">
+  return <section className="space-y-2 border-b border-slate-200 py-3 dark:border-slate-700" data-testid="collection-scheduled-automations">
     <div className="flex items-center gap-2">
       <strong>Daily scheduled rules</strong>
       <button type="button" className={btnClass} disabled={readOnly || !targets.length || rules.length >= 20}
         onClick={add}>+ Daily rule</button>
     </div>
-    <p>Rules run once per local day, at or after the chosen time, when the secured server
+    <p className={hintClass}>Rules run once per local day, at or after the chosen time, when the secured server
       scheduler is configured. They modify fields only; they never send messages or webhooks.</p>
     {rules.map(rule => {
       const target = targets.find(field => field.id === rule.targetFieldId);
       const match = conditions.find(field => field.id === rule.matchFieldId);
-      return <div key={rule.id} className="space-y-2 rounded border p-2">
+      return <div key={rule.id} className="space-y-2 border-l-2 border-slate-200 py-2 pl-3 dark:border-slate-700">
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-1"><input type="checkbox"
             aria-label={"Enable daily rule " + rule.name} checked={rule.enabled}
@@ -99,7 +99,7 @@ export function CollectionScheduledAutomationSettings({ data, readOnly, onChange
           {valueEditor(target, rule.targetValue, value => edit(rule.id, { targetValue: value }),
             "Scheduled target value")}
         </div>
-        <p className="text-slate-500">
+        <p className={hintClass}>
           Last committed run: {rule.lastRunDay ?? "Never"}.
           {!validScheduledRule(data, rule) ? " Configuration is invalid; execution disabled." : ""}
         </p>

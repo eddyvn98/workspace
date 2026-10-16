@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { recordTitle, setRecordValue, updateRecordBody,
   type CollectionBlockPayload, type CollectionSources } from "../collections/model";
-import { FieldEditor } from "./CollectionFieldEditor";
+import { FieldEditor, hintClass } from "./CollectionFieldEditor";
 
 interface Props { data: CollectionBlockPayload; sources?: CollectionSources; recordId: string;
   readOnly: boolean; onChange: (data: CollectionBlockPayload) => void; onClose: () => void; }
@@ -26,7 +26,7 @@ export function CollectionRecordDetails({ data, sources, recordId, readOnly, onC
         <button className="rounded border px-3 py-1 text-sm" onClick={onClose}>Close</button>
       </header>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <p className="text-xs text-slate-500">Record ID: {record.id}</p>
+        <p className={hintClass}>Record ID: {record.id}</p>
         {data.fields.map(field => <label key={field.id} className="block space-y-1 text-sm">
           <span className="text-xs font-medium">{field.name}</span>
           <FieldEditor field={field} value={record.values[field.id] ?? ""} readOnly={readOnly}
@@ -35,7 +35,7 @@ export function CollectionRecordDetails({ data, sources, recordId, readOnly, onC
         </label>)}
         <label className="block space-y-1 text-sm">
           <span className="font-medium">Record notes</span>
-          <textarea className="min-h-64 w-full rounded border bg-transparent p-3 text-sm"
+          <textarea className="min-h-64 w-full rounded border bg-transparent p-3 text-sm placeholder:text-xs placeholder:text-slate-400 dark:placeholder:text-slate-500"
             aria-label="Record notes" placeholder="Write details, meeting notes or a description..."
             maxLength={20000} readOnly={readOnly} value={record.body ?? ""}
             onChange={event => onChange(updateRecordBody(data, record.id, event.target.value))} />

@@ -5,7 +5,7 @@ import "@xyflow/react/dist/style.css";
 import type { CollectionBlockPayload, CollectionRecord } from "../collections/model";
 import { recordTitle, setParent } from "../collections/model";
 import { layoutMindMap } from "./collectionMindMapLayout";
-import { inputClass } from "./CollectionFieldEditor";
+import { hintClass, inputClass } from "./CollectionFieldEditor";
 
 interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; readOnly: boolean;
   onChange: (next: CollectionBlockPayload) => void; }
@@ -39,7 +39,7 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
   };
   return <div className="flex h-full min-h-[420px] flex-col gap-2" data-testid="collection-mindmap">
     <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs">
-      <span>Drag background to pan, scroll to zoom, or drop a node near another node to change its parent.</span>
+      <span className={hintClass}>Drag background to pan, scroll to zoom, or drop a node near another node to change its parent.</span>
       <select aria-label="Mind Map selected record" className={inputClass} value={selected?.id ?? ""}
         onChange={event => setSelectedId(event.target.value)}>
         {graph.nodes.map(node => <option key={node.id} value={node.id}>{labels.get(node.id) ?? "Untitled"}</option>)}

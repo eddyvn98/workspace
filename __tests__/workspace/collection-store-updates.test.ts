@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { addRecord, createCollection } from "../../app/workspace/collections/model";
+import { addRecord, createCollection, normalizeCollection, setRecordValue } from "../../app/workspace/collections/model";
 import { createDualTransform, type CanvasBlock } from "../../app/workspace/types/block";
 import { useWorkspaceStore } from "../../app/workspace/store/useWorkspaceStore";
 
@@ -32,4 +32,25 @@ describe("Workspace Collection store updates", () => {
     useWorkspaceStore.getState().updateBlock(block.id, { data: { html: "wrong block type" } } as never);
     expect(useWorkspaceStore.getState().blocks[block.id]).toEqual(block);
   });
+  it("persists the final value across rapid edits using current store state", () => {
+    const block = collectionBlock();
+    const field = block.data.fields[0].id;
+    block.data = addRecord(block.data, { [field]: "Initial" });
+    useWorkspaceStore.setState({ blocks: { [block.id]: block } });
+    const recordId = block.data.records[0].id;
+    const change = (value: string) => {
+      const state = useWorkspaceStore.getState();
+      const current = state.blocks[block.id];
+      if (current?.type !== "collection") throw new Error("Missing collection");
+      state.updateBlock(block.id, {
+        data: setRecordValue(normalizeCollection(current.data), recordId, field, value),
+      });
+    };
+    change("Done");
+    change("In progress");
+    const saved = useWorkspaceStore.getState().blocks[block.id];
+    if (saved.type !== "collection") throw new Error("Missing collection");
+    expect(saved.data.records[0].values[field]).toBe("In progress");
+  });
+
 });

@@ -21,11 +21,10 @@ export function CollectionGalleryView({ data, sources, view, rows, titleField, r
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {rows.slice(0, limit).map(record => {
         const url = image ? record.values[image.id] : undefined;
-        return <article key={record.id} className="overflow-hidden rounded-lg border dark:border-slate-700"
+        return <article key={record.id} className="group min-w-0 overflow-hidden rounded-md transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
           data-testid="collection-gallery-card" data-record-id={record.id}>
           {url && /^https?:\/\//i.test(url)
-            ? <img src={url} alt="" loading="lazy" className="h-28 w-full object-cover" />
-            : <div className="h-28 bg-slate-100 dark:bg-slate-800" />}
+            && <img src={url} alt="" loading="lazy" className="h-28 w-full object-cover" />}
           <div className="space-y-2 p-3 text-xs">
             <strong className="block truncate" title={recordTitle(data, record)}>{recordTitle(data, record)}</strong>
             <button type="button" className={btnClass} onClick={() => setOpenRecordId(record.id)}

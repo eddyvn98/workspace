@@ -57,8 +57,9 @@ export function CollectionTableView({ data, sources, view, rows, readOnly, onCha
       onChange({ ...data, views: data.views.map(v => v.id === view.id ? { ...v, sorts, sort: undefined } : v) });
     },
   });
-  return <div className="space-y-2" data-testid="collection-paged-table">
-    <table className="w-full border-collapse text-left text-xs" data-testid="collection-tanstack-table">
+  return <div className="min-w-0 space-y-2" data-testid="collection-paged-table">
+    <div className="overflow-x-auto">
+    <table className="w-full min-w-max border-collapse text-left text-xs" data-testid="collection-tanstack-table">
     <thead>{table.getHeaderGroups().map(group => <tr key={group.id}>
       {group.headers.map(header => <th key={header.id} className="sticky top-0 whitespace-nowrap border-b bg-slate-100 p-2 dark:bg-slate-800">
         <button type="button" disabled={readOnly} onClick={header.column.getToggleSortingHandler()}
@@ -84,7 +85,8 @@ export function CollectionTableView({ data, sources, view, rows, readOnly, onCha
       return <td key={field.id} className="border-t bg-slate-50 p-2 text-xs font-semibold dark:bg-slate-900">
         {aggregate ? aggregate.operation + ": " + calculateCollectionAggregate(rows, aggregate) : ""}</td>;
     })}<td className="border-t text-xs">Visible totals</td></tr></tfoot>}
-  </table>
+    </table>
+    </div>
     <nav aria-label="Collection Table pagination" className="flex flex-wrap items-center gap-2 text-xs">
       <span role="status" aria-live="polite" data-testid="collection-page-summary">
         {page.total ? page.start + 1 : 0}–{page.end} of {page.total} matching records
