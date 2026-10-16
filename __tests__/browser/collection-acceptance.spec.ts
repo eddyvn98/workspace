@@ -289,3 +289,26 @@ test("React Flow Mind Map persists parent links, supports zoom and read-only", a
   await reopened.getByRole("combobox", { name: "Mind Map selected record" }).selectOption({ label: "Child" });
   await expect(reopened.getByRole("combobox", { name: "Parent of Child" })).toBeDisabled();
 });
+
+test("rapid Kanban status toggles retain the final selection after reload", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await expect(page.getByTestId("collection-acceptance")).toBeVisible();
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
+  const collection = page.getByTestId("collection-block");
+  await collection.getByRole("button", { name: "+ Record" }).click();
+  await collection.getByRole("textbox", { name: "Name" }).first().fill("Rapid toggle");
+  await collection.getByRole("button", { name: "Kanban", exact: true }).click();
+  const status = collection.getByRole("combobox", { name: "Status for Rapid toggle" });
+  await expect(status).toBeVisible();
+  // Do not wait for autosave between selections. The final value wins.
+  await status.selectOption("Done");
+  await status.selectOption("In progress");
+  await status.selectOption("Done");
+  await expect(status).toHaveValue("Done");
+  const reload = await page.reload();
+  expect(reload?.status()).toBe(200);
+  const reopened = page.getByTestId("collection-block");
+  await expect(reopened.getByRole("combobox", { name: "Status for Rapid toggle" })).toHaveValue("Done");
+});
