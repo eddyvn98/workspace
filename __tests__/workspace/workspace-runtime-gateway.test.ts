@@ -41,7 +41,7 @@ describe("Workspace runtime gateway", () => {
     expect((await POST(request())).status).toBe(404); expect(fetcher).not.toHaveBeenCalled();
   });
   it("does not expose upstream credential-bearing errors", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response('Bearer provider-secret', { status: 401 })); vi.stubGlobal("fetch", fetcher);
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ error: "Bearer provider-secret" }, { status: 401 })); vi.stubGlobal("fetch", fetcher);
     const response = await POST(request()); expect(response.status).toBe(401); expect(await response.text()).not.toContain("provider-secret");
   });
 });
