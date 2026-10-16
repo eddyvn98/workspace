@@ -43,7 +43,7 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   const reopened = page.getByTestId("collection-block");
   await expect(reopened).toBeVisible();
   await expect(reopened.getByText("Persisted acceptance record").first()).toBeVisible();
-  await expect(reopened.getByRole("button", { name: "Kanban", exact: true })).toHaveClass(/border-blue-500/);
+  await expect(reopened.getByRole("button", { name: "Kanban", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Back to Workspace" }).click();
   await page.getByRole("checkbox", { name: "Read-only" }).check();
   await page.getByRole("button", { name: "Open collection" }).click();
@@ -53,7 +53,7 @@ test("create, edit, switch saved view, reload, edit in read-only mode denied", a
   const secondReload = await page.reload();
   expect(secondReload?.status()).toBe(200);
   await expect(page.getByTestId("collection-acceptance")).toBeVisible();
-  await expect(page.getByTestId("collection-block").getByRole("button", { name: "Kanban", exact: true })).toHaveClass(/border-blue-500/);
+  await expect(page.getByTestId("collection-block").getByRole("button", { name: "Kanban", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("convert table without mutating source, edit and delete a record", async ({ page }) => {
