@@ -9,7 +9,7 @@ import { resolveTransform } from "@/app/workspace/types/block";
 
 afterEach(cleanup);
 
-it("Grid writes selected layout into the effective transform override", () => {
+it("Grid writes selected layout into the effective transform override", async () => {
   const transform = (x: number, y: number) => ({ computed: null, override: { x, y, w: 100, h: 60, rotation: 0, zIndex: 0 } });
   useWorkspaceStore.setState({
     isReadOnly: false,
@@ -21,8 +21,9 @@ it("Grid writes selected layout into the effective transform override", () => {
   });
 
   render(<WorkspaceArrangeMenu />);
-  fireEvent.click(screen.getByRole("button", { name: "Arrange selection" }));
-  fireEvent.click(screen.getByRole("button", { name: /^Grid/ }));
+  // Radix DropdownMenu opens on pointer down rather than a synthetic click.
+  fireEvent.pointerDown(screen.getByRole("button", { name: "Arrange selection" }), { button: 0, ctrlKey: false });
+  fireEvent.click(await screen.findByRole("button", { name: /^Grid/ }));
 
   const second = useWorkspaceStore.getState().blocks.second;
   expect(resolveTransform(second.transform, { x: 0, y: 0, w: 1, h: 1, rotation: 0, zIndex: 0 })).toMatchObject({ x: 165, y: 0 });

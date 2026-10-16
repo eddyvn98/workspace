@@ -7,6 +7,8 @@ import { defineConfig } from "vitest/config";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // Vite 8 uses Oxc. Override Next.js's jsx=preserve for Vitest imports.
+  oxc: { jsx: { runtime: "automatic", importSource: "react" } },
   resolve: {
     alias: {
       "@": projectRoot,

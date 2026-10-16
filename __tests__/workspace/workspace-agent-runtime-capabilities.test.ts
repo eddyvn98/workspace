@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import commandRegistry from "@/config/workspace-command-registry.json";
 import { parseWorkspaceModelProposal } from "@/lib/workspace-agent/proposalValidation";
 import { WORKSPACE_RUNTIME_ACTION_SCHEMAS, WORKSPACE_RUNTIME_ALLOWED_ACTIONS } from "@/lib/workspace-agent/actionSchema";
 import { normalizeAgentMapLayoutAction } from "@/app/api/workspaces/[id]/agent/mapStyleParity";
@@ -13,8 +14,8 @@ const proposal = (action: Record<string, unknown>) => JSON.stringify({ done: fal
 
 describe("Workspace runtime map and diagram schemas", () => {
   it("exposes strict schemas for root maps and semantic diagrams", () => {
-    expect(Object.keys(WORKSPACE_RUNTIME_ACTION_SCHEMAS)).toHaveLength(108);
-    expect(WORKSPACE_RUNTIME_ALLOWED_ACTIONS).toHaveLength(108);
+    expect(Object.keys(WORKSPACE_RUNTIME_ACTION_SCHEMAS)).toHaveLength(commandRegistry.commands.length);
+    expect(WORKSPACE_RUNTIME_ALLOWED_ACTIONS).toHaveLength(commandRegistry.commands.length);
     for (const name of WORKSPACE_RUNTIME_ALLOWED_ACTIONS) {
       expect(WORKSPACE_RUNTIME_ACTION_SCHEMAS[name]).toMatchObject({
         type: "object",

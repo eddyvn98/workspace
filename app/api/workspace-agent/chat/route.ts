@@ -93,8 +93,9 @@ export async function POST(req: NextRequest) {
     });
     phase = "runtime_response";
     if (!upstream.ok) {
-      const failure = await upstream.json().catch(() => ({})) as { error?: string };
-      return NextResponse.json({ error: failure.error ?? "Workspace runtime request failed" }, { status: upstream.status });
+      // Runtime error bodies may contain internal service URLs or credentials.
+      // Preserve the HTTP status for callers but never reflect upstream text.
+      return NextResponse.json({ error: "Workspace runtime request failed" }, { status: upstream.status });
     }
     const turn = await upstream.json() as {
       answer: string;

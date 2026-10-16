@@ -1,0 +1,64 @@
+name: Workspace universal quality gate
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: workspace-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+      - name: Validate command registry without private Dify files
+        run: node scripts/validate-workspace-registry.mjs
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+      - name: Full Workspace test suite
+        run: pnpm test:workspace
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+          MONGODB_URI: mongodb://localhost:27017/workspace
+      - name: Production build
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://workspace:workspace@localhost:5432/workspace
+          MONGODB_URI: mongodb://localhost:27017/workspace
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Collection browser acceptance fixture
+        run: pnpm exec playwright test -c playwright.collection.config.ts
+        env:
+          CI: 'true'
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-playwright-traces
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
