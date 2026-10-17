@@ -24,26 +24,46 @@ export function relationValueValid(data: CollectionBlockPayload, field: Collecti
     && ids.every(id => (field.relationTargetBlockId ? sources[field.relationTargetBlockId]?.records : data.records)
       ?.some(record => record.id === id));
 }
+type IndexedRecord = { record: CollectionRecord; order: number };
+export type CollectionRelationIndex = WeakMap<CollectionBlockPayload, Map<string, IndexedRecord>>;
+
+/** Build target-record indexes once per view projection, not once per row. */
+export function buildCollectionRelationIndex(
+  data: CollectionBlockPayload, sources: CollectionSources = {},
+): CollectionRelationIndex {
+  const index: CollectionRelationIndex = new WeakMap();
+  for (const target of [data, ...Object.values(sources)]) {
+    if (index.has(target)) continue;
+    index.set(target, new Map(target.records.map((record, order) => [
+      record.id, { record, order },
+    ])));
+  }
+  return index;
+}
 function relatedValues(data: CollectionBlockPayload, record: CollectionRecord, field: CollectionField,
-  sources: CollectionSources): string[] {
+  sources: CollectionSources, index?: CollectionRelationIndex): string[] {
   const relation = data.fields.find(item => item.id === field.relationFieldId && item.type === "relation");
   const targetData = relation?.relationTargetBlockId ? sources[relation.relationTargetBlockId] : data;
   const source = targetData?.fields.find(item => item.id === field.targetFieldId &&
     !["lookup", "rollup", "formula", "relation"].includes(item.type));
   if (!relation || !targetData) return [];
   const ids = new Set(relationIds(record.values[relation.id]));
-  const linked = targetData.records.filter(item => ids.has(item.id));
+  const targetIndex = index?.get(targetData);
+  const linked = targetIndex
+    ? [...ids].map(id => targetIndex.get(id)).filter((item): item is IndexedRecord => !!item)
+      .sort((a, b) => a.order - b.order).map(item => item.record)
+    : targetData.records.filter(item => ids.has(item.id));
   if (field.type === "rollup" && field.rollupOperation === "count") return linked.map(() => "1");
   if (!source) return [];
   return linked.map(item => item.values[source.id] ?? "").filter(Boolean);
 }
 export function getCollectionValue(data: CollectionBlockPayload, record: CollectionRecord,
-  field: CollectionField, sources: CollectionSources = {}): string {
+  field: CollectionField, sources: CollectionSources = {}, index?: CollectionRelationIndex): string {
   if (field.type !== "lookup" && field.type !== "rollup") return record.values[field.id] ?? "";
   const current = data.fields.find(item => item.id === field.id &&
     (item.type === "lookup" || item.type === "rollup"));
   if (!current) return "";
-  const values = relatedValues(data, record, current, sources);
+  const values = relatedValues(data, record, current, sources, index);
   if (current.type === "lookup") return values.join(", ").slice(0, 2000);
   const operation = current.rollupOperation ?? "count";
   if (operation === "count") return String(values.length);
@@ -55,11 +75,11 @@ export function getCollectionValue(data: CollectionBlockPayload, record: Collect
   return Number.isFinite(result) ? String(Number(result.toFixed(6))) : "";
 }
 export function projectCollectionLookups(data: CollectionBlockPayload, record: CollectionRecord,
-  sources: CollectionSources = {}): CollectionRecord {
+  sources: CollectionSources = {}, index?: CollectionRelationIndex): CollectionRecord {
   const computed = data.fields.filter(field => field.type === "lookup" || field.type === "rollup");
   if (!computed.length) return record;
   const values = { ...record.values };
-  for (const field of computed) values[field.id] = getCollectionValue(data, record, field, sources);
+  for (const field of computed) values[field.id] = getCollectionValue(data, record, field, sources, index);
   return { ...record, values };
 }
 export function removeInboundRelations(data: CollectionBlockPayload, deletedId: string): CollectionRecord[] {
