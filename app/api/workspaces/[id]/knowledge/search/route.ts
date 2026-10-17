@@ -94,7 +94,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         { status: err.code === "FORBIDDEN" ? 403 : 404 },
       );
     }
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Do not expose database query errors, credentials, or internal paths to
+    // browser or model-tool clients. The request has already been authorized.
+    return NextResponse.json({ error: "Knowledge search unavailable" }, { status: 500 });
   }
 }
