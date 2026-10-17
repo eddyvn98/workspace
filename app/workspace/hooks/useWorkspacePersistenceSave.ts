@@ -9,8 +9,6 @@ import { boardKey, upsertIndexEntry, type BoardSnapshot } from "./workspaceBoard
 import { consumeWorkspaceMutation } from "../utils/workspaceMutationIntent";
 import { isWorkspaceRealtimeLive } from "../utils/workspaceRealtimeProjection";
 import { announceWorkspaceBoardPersisted } from "./useWorkspaceRemoteBoardId";
-import { normalizeCameraFrames } from "../utils/cameraFrameOps";
-import { normalizeTreeLayoutFields } from "../utils/normalizeTreeLayoutFields";
 import type { AdoptPayload } from "./workspacePersistenceTypes";
 
 export function useWorkspacePersistenceSave(
@@ -90,11 +88,22 @@ export function useWorkspacePersistenceSave(
           treeCatalogDescendantStyle: state.treeCatalogDescendantStyle,
           ...(editOperation ? { editOperation } : {}),
         });
+        // A board switch while the request was in flight must not overwrite
+        // the newly opened board with this response or its conflict state.
+        if (boardIdRef.current !== id) return;
         lastSaveOkRef.current = result.ok;
         if (!result.ok) {
+          // Network errors and 5xx are not revision conflicts. A healthy GET
+          // after a failed PUT does NOT prove this draft was saved; replacing
+          // it with the server copy would silently delete the user's edits.
+          if (!result.conflict) {
+            setSaveError(result.error ?? "Failed to save workspace; changes remain on this device");
+            return;
+          }
           // Taken before checkBoardAccess below replaces it with the server's.
-          const base = result.conflict ? getKnownContent(id) : undefined;
+          const base = getKnownContent(id);
           const authoritative = await checkBoardAccess(id);
+          if (boardIdRef.current !== id) return;
           if (authoritative.status === "ok" && base) {
             // Another writer moved the board on: fold this tab's edits into
             // the server's version instead of throwing them away, then save
@@ -115,28 +124,19 @@ export function useWorkspacePersistenceSave(
             setSaveError(merged.conflicts === 0 ? null : "Some of your changes conflicted with another editor's and were not applied.");
             notifyMergeConflicts(merged.items);
             hasPendingSaveRef.current = true;
-          } else if (authoritative.status === "ok") {
-            const current = useWorkspaceStore.getState();
-            const matchesAuthoritative = JSON.stringify(current.blocks) === JSON.stringify(authoritative.board.blocks)
-              && JSON.stringify(current.blockOrder) === JSON.stringify(authoritative.board.blockOrder)
-              && JSON.stringify(current.connectors) === JSON.stringify(authoritative.board.connectors);
-            setSaveError(matchesAuthoritative ? null : result.error ?? "Failed to save workspace");
-            lastSaveOkRef.current = matchesAuthoritative;
-            ignoreNextStoreChangeRef.current = true;
-            adopt(authoritative.board, id);
-            try {
-              window.localStorage.setItem(boardKey(id), JSON.stringify({
-                blocks: authoritative.board.blocks,
-                blockOrder: authoritative.board.blockOrder,
-                connectors: authoritative.board.connectors,
-                camera: authoritative.board.camera,
-                frames: normalizeCameraFrames(authoritative.board.frames),
-                title: authoritative.board.title,
-                ...normalizeTreeLayoutFields(authoritative.board),
-                savedAt: new Date(authoritative.board.updatedAt).getTime() || Date.now(),
-              }));
-            } catch {}
-          } else setSaveError(result.error ?? "Failed to save workspace");
+          } else {
+            // Without a known common ancestor or a successful server read
+            // there is no safe automatic merge. Keep the draft and let the
+            // user retry after connectivity is restored.
+            setSaveError("This board changed on the server; local edits were kept, but a safe merge is unavailable");
+          }
+        }
+      } catch (error) {
+        // Unexpected failures must never leave the save queue wedged or
+        // masquerade as persisted state during an AI preflight flush.
+        if (boardIdRef.current === id) {
+          lastSaveOkRef.current = false;
+          setSaveError(error instanceof Error ? error.message : "Failed to save workspace");
         }
       } finally {
         isSaveInFlightRef.current = false;
@@ -151,15 +151,20 @@ export function useWorkspacePersistenceSave(
 
   const flushPendingSave = useCallback(async (): Promise<boolean> => {
     if (typeof window === "undefined") return true;
-    if (debounceRef.current !== null) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-      save();
-    }
-    while (isSaveInFlightRef.current || hasPendingSaveRef.current) {
+    // An edit may schedule another debounce *while* a preceding request is
+    // in flight. Re-check the timer after every await so AI never reads a
+    // "successfully flushed" board that still has local queued changes.
+    for (;;) {
+      if (debounceRef.current !== null) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+        save();
+      }
+      if (!isSaveInFlightRef.current && !hasPendingSaveRef.current) {
+        return lastSaveOkRef.current;
+      }
       await (saveInFlightPromiseRef.current ?? Promise.resolve());
     }
-    return lastSaveOkRef.current;
   }, [save]);
 
   const ignoreNextStoreChangeRef = useRef(false);
