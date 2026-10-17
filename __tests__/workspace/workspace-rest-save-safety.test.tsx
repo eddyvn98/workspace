@@ -51,7 +51,7 @@ describe("Workspace REST save failure safety", () => {
     act(() => host.api.save());
     const persisted = await host.api.flushPendingSave();
     expect(persisted).toBe(false);
-    expect(host.adopt).not.toHaveBeenCalled();
+    expect(host.adopted).not.toHaveBeenCalled();
     expect(mocks.access).not.toHaveBeenCalled();
     expect(useWorkspaceStore.getState().blocks).toBe(before);
     host.unmount();
