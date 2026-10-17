@@ -43,7 +43,9 @@ export function fromTableBlock(block: CanvasBlock<"table">): CollectionBlockPayl
 export function importCollectionCsv(text: string): CollectionBlockPayload {
   const parsed = Papa.parse<string[]>(text.replace(/^\uFEFF/, ""), { delimiter: ",", skipEmptyLines: "greedy" });
   if (parsed.errors.length) throw new Error("Invalid CSV: " + parsed.errors[0].message);
-  const rows = (parsed.data ?? []).slice(0, 5001);
+  if ((parsed.data ?? []).length > 5001) throw new Error("CSV import exceeds 5000-record limit");
+  if ((parsed.data?.[0]?.length ?? 0) > 50) throw new Error("CSV import exceeds 50-field limit");
+  const rows = parsed.data ?? [];
   if (!rows.length || !rows[0].length) throw new Error("CSV is empty");
   const header = rows[0].slice(0, 50);
   const fields: CollectionField[] = header.map((name, i) => ({ id: newId(), name: String(name).trim() || "Column " + (i + 1), type: "text" }));
