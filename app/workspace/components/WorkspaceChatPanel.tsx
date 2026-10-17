@@ -119,11 +119,14 @@ export const WorkspaceChatPanel = React.memo(function WorkspaceChatPanel({
     });
   }, [draft, attachedFiles, clearFiles, sendMessageNow, summaryLabels.length, contextPrompt]);
 
+  const handleSendRef = useRef(handleSend);
+  handleSendRef.current = handleSend;
+
   useEffect(() => {
     if (!initialPrompt || sentInitialPrompt.current === initialPrompt) return;
     sentInitialPrompt.current = initialPrompt;
-    handleSend(initialPrompt);
-  }, [handleSend, initialPrompt]);
+    handleSendRef.current(initialPrompt);
+  }, [initialPrompt]);
 
   const handleNewConversation = () => {
     clearFiles();

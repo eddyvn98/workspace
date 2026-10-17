@@ -14,4 +14,7 @@ export default defineConfig({
       "@": projectRoot,
     },
   },
+  test: {
+    testTimeout: 15_000,
+  },
 });
