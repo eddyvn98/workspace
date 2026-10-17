@@ -7,7 +7,8 @@ if (!origin || !secret || secret.length < 32 || !/^https?:\/\//i.test(origin)) {
   console.error("WORKSPACE_AUTOMATION_URL and a >=32-character WORKSPACE_AUTOMATION_CRON_SECRET are required");
   process.exitCode = 1;
 } else {
-  let cursor = "", scanned = 0, changed = 0;
+  let cursor = "", scanned = 0, changed = 0, conflicted = 0, rulesExecuted = 0, boardsUpdated = 0;
+  const startedAt = Date.now();
   try {
     for (let page = 0; page < 10000; page++) {
       const url = new URL("/api/internal/workspace/collection-schedules", origin);
@@ -21,12 +22,18 @@ if (!origin || !secret || secret.length < 32 || !/^https?:\/\//i.test(origin)) {
       const result = await response.json();
       scanned += Number(result.scanned ?? 0);
       changed += Number(result.recordsChanged ?? 0);
+      conflicted += Number(result.conflicted ?? 0);
+      rulesExecuted += Number(result.rulesExecuted ?? 0);
+      boardsUpdated += Number(result.boardsUpdated ?? 0);
       if (!result.nextCursor) break;
       if (result.nextCursor === cursor) throw new Error("Non-advancing schedule cursor");
       cursor = result.nextCursor;
       if (page === 9999) throw new Error("Scheduled batch traversal limit exceeded");
     }
-    console.info("Workspace scheduled automations:", { scanned, recordsChanged: changed });
+    console.info("Workspace scheduled automations:", { scanned, boardsUpdated, rulesExecuted, recordsChanged: changed, conflicted, durationMs: Date.now() - startedAt });
+    // CAS conflicts are expected during concurrent editing, but a full-run
+    // conflict report must be visible to monitoring and retried next tick.
+    if (conflicted > 0) console.warn("Workspace scheduled automations encountered CAS conflicts", { conflicted });
   } catch (error) {
     console.error("Scheduled automation run failed:", error);
     process.exitCode = 1;
