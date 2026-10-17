@@ -85,7 +85,8 @@ function validateParents(records: Array<Record<string, unknown>>): void {
 
 /** Validate JSON at the import boundary before it can replace an open board. */
 export function validateCollectionImport(value: unknown): CollectionBlockPayload {
-  if (!object(value) || value.version !== 1 || !text(value.title, 2000) ||
+  if (!object(value) || value.version !== 1 ||
+    (value.title !== undefined && !text(value.title, 2000)) ||
     !Array.isArray(value.fields) || value.fields.length < 1 || value.fields.length > MAX_FIELDS ||
     !Array.isArray(value.records) || value.records.length > MAX_RECORDS ||
     !Array.isArray(value.views) || value.views.length < 1 || value.views.length > MAX_VIEWS) {
@@ -94,7 +95,8 @@ export function validateCollectionImport(value: unknown): CollectionBlockPayload
   const fields = uniqueIds(value.fields, "field");
   const records = uniqueIds(value.records, "record");
   const views = uniqueIds(value.views, "view");
-  if (!id(value.activeViewId) || !views.has(value.activeViewId)) {
+  if (value.activeViewId !== undefined &&
+    (!id(value.activeViewId) || !views.has(value.activeViewId))) {
     throw new Error("Invalid Collection active view");
   }
   for (const field of value.fields as Array<Record<string, unknown>>) {
