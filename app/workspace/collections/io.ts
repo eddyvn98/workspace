@@ -3,6 +3,7 @@ import type { CanvasBlock } from "../types/block";
 import { createCollection, newId, normalizeCollection, type CollectionBlockPayload, type CollectionField, type CollectionRecord, type CollectionSources } from "./model";
 import { projectCollectionLookups } from "./collectionRelations";
 import { projectCollectionFormulas } from "./collectionFormula";
+import { validateCollectionImport } from "./collectionImportValidation";
 
 export function fromTableBlock(block: CanvasBlock<"table">): CollectionBlockPayload {
   const data = createCollection();
@@ -65,21 +66,7 @@ export function exportCollectionCsv(data: CollectionBlockPayload, sources: Colle
     })].join("\r\n");
 }
 export function importCollectionJson(text: string): CollectionBlockPayload {
-  const raw: unknown = JSON.parse(text);
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Invalid collection JSON");
-  const value = raw as Partial<CollectionBlockPayload>;
-  if (value.version !== 1 || !Array.isArray(value.fields) || !Array.isArray(value.records) || !Array.isArray(value.views)) {
-    throw new Error("Unsupported collection format");
-  }
-  if (value.fields.length > 100 || value.records.length > 5000 || value.views.length > 100) throw new Error("Collection exceeds import limits");
-  const fields = value.fields;
-  const records = value.records;
-  if (!fields.every((f) => f && typeof f.id === "string" && typeof f.name === "string" && typeof f.type === "string")
-    || !records.every((r) => r && typeof r.id === "string" && r.values && typeof r.values === "object"
-      && (r.body === undefined || (typeof r.body === "string" && r.body.length <= 20000)))) {
-    throw new Error("Invalid collection fields or records");
-  }
-  return normalizeCollection(value as CollectionBlockPayload);
+  return normalizeCollection(validateCollectionImport(JSON.parse(text) as unknown));
 }
 export function downloadCollection(filename: string, content: string, type: string): void {
   const objectUrl = URL.createObjectURL(new Blob([content], { type }));
