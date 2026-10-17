@@ -1,6 +1,6 @@
 import { createWorkspaceId } from "../utils/workspaceId";
 import { matchesViewFilters, type CollectionFilter, type FilterLogic } from "./collectionFilters";
-import { projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
+import { buildCollectionRelationIndex, projectCollectionLookups, removeInboundRelations } from "./collectionRelations";
 import { applyCollectionAutomations, sanitizeCollectionAutomations, type CollectionAutomation } from "./collectionAutomations";
 import type { CollectionAuditEntry } from "./collectionAudit";
 import { sanitizeCollectionSchedules, type CollectionScheduledRule } from "./collectionSchedules";
@@ -134,7 +134,9 @@ export function visibleRecords(data: CollectionBlockPayload, view: CollectionVie
   // Keep it in the saved view so users can complete it after reload.
   const filters = viewFilters(view);
   const sorts = viewSorts(view);
-  let rows = data.records.map(record => projectCollectionFormulas(data, projectCollectionLookups(data, record, sources)))
+  const index = data.fields.some(field => field.type === "lookup" || field.type === "rollup")
+    ? buildCollectionRelationIndex(data, sources) : undefined;
+  let rows = data.records.map(record => projectCollectionFormulas(data, projectCollectionLookups(data, record, sources, index)))
     .filter((r) => matchesViewFilters(r, data.fields, filters, view.filterLogic)
     && (!search || Object.values(r.values).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))));
   if (sorts.length) rows = [...rows].sort((a, b) => {
