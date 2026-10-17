@@ -28,4 +28,16 @@ describe("Collection Mind Map graph projection", () => {
     expect(graph.truncated).toBe(1);
     expect(rows).toHaveLength(201);
   });
+  it("pages through all records without silently dropping persistent parent links", () => {
+    const rows = Array.from({ length: 450 }, (_, i) => ({ id: "r" + i, values: {}, parentId: i ? "r" + (i - 1) : null }));
+    const page1 = layoutMindMap(rows, 200, 0);
+    const page3 = layoutMindMap(rows, 200, 400);
+    expect(page1.nodes).toHaveLength(200);
+    expect(page3.nodes.map(node => node.id)).toEqual(rows.slice(400).map(row => row.id));
+    expect(page3.nodes[0].parentId).toBeNull(); // parent is on a previous page
+    expect(rows[400].parentId).toBe("r399"); // model relation is unchanged
+    expect(page3.total).toBe(450);
+    expect(page3.offset).toBe(400);
+    expect(page3.truncated).toBe(400);
+  });
 });
