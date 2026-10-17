@@ -33,8 +33,7 @@ function accessErrorResponse(err: unknown) {
       { status: err.code === "FORBIDDEN" ? 403 : 404 },
     );
   }
-  const message = err instanceof Error ? err.message : String(err);
-  return NextResponse.json({ error: message }, { status: 500 });
+  return NextResponse.json({ error: "Workspace resource operation failed" }, { status: 500 });
 }
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
