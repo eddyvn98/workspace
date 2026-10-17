@@ -39,6 +39,15 @@ describe("Collection untrusted import integrity", () => {
     const records = [{ ...v.records[0], parentId: "b" }, v.records[1]];
     expect(() => importCollectionJson(JSON.stringify({ ...v, records }))).toThrow(/cycle/i);
   });
+  it("rejects cyclic or dangling Gantt dependencies before replacing Collection data", () => {
+    const v = valid();
+    expect(() => importCollectionJson(JSON.stringify({ ...v, records: [
+      { ...v.records[0], dependsOn: ["b"] }, { ...v.records[1], dependsOn: ["a"] },
+    ] }))).toThrow(/dependency cycle/i);
+    expect(() => importCollectionJson(JSON.stringify({ ...v, records: [
+      { ...v.records[0], dependsOn: ["missing"] }, v.records[1],
+    ] }))).toThrow(/dependency reference/i);
+  });
   it("never loops when reparenting older corrupted parent graphs", () => {
     const v = valid();
     const malformed = { ...v, records: [...v.records, { id: "c", values: {}, parentId: "d" },
