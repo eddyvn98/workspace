@@ -13,6 +13,15 @@ describe("Collection untrusted import integrity", () => {
     expect(actual.records.map(r => r.id)).toEqual(["a", "b"]);
     expect(actual.records[1].parentId).toBe("a");
   });
+  it("preserves compatibility with legacy imports lacking title and activeViewId", () => {
+    const { title: unusedTitle, activeViewId: unusedView, ...old } = valid();
+    const imported = importCollectionJson(JSON.stringify(old));
+    expect(imported.title).toBe("Untitled collection");
+    expect(imported.activeViewId).toBe(imported.views[0].id);
+    expect(imported.records.map(row => row.id)).toEqual(["a", "b"]);
+    void unusedTitle;
+    void unusedView;
+  });
   it("rejects duplicate record, field or view IDs", () => {
     const v = valid();
     expect(() => importCollectionJson(JSON.stringify({ ...v, records: [v.records[0], v.records[0]] }))).toThrow(/duplicate/i);
