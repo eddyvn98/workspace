@@ -32,8 +32,7 @@ function accessErrorResponse(err: unknown) {
   if (err instanceof WorkspaceResourceInUseError) {
     return NextResponse.json({ error: err.message, code: "RESOURCE_IN_USE" }, { status: 409 });
   }
-  const message = err instanceof Error ? err.message : String(err);
-  return NextResponse.json({ error: message }, { status: 500 });
+  return NextResponse.json({ error: "Workspace resource operation failed" }, { status: 500 });
 }
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
