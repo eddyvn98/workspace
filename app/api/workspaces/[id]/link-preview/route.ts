@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     if (err instanceof WorkspaceAccessError) {
       return NextResponse.json({ error: err.message }, { status: err.code === "FORBIDDEN" ? 403 : 404 });
     }
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: "Workspace access verification unavailable" }, { status: 500 });
   }
 
   const preview = await fetchLinkPreview(url);
