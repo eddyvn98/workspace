@@ -1,5 +1,6 @@
 "use client";
 import { getKnownRevision, rememberRevision } from "./workspaceBoardApi";
+import { useCollectionRevisionWatch } from "./useCollectionRevisionWatch";
 
 import { boardMetadata } from "@/lib/workspace/boardMetadata";
 import { normalizeTreeLayoutFields } from "../utils/normalizeTreeLayoutFields";
@@ -73,6 +74,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   // Collection records require REST CAS + per-record 3-way merge. The current
   // room protocol stores whole blocks and can lose concurrent record writes.
   const hasCollection = useWorkspaceStore((state) => Object.values(state.blocks).some((b) => b.type === "collection"));
+  useCollectionRevisionWatch(remoteBoardId ?? boardId, enabled && hasCollection, false);
   const [live, setLive] = useState(false);
   const [peers, setPeers] = useState<WorkspacePeer[]>([]);
   const handleRef = useRef<WorkspaceLiveHandle | null>(null);
