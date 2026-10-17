@@ -38,3 +38,37 @@ test("compound Collection filters, OR/AND, persistence and read-only controls", 
   await expect(reopened.getByRole("combobox", { name: "Filter logic" })).toBeDisabled();
   await expect(reopened.getByRole("combobox", { name: "Filter operator 1" })).toBeDisabled();
 });
+
+test("Timeline bounds 501 scheduled rows to a navigable 100-row slice", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
+  const block = page.getByTestId("collection-block");
+  const fixture = {
+    version: 1, title: "Large timeline",
+    fields: [{ id: "name", name: "Name", type: "text" }, { id: "date", name: "Start", type: "date" }],
+    records: Array.from({ length: 501 }, (_, i) => ({
+      id: "task-" + i, values: { name: "Task " + i, date: "2026-10-17" },
+    })),
+    views: [{ id: "timeline", name: "Timeline", kind: "timeline", dateFieldId: "date" }],
+    activeViewId: "timeline",
+  };
+  page.once("dialog", dialog => { void dialog.accept(); });
+  await block.locator('input[type="file"]').setInputFiles({
+    name: "timeline-501.json", mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(fixture)),
+  });
+  const rows = block.getByTestId("collection-timeline-row");
+  await expect(rows).toHaveCount(100);
+  await expect(block.getByTestId("collection-timeline-page-number")).toHaveText("Page 1 of 6");
+  await block.getByRole("button", { name: "Next timeline page" }).click();
+  await expect(rows).toHaveCount(100);
+  await expect(rows.first()).toHaveAttribute("data-record-id", "task-100");
+  for (let i = 0; i < 4; i++) {
+    await block.getByRole("button", { name: "Next timeline page" }).click();
+  }
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute("data-record-id", "task-500");
+  await expect(block.getByTestId("collection-timeline-edit")).toHaveCount(1);
+});
