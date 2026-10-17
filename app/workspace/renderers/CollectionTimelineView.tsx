@@ -6,6 +6,7 @@ import { FieldEditor, btnClass, hintClass } from "./CollectionFieldEditor";
 import { addUtcDays, timelineLayout } from "./collectionTimelineDates";
 import { parseCalendarDay } from "./collectionCalendarDates";
 import { CollectionGanttBar } from "./CollectionGanttBar";
+import { collectionTablePage } from "./collectionTablePaging";
 import { longestCollectionDependencyChain, scheduleCollectionDependencies, setCollectionDependencies } from "../collections/collectionDependencies";
 
 interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; start?: CollectionField;
@@ -14,11 +15,14 @@ interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; start?
 const CELL = 26;
 export function TimelineView({ rows, data, start, end, readOnly, onChange, patch }: Props) {
   const [scale, setScale] = useState<"day" | "week">("day");
+  const [requestedPage, setRequestedPage] = useState(0);
   const [highlightChain, setHighlightChain] = useState(false);
   const longest = useMemo(() => longestCollectionDependencyChain(data, start?.id, end?.id),
     [data, start?.id, end?.id]);
   const highlightedIds = new Set(highlightChain ? longest.ids : []);
   const view = useMemo(() => timelineLayout(rows, start?.id, end?.id), [rows, start?.id, end?.id]);
+  const page = useMemo(() => collectionTablePage(view.entries, requestedPage, 100),
+    [view.entries, requestedPage]);
   const span = view.days * CELL;
   const changeDates = (record: CollectionRecord, amount: number) => {
     if (!start || readOnly) return;
@@ -60,6 +64,17 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
       {view.undated > 0 && <span className={hintClass}>{view.undated} undated records (edit in Table)</span>}
       {view.beyondWindow > 0 && <span className={hintClass}>Showing first 180 days; {view.beyondWindow} records outside window</span>}
     </div>
+    <nav aria-label="Collection Timeline pagination" className="flex flex-wrap items-center gap-2">
+      <span data-testid="collection-timeline-page-summary">
+        {page.total ? page.start + 1 : 0}–{page.end} of {page.total} scheduled records
+      </span>
+      <button type="button" className={btnClass} aria-label="Previous timeline page"
+        disabled={page.pageIndex === 0} onClick={() => setRequestedPage(page.pageIndex - 1)}>Previous</button>
+      <span data-testid="collection-timeline-page-number">Page {page.pageIndex + 1} of {page.pageCount}</span>
+      <button type="button" className={btnClass} aria-label="Next timeline page"
+        disabled={page.pageIndex >= page.pageCount - 1}
+        onClick={() => setRequestedPage(page.pageIndex + 1)}>Next</button>
+    </nav>
     <div className="max-w-full overflow-x-auto rounded border" data-testid="collection-timeline-scroll">
       <div style={{ minWidth: 150 + span }}>
         <div className="flex border-b bg-slate-100 dark:bg-slate-900">
@@ -77,7 +92,7 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
             })}
           </div>
         </div>
-        {view.entries.map(({ record, startOffset, length }) =>
+        {page.rows.map(({ record, startOffset, length }) =>
           <div className="flex min-h-12 items-center border-b" key={record.id}
             data-testid="collection-timeline-row" data-record-id={record.id}>
             <div className="w-[150px] shrink-0 truncate border-r p-1" title={recordTitle(data, record)}>
@@ -95,7 +110,7 @@ export function TimelineView({ rows, data, start, end, readOnly, onChange, patch
       </div>
     </div>
     <div className="space-y-2">
-      {view.entries.map(({ record }) => <div key={record.id}
+      {page.rows.map(({ record }) => <div key={record.id}
         className="flex flex-wrap items-center gap-2 border-b py-1" data-testid="collection-timeline-edit">
         <strong className="w-28 truncate">{recordTitle(data, record)}</strong>
         {start && <FieldEditor field={start} value={record.values[start.id] ?? ""}
