@@ -68,6 +68,32 @@ function validateViews(rows: unknown[], fields: Set<string>): void {
   }
 }
 
+function validateDependencies(records: Array<Record<string, unknown>>, ids: Set<string>): void {
+  const edges = new Map<string, string[]>();
+  for (const row of records) {
+    const deps = row.dependsOn ?? [];
+    if (!stringList(deps, 20) || new Set(deps).size !== deps.length ||
+      deps.some(dep => !ids.has(dep) || dep === row.id)) {
+      throw new Error("Invalid Collection dependency reference");
+    }
+    edges.set(row.id as string, deps);
+  }
+  // Iterative DFS handles long imported chains without recursion overflow.
+  const state = new Map<string, 1 | 2>();
+  for (const root of ids) {
+    const stack: Array<{ id: string; exit: boolean }> = [{ id: root, exit: false }];
+    while (stack.length) {
+      const item = stack.pop()!;
+      if (item.exit) { state.set(item.id, 2); continue; }
+      if (state.get(item.id) === 2) continue;
+      if (state.get(item.id) === 1) throw new Error("Collection dependency cycle detected");
+      state.set(item.id, 1);
+      stack.push({ id: item.id, exit: true });
+      for (const dep of edges.get(item.id) ?? []) stack.push({ id: dep, exit: false });
+    }
+  }
+}
+
 function validateParents(records: Array<Record<string, unknown>>): void {
   const parent = new Map(records.map(row => [row.id as string, row.parentId]));
   const checked = new Set<string>();
@@ -112,11 +138,12 @@ export function validateCollectionImport(value: unknown): CollectionBlockPayload
       !fields.has(field) || !text(val, MAX_VALUE)) ||
       (row.body !== undefined && !text(row.body, MAX_VALUE)) ||
       (row.parentId !== undefined && row.parentId !== null && !id(row.parentId)) ||
-      (row.dependsOn !== undefined && !stringList(row.dependsOn, MAX_RECORDS))) {
+      (row.dependsOn !== undefined && !stringList(row.dependsOn, 20))) {
       throw new Error("Invalid Collection record values");
     }
   }
   validateParents(rows);
+  validateDependencies(rows, records);
   validateViews(value.views, fields);
   return value as unknown as CollectionBlockPayload;
 }
