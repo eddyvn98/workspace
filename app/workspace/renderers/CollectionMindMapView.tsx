@@ -12,7 +12,11 @@ interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; readOn
 
 export function MindMapView({ rows, data, readOnly, onChange }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const graph = useMemo(() => layoutMindMap(rows), [rows]);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 200;
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const graph = useMemo(() => layoutMindMap(rows, PAGE_SIZE, currentPage * PAGE_SIZE), [rows, currentPage]);
   const labels = useMemo(() => new Map(rows.map(record => [record.id, recordTitle(data, record)])), [rows, data]);
   const nodes = useMemo<Node[]>(() => graph.nodes.map(item => ({
     id: item.id, position: { x: item.x, y: item.y },
@@ -24,8 +28,13 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
     id: link.source + ">" + link.target, source: link.source, target: link.target,
     type: "smoothstep", animated: false,
   })), [graph]);
-  const selected = rows.find(item => item.id === selectedId) ?? rows[0];
-  const parentChoice = selected?.parentId && graph.nodes.some(item => item.id === selected.parentId)
+  const selected = rows.find(item => item.id === selectedId) ?? rows[currentPage * PAGE_SIZE];
+  const selectRecord = (id: string) => {
+    setSelectedId(id);
+    const index = rows.findIndex(row => row.id === id);
+    if (index >= 0) setPage(Math.floor(index / PAGE_SIZE));
+  };
+  const parentChoice = selected?.parentId && rows.some(item => item.id === selected.parentId)
     ? selected.parentId : "";
   const dropParent = (movedId: string, x: number, y: number) => {
     if (readOnly) return;
@@ -41,11 +50,13 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
     <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs">
       <span className={hintClass}>Drag background to pan, scroll to zoom, or drop a node near another node to change its parent.</span>
       <select aria-label="Mind Map selected record" className={inputClass} value={selected?.id ?? ""}
-        onChange={event => setSelectedId(event.target.value)}>
-        {graph.nodes.map(node => <option key={node.id} value={node.id}>{labels.get(node.id) ?? "Untitled"}</option>)}
+        onChange={event => selectRecord(event.target.value)}>
+        {rows.map(row => <option key={row.id} value={row.id}>{labels.get(row.id) ?? "Untitled"}</option>)}
       </select>
-      {graph.truncated > 0 && <span className="text-amber-600">
-        Displaying first 200 records; {graph.truncated} not drawn
+      {pageCount > 1 && <span className="flex items-center gap-1" aria-label="Mind Map pages">
+        <button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</button>
+        <span>Page {currentPage + 1} of {pageCount} ({rows.length} records)</span>
+        <button type="button" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>Next</button>
       </span>}
       {selected && <label>Parent of {recordTitle(data, selected)}
         <select aria-label={"Parent of " + recordTitle(data, selected)}
@@ -56,16 +67,17 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
             if (next !== data) onChange(next);
           }}>
           <option value="">Root</option>
-          {graph.nodes.filter(item => item.id !== selected.id).map(item =>
+          {rows.filter(item => item.id !== selected.id).map(item =>
             <option key={item.id} value={item.id}>{labels.get(item.id) ?? "Untitled"}</option>)}
         </select>
       </label>}
     </div>
+    {selected?.parentId && !graph.nodes.some(node => node.id === selected.parentId) && <span className={hintClass}>Parent is outside this page; the saved relationship is unchanged.</span>}
     <div className="min-h-[380px] flex-1 overflow-hidden rounded border" data-testid="collection-mindmap-graph">
       <ReactFlow nodes={nodes} edges={edges} fitView minZoom={0.15} maxZoom={2}
         nodesDraggable={!readOnly} nodesConnectable={false} selectNodesOnDrag={false}
         onNodeDragStop={(_event, node) => dropParent(node.id, node.position.x, node.position.y)}
-        onNodeClick={(_event, node) => setSelectedId(node.id)}
+        onNodeClick={(_event, node) => selectRecord(node.id)}
         proOptions={{ hideAttribution: true }}>
         <Background />
         <Controls showInteractive={false} />
