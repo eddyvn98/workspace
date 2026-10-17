@@ -33,26 +33,26 @@ function validateViews(rows: unknown[], fields: Set<string>): void {
     for (const key of ["groupFieldId", "dateFieldId", "endDateFieldId"]) {
       if (item[key] !== undefined && !id(item[key])) throw new Error("Invalid Collection view field");
     }
+    if (item.filters !== undefined && (!Array.isArray(item.filters) || item.filters.length > 50)) {
+      throw new Error("Invalid Collection filters");
+    }
     const checks = [
       ...(item.filter === undefined ? [] : [item.filter]),
       ...(item.filters === undefined ? [] : item.filters as unknown[]),
     ];
-    if (item.filters !== undefined && (!Array.isArray(item.filters) || item.filters.length > 50)) {
-      throw new Error("Invalid Collection filters");
-    }
     for (const condition of checks) {
       if (!object(condition) || !id(condition.fieldId) ||
         !fields.has(condition.fieldId) || !text(condition.value, MAX_VALUE)) {
         throw new Error("Invalid Collection filter");
       }
     }
+    if (item.sorts !== undefined && (!Array.isArray(item.sorts) || item.sorts.length > MAX_FIELDS)) {
+      throw new Error("Invalid Collection sort list");
+    }
     const sorts = [
       ...(item.sort === undefined ? [] : [item.sort]),
       ...(item.sorts === undefined ? [] : item.sorts as unknown[]),
     ];
-    if (item.sorts !== undefined && (!Array.isArray(item.sorts) || item.sorts.length > MAX_FIELDS)) {
-      throw new Error("Invalid Collection sort list");
-    }
     for (const sort of sorts) {
       if (!object(sort) || !id(sort.fieldId) || !fields.has(sort.fieldId) ||
         (sort.direction !== "asc" && sort.direction !== "desc")) {
