@@ -3,6 +3,7 @@ import type { CanvasBlock } from "../types/block";
 import { createCollection, newId, normalizeCollection, type CollectionBlockPayload, type CollectionField, type CollectionRecord, type CollectionSources } from "./model";
 import { projectCollectionLookups } from "./collectionRelations";
 import { projectCollectionFormulas } from "./collectionFormula";
+import { validateCollectionImport } from "./collectionImportValidation";
 
 export function fromTableBlock(block: CanvasBlock<"table">): CollectionBlockPayload {
   const data = createCollection();
@@ -42,7 +43,9 @@ export function fromTableBlock(block: CanvasBlock<"table">): CollectionBlockPayl
 export function importCollectionCsv(text: string): CollectionBlockPayload {
   const parsed = Papa.parse<string[]>(text.replace(/^\uFEFF/, ""), { delimiter: ",", skipEmptyLines: "greedy" });
   if (parsed.errors.length) throw new Error("Invalid CSV: " + parsed.errors[0].message);
-  const rows = (parsed.data ?? []).slice(0, 5001);
+  if ((parsed.data ?? []).length > 5001) throw new Error("CSV import exceeds 5000-record limit");
+  if ((parsed.data?.[0]?.length ?? 0) > 50) throw new Error("CSV import exceeds 50-field limit");
+  const rows = parsed.data ?? [];
   if (!rows.length || !rows[0].length) throw new Error("CSV is empty");
   const header = rows[0].slice(0, 50);
   const fields: CollectionField[] = header.map((name, i) => ({ id: newId(), name: String(name).trim() || "Column " + (i + 1), type: "text" }));
@@ -65,21 +68,7 @@ export function exportCollectionCsv(data: CollectionBlockPayload, sources: Colle
     })].join("\r\n");
 }
 export function importCollectionJson(text: string): CollectionBlockPayload {
-  const raw: unknown = JSON.parse(text);
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Invalid collection JSON");
-  const value = raw as Partial<CollectionBlockPayload>;
-  if (value.version !== 1 || !Array.isArray(value.fields) || !Array.isArray(value.records) || !Array.isArray(value.views)) {
-    throw new Error("Unsupported collection format");
-  }
-  if (value.fields.length > 100 || value.records.length > 5000 || value.views.length > 100) throw new Error("Collection exceeds import limits");
-  const fields = value.fields;
-  const records = value.records;
-  if (!fields.every((f) => f && typeof f.id === "string" && typeof f.name === "string" && typeof f.type === "string")
-    || !records.every((r) => r && typeof r.id === "string" && r.values && typeof r.values === "object"
-      && (r.body === undefined || (typeof r.body === "string" && r.body.length <= 20000)))) {
-    throw new Error("Invalid collection fields or records");
-  }
-  return normalizeCollection(value as CollectionBlockPayload);
+  return normalizeCollection(validateCollectionImport(JSON.parse(text) as unknown));
 }
 export function downloadCollection(filename: string, content: string, type: string): void {
   const objectUrl = URL.createObjectURL(new Blob([content], { type }));

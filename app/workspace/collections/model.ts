@@ -231,6 +231,11 @@ export function setParent(data: CollectionBlockPayload, recordId: string, parent
   if (parentId === recordId || (parentId && !data.records.some((r) => r.id === parentId))) return data;
   const parents = new Map(data.records.map((r) => [r.id, r.parentId]));
   let cursor: string | null | undefined = parentId;
-  while (cursor) { if (cursor === recordId) return data; cursor = parents.get(cursor); }
+  const visited = new Set<string>();
+  while (cursor) {
+    if (cursor === recordId || visited.has(cursor)) return data;
+    visited.add(cursor);
+    cursor = parents.get(cursor);
+  }
   return { ...data, records: data.records.map((r) => r.id === recordId ? { ...r, parentId } : r) };
 }
