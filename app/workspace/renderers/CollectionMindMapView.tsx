@@ -5,6 +5,7 @@ import "@xyflow/react/dist/style.css";
 import type { CollectionBlockPayload, CollectionRecord } from "../collections/model";
 import { recordTitle, setParent } from "../collections/model";
 import { layoutMindMap } from "./collectionMindMapLayout";
+import { visibleMindMapSelection } from "./collectionMindMapSelection";
 import { hintClass, inputClass } from "./CollectionFieldEditor";
 
 interface Props { rows: CollectionRecord[]; data: CollectionBlockPayload; readOnly: boolean;
@@ -28,7 +29,7 @@ export function MindMapView({ rows, data, readOnly, onChange }: Props) {
     id: link.source + ">" + link.target, source: link.source, target: link.target,
     type: "smoothstep", animated: false,
   })), [graph]);
-  const selected = rows.find(item => item.id === selectedId) ?? rows[currentPage * PAGE_SIZE];
+  const selected = visibleMindMapSelection(rows, selectedId, currentPage, PAGE_SIZE);
   const selectRecord = (id: string) => {
     setSelectedId(id);
     const index = rows.findIndex(row => row.id === id);
