@@ -30,6 +30,8 @@ interface WorkspaceChatInputProps {
   isBoardLoading?: boolean;
 }
 
+const CHAT_HIDDEN_GROUP_IDS = ["google"] as const;
+
 export function WorkspaceChatInput({
   draft,
   setDraft,
@@ -77,11 +79,19 @@ export function WorkspaceChatInput({
     }
   };
 
+  const adjustHeight = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    const nextHeight = Math.min(el.scrollHeight, 180);
+    el.style.height = `${nextHeight}px`;
+  };
+
   useEffect(() => {
     const textarea = inputRef.current;
     if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    if (!draft || textarea.value !== draft) {
+      adjustHeight(textarea);
+    }
   }, [draft, inputRef]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -193,11 +203,14 @@ export function WorkspaceChatInput({
         <textarea
           ref={inputRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            adjustHeight(e.target);
+            setDraft(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={isSending ? "AI is replying... (Enter to queue, ⌘/Ctrl+Enter to send now)" : placeholder}
           rows={1}
-          className="min-h-[24px] w-full resize-none border-none bg-transparent p-1 text-xs text-slate-800 placeholder:text-slate-400 shadow-none outline-none select-text focus:outline-none focus:ring-0 focus-visible:ring-0 dark:text-slate-200 dark:placeholder:text-slate-500"
+          className="min-h-[24px] max-h-[180px] w-full resize-none border-none bg-transparent p-1 text-xs text-slate-800 placeholder:text-slate-400 shadow-none outline-none select-text focus:outline-none focus:ring-0 focus-visible:ring-0 [field-sizing:content] dark:text-slate-200 dark:placeholder:text-slate-500"
         />
 
         {/* 3. Bottom Bar Toolbar */}
@@ -224,7 +237,7 @@ export function WorkspaceChatInput({
             <div className="origin-left scale-90">
               <AIActionLauncher
                 variant="ghost"
-                hiddenGroupIds={["google"]}
+                hiddenGroupIds={CHAT_HIDDEN_GROUP_IDS}
                 visibleModelIds={WORKSPACE_DIFY_VISIBLE_MODEL_IDS}
                 compact
                 showCapabilities={false}
