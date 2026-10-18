@@ -11,7 +11,7 @@ import { normalizeCollection, type CollectionSources } from "@/app/workspace/col
 import { CollectionSurface } from "@/app/workspace/renderers/CollectionSurface";
 import { fetchRemoteBoard } from "@/app/workspace/hooks/workspaceBoardApi";
 
-function LoadedCollection({ boardId, blockId }: { boardId: string; blockId: string }) {
+function LoadedCollection({ boardId, blockId, viewer }: { boardId: string; blockId: string; viewer: boolean }) {
   const persistence = useWorkspacePersistence(boardId);
   useWorkspaceExternalSync(boardId, { live: false, hasUnsavedLocalChanges: persistence.isSavePending });
   useBoardViewerRole(boardId);
@@ -34,16 +34,17 @@ function LoadedCollection({ boardId, blockId }: { boardId: string; blockId: stri
     {persistence.loadError ? <p className="p-6" role="alert">This Workspace is unavailable or access was denied.</p> : null}
     {persistence.isBoardReady && !persistence.loadError && !data ? <p className="p-6" role="alert">Collection not found. It may have been deleted from Workspace.</p> : null}
     {persistence.isBoardReady && !persistence.loadError && data &&
-      <div className="min-h-0 flex-1"><CollectionSurface standalone blockId={blockId} data={data} sources={sources} readOnly={readOnly || Boolean(block?.style?.isLocked)} revisionNotice={revisionNotice} onChange={next => update(blockId, { data: next })} /></div>}
+      <div className="min-h-0 flex-1"><CollectionSurface standalone blockId={blockId} data={data} sources={sources} readOnly={viewer || readOnly || Boolean(block?.style?.isLocked)} revisionNotice={revisionNotice} onChange={next => update(blockId, { data: next })} /></div>}
   </div>;
 }
 
 export default function CollectionAppClient({ boardId, blockId }: { boardId: string; blockId: string }) {
   const [authorized, setAuthorized] = useState(false);
+  const [viewer, setViewer] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    setAuthorized(false); setError("");
+    setAuthorized(false); setViewer(true); setError("");
     void fetchRemoteBoard(boardId).then(board => {
       if (!active) return;
       if (!board) { setError("Collection unavailable or access denied"); return; }
@@ -51,6 +52,7 @@ export default function CollectionAppClient({ boardId, blockId }: { boardId: str
       const item = blocks && typeof blocks === "object" && !Array.isArray(blocks)
         ? (blocks as Record<string, { type?: string }>)[blockId] : null;
       if (item?.type !== "collection") { setError("Collection not found"); return; }
+      setViewer(board.viewerRole === "VIEWER");
       setAuthorized(true);
     });
     return () => { active = false; };
@@ -59,7 +61,7 @@ export default function CollectionAppClient({ boardId, blockId }: { boardId: str
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {error && <p className="p-6" role="alert">{error} <Link href="/collections" className="text-blue-600 underline">Browse Collections</Link></p>}
       {!authorized && !error && <p className="p-6" role="status">Checking Collection access...</p>}
-      {authorized && <LoadedCollection key={boardId} boardId={boardId} blockId={blockId} />}
+      {authorized && <LoadedCollection key={boardId} boardId={boardId} blockId={blockId} viewer={viewer} />}
     </main>
   </ProtectedRoute>;
 }
