@@ -4,7 +4,7 @@ import Link from "next/link";
 import ProtectedRoute from "@/components/features/auth/protected-route";
 import type { CollectionAppSummary } from "@/app/workspace/collections/collectionAppListing";
 
-export default function CollectionsClient() {
+export default function CollectionsClient({ devBypass }: { devBypass: boolean }) {
   const [items, setItems] = useState<CollectionAppSummary[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export default function CollectionsClient() {
     return () => { active = false; document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
-  return <ProtectedRoute devBypass={process.env.NODE_ENV !== "production" && Boolean(process.env.NEXT_PUBLIC_WORKSPACE_DEV_USER_EMAIL)}>
+  return <ProtectedRoute devBypass={devBypass}>
     <main className="min-h-full bg-slate-50 p-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100 sm:p-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
