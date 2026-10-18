@@ -17,6 +17,8 @@ export interface WorkspaceSpreadsheetEditorProps {
   onChange: (patch: Partial<TableBlockPayload>) => void;
   onClose: () => void;
   standalone?: boolean;
+  fillParent?: boolean;
+  hideHeader?: boolean;
   boardTitle?: string;
   allowEdit?: boolean;
   assistant?: React.ReactNode;
@@ -27,6 +29,8 @@ export function WorkspaceSpreadsheetEditor({
   onChange,
   onClose,
   standalone = false,
+  fillParent = false,
+  hideHeader = false,
   boardTitle,
   allowEdit = true,
   assistant,
@@ -163,10 +167,10 @@ export function WorkspaceSpreadsheetEditor({
   const editor = (
     <section
       className={standalone
-        ? "flex h-screen w-screen min-w-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-900"
+        ? (fillParent ? "flex h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-900" : "flex h-screen w-screen min-w-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-900")
         : "flex h-[min(820px,calc(100vh-32px))] w-[min(1280px,calc(100vw-32px))] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"}
     >
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-700 dark:bg-slate-900">
+      {!hideHeader && <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex min-w-0 items-center gap-3">
           {standalone && (
             <button type="button" onClick={onClose} aria-label="Back to workspace" title="Back to workspace" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100">
@@ -183,7 +187,7 @@ export function WorkspaceSpreadsheetEditor({
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
-      </header>
+      </header>}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className={standalone ? "min-h-0 min-w-0 flex-1 p-3" : "min-h-0 min-w-0 flex-1 p-2"}>
           <div className="h-full w-full overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
