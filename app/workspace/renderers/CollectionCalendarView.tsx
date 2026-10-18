@@ -19,6 +19,8 @@ export function CalendarView({ month, setMonth, rows, data, field, readOnly, pat
   const [mode, setMode] = useState<CalendarMode>("month");
   const [anchor, setAnchor] = useState(() => month + "-01");
   const mobileDefaulted = useRef(false);
+  const [expandedDays, setExpandedDays] = useState<string[]>([]);
+  const MAX_DAY_CARDS = 20;
   useEffect(() => {
     if (mobileDefaulted.current || !window.matchMedia("(max-width: 640px)").matches) return;
     const firstScheduledDate = field && rows.map(record => record.values[field.id] ?? "")
@@ -71,7 +73,9 @@ export function CalendarView({ month, setMonth, rows, data, field, readOnly, pat
       {mode !== "day" && ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(label =>
         <strong key={label} className="text-center">{label}</strong>)}
       {days.map(day => {
-        const matches = byDate.get(day) ?? [];
+        const allMatches = byDate.get(day) ?? [];
+        const expanded = expandedDays.includes(day);
+        const matches = expanded ? allMatches : allMatches.slice(0, MAX_DAY_CARDS);
         const outside = mode === "month" && !day.startsWith(anchor.slice(0, 7));
         return <section key={day} data-testid="collection-calendar-day" data-date={day}
           aria-label={"Date " + day}
@@ -80,6 +84,12 @@ export function CalendarView({ month, setMonth, rows, data, field, readOnly, pat
           onDrop={event => onDrop(event, day)}>
           <button type="button" className="text-slate-500 underline" aria-label={"Select " + day}
             onClick={() => navigate(day)}>{day.slice(8)}</button>
+          {allMatches.length > MAX_DAY_CARDS && <button type="button"
+            aria-label={(expanded ? "Show fewer" : "Show all") + " records for " + day}
+            className={btnClass} onClick={() => setExpandedDays(current => expanded
+              ? current.filter(value => value !== day) : [...current, day])}>
+            {expanded ? "Show fewer" : "Show all " + allMatches.length + " records"}
+          </button>}
           {matches.map(record => <div key={record.id} data-record-id={record.id}
             className="mt-1 space-y-1 overflow-hidden rounded bg-blue-100 p-1 text-blue-900"
             draggable={!readOnly && !!field}
