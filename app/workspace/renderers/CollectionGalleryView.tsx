@@ -4,14 +4,16 @@ import { recordTitle, type CollectionBlockPayload, type CollectionField, type Co
   type CollectionView, type CollectionSources } from "../collections/model";
 import { btnClass, FieldEditor } from "./CollectionFieldEditor";
 import { CollectionRecordDetails } from "./CollectionRecordDetails";
+import { collectionTablePage } from "./collectionTablePaging";
 interface Props { data: CollectionBlockPayload; sources?: CollectionSources;
   view: CollectionView; rows: CollectionRecord[];
   titleField?: CollectionField; readOnly: boolean;
   patch: (record: CollectionRecord, field: CollectionField, value: string) => void;
   onChange: (data: CollectionBlockPayload) => void; }
-const PAGE = 24;
+const PAGE = 25;
 export function CollectionGalleryView({ data, sources, view, rows, titleField, readOnly, patch, onChange }: Props) {
-  const [limit, setLimit] = useState(PAGE);
+  const [requestedPage, setRequestedPage] = useState(0);
+  const page = collectionTablePage(rows, requestedPage, PAGE);
   const [openRecordId, setOpenRecordId] = useState<string | null>(null);
   const eligible = data.fields.filter(field => field.id !== titleField?.id && field.type !== "image");
   const fieldIds = view.galleryFieldIds ?? eligible.slice(0, 3).map(field => field.id);
@@ -19,7 +21,7 @@ export function CollectionGalleryView({ data, sources, view, rows, titleField, r
   const image = data.fields.find(field => field.type === "image");
   return <div className="space-y-3" data-testid="collection-gallery">
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {rows.slice(0, limit).map(record => {
+      {page.rows.map(record => {
         const url = image ? record.values[image.id] : undefined;
         return <article key={record.id} className="group min-w-0 overflow-hidden rounded-md transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
           data-testid="collection-gallery-card" data-record-id={record.id}>
@@ -43,7 +45,14 @@ export function CollectionGalleryView({ data, sources, view, rows, titleField, r
     </div>
     {openRecordId && <CollectionRecordDetails data={data} sources={sources} recordId={openRecordId}
       readOnly={readOnly} onChange={onChange} onClose={() => setOpenRecordId(null)} />}
-    {rows.length > limit && <button type="button" className={btnClass}
-      onClick={() => setLimit(current => current + PAGE)}>Show more cards ({rows.length - limit} remaining)</button>}
+    <nav aria-label="Collection Gallery pagination" className="flex flex-wrap items-center gap-2 text-xs">
+      <span data-testid="collection-gallery-page-summary">{page.total ? page.start + 1 : 0}–{page.end} of {page.total} cards</span>
+      <button type="button" className={btnClass} aria-label="Previous gallery page" disabled={page.pageIndex === 0}
+        onClick={() => setRequestedPage(page.pageIndex - 1)}>Previous</button>
+      <span data-testid="collection-gallery-page-number">Page {page.pageIndex + 1} of {page.pageCount}</span>
+      <button type="button" className={btnClass} aria-label="Next gallery page"
+        disabled={page.pageIndex >= page.pageCount - 1}
+        onClick={() => setRequestedPage(page.pageIndex + 1)}>Next</button>
+    </nav>
   </div>;
 }
