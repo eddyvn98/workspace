@@ -38,7 +38,7 @@ function LoadedCollection({ boardId, blockId, viewer }: { boardId: string; block
   </div>;
 }
 
-export default function CollectionAppClient({ boardId, blockId }: { boardId: string; blockId: string }) {
+export default function CollectionAppClient({ boardId, blockId, devBypass }: { boardId: string; blockId: string; devBypass: boolean }) {
   const [authorized, setAuthorized] = useState(false);
   const [viewer, setViewer] = useState(true);
   const [error, setError] = useState("");
@@ -57,7 +57,7 @@ export default function CollectionAppClient({ boardId, blockId }: { boardId: str
     });
     return () => { active = false; };
   }, [boardId, blockId]);
-  return <ProtectedRoute devBypass={process.env.NODE_ENV !== "production" && Boolean(process.env.NEXT_PUBLIC_WORKSPACE_DEV_USER_EMAIL)}>
+  return <ProtectedRoute devBypass={devBypass}>
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {error && <p className="p-6" role="alert">{error} <Link href="/collections" className="text-blue-600 underline">Browse Collections</Link></p>}
       {!authorized && !error && <p className="p-6" role="status">Checking Collection access...</p>}
