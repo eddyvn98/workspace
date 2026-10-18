@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createOfficeBlock } from "@/lib/office/factory";
-import { listOfficeFilesFromBoard, officeEditorUrl, officeKindOfBlock } from "@/lib/office/catalog";
+import { listOfficeFilesFromBoard, officeEditorUrl, officeKindOfBlock, officeFileAccess } from "@/lib/office/catalog";
 
 describe("Office blocks share the Workspace persistence contract", () => {
   it.each(["document", "spreadsheet", "presentation"] as const)(
@@ -44,6 +44,17 @@ describe("Office blocks share the Workspace persistence contract", () => {
     expect(files).toHaveLength(1);
     expect(files[0].title).toBe("Specification");
     expect(officeKindOfBlock({ type: "table", embeddedInDocId: "a" })).toBe(null);
+  });
+
+  it("fails closed for missing role, mismatched blocks and only permits viewer reads", () => {
+    const board = { viewerRole: "VIEWER", blocks: { doc1: { id: "doc1", type: "doc" } } };
+    expect(officeFileAccess(null, "document", "doc1").authorized).toBe(false);
+    expect(officeFileAccess({ ...board, viewerRole: undefined }, "document", "doc1").authorized).toBe(false);
+    expect(officeFileAccess(board, "spreadsheet", "doc1").authorized).toBe(false);
+    expect(officeFileAccess(board, "document", "missing").authorized).toBe(false);
+    expect(officeFileAccess(board, "document", "doc1")).toEqual({ authorized: true, viewer: true });
+    expect(officeFileAccess({ ...board, viewerRole: "EDITOR" }, "document", "doc1"))
+      .toEqual({ authorized: true, viewer: false });
   });
 
   it("builds an encoded deep link to the same board/block", () => {
