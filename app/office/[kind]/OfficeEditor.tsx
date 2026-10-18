@@ -73,14 +73,14 @@ function Content({ kind }: { kind: OfficeKind }) {
       </div>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className="min-h-0 min-w-0 flex-1 overflow-auto p-5"><div className="mx-auto min-h-full max-w-3xl bg-white shadow-sm dark:bg-slate-900">
-          <WorkspaceDocRichEditor blockId={blockId} html={block.data.html || ""} isEditing={!readOnly}
+          <WorkspaceDocRichEditor blockId={blockId} html={(block as CanvasBlock<"doc">).data.html || ""} isEditing={!readOnly}
             onChange={html => changeData({ html })} onStopEditing={() => {}} />
         </div></div>
         <WorkspaceBlockAiPanel boardId={boardId} blockId={blockId} blockType="doc" />
       </div>
     </div>}
     {kind === "spreadsheet" && block.type === "table" && <div className="min-h-0 flex-1">
-      <Spreadsheet block={block} standalone fillParent hideHeader allowEdit={!readOnly} boardTitle={title}
+      <Spreadsheet block={block as CanvasBlock<"table">} standalone fillParent hideHeader allowEdit={!readOnly} boardTitle={title}
         onClose={() => void saveAndLeave()}
         onChange={(patch: Partial<TableBlockPayload>) => {
           const latest = useWorkspaceStore.getState().blocks[blockId];
@@ -90,7 +90,7 @@ function Content({ kind }: { kind: OfficeKind }) {
     </div>}
     {kind === "presentation" && block.type === "slideDeck" && <div className="min-h-0 flex-1 overflow-auto p-4">
       <div className="mx-auto h-full min-h-96 max-w-7xl overflow-hidden rounded-xl bg-white shadow-md">
-        <SlideDeckBlock block={block} isSelected readOnly={readOnly} onChange={patch => {
+        <SlideDeckBlock block={block as CanvasBlock<"slideDeck">} isSelected readOnly={readOnly} onChange={patch => {
           const latest = useWorkspaceStore.getState().blocks[blockId];
           if (latest?.type === "slideDeck" && !readOnly) changeData({ ...latest.data, ...patch });
         }} />
