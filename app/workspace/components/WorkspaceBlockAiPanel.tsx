@@ -14,7 +14,7 @@ import { WorkspaceChatQueueTray } from "./WorkspaceChatQueueTray";
 
 const UPLOAD_HEADERS = { "x-category": WORKSPACE_CHAT_CATEGORY };
 
-export function WorkspaceBlockAiPanel({ boardId, blockId, blockType }: { boardId: string; blockId: string; blockType: "doc" | "table" }) {
+export function WorkspaceBlockAiPanel({ boardId, blockId, blockType, forceReadOnly = false }: { boardId: string; blockId: string; blockType: "doc" | "table"; forceReadOnly?: boolean }) {
   const label = blockType === "doc" ? "Document" : "Spreadsheet";
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -33,12 +33,12 @@ export function WorkspaceBlockAiPanel({ boardId, blockId, blockType }: { boardId
 
   const getContext = useCallback(() => {
     const state = useWorkspaceStore.getState();
-    if (state.isReadOnly || state.boardId !== boardId || state.blocks[blockId]?.type !== blockType) return null;
+    if (forceReadOnly || state.isReadOnly || state.boardId !== boardId || state.blocks[blockId]?.type !== blockType) return null;
     return `${formatSelectedBlocksContext([blockId], state.blocks).contextPrompt}\n` +
       `The user is editing ${label.toLowerCase()} ${JSON.stringify(blockId)} in full view. ` +
       "Apply requested edits to this existing block in place, preserving unrelated content and formatting. " +
       "Do not create a replacement block unless explicitly requested.";
-  }, [boardId, blockId, blockType, label]);
+  }, [boardId, blockId, blockType, label, forceReadOnly]);
 
   const send = useCallback((text?: string, immediately = false) => {
     const query = (text ?? draft).trim();
@@ -65,7 +65,7 @@ export function WorkspaceBlockAiPanel({ boardId, blockId, blockType }: { boardId
         <Sparkles className="h-4 w-4 text-orange-500" /> {label} AI
       </div>
       <WorkspaceChatMessageList messages={chat.messages} listRef={listRef} isSending={chat.isSending} onSuggestionClick={(text) => send(text)} />
-      {isReadOnly ? (
+      {(forceReadOnly || isReadOnly) ? (
         <p className="shrink-0 p-4 text-xs text-slate-500">This {label.toLowerCase()} is read-only.</p>
       ) : (
         <>
