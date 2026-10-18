@@ -47,3 +47,29 @@ test("Gallery settings persist selected card fields across reload", async ({ pag
   await page.getByRole("button", { name: "Open collection" }).click();
   await expect(reopened.getByRole("checkbox", { name: "Show Status in Gallery" })).toBeDisabled();
 });
+
+test("Gallery pagination limits 501 records and navigates without changing record IDs", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
+  const block = page.getByTestId("collection-block");
+  const fixture = {
+    version: 1, title: "Gallery stress",
+    fields: [{ id: "name", name: "Name", type: "text" }],
+    records: Array.from({ length: 501 }, (_, i) => ({ id: "g-" + i, values: { name: "Card " + i } })),
+    views: [{ id: "gallery", name: "Gallery", kind: "gallery" }], activeViewId: "gallery",
+  };
+  page.once("dialog", dialog => { void dialog.accept(); });
+  await block.locator('input[type="file"]').setInputFiles({
+    name: "gallery.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(fixture)),
+  });
+  const cards = block.getByTestId("collection-gallery-card");
+  await expect(cards).toHaveCount(25);
+  await expect(block.getByTestId("collection-gallery-page-number")).toHaveText("Page 1 of 21");
+  await block.getByRole("button", { name: "Next gallery page" }).click();
+  await expect(cards.first()).toHaveAttribute("data-record-id", "g-25");
+  for (let i = 0; i < 19; i++) await block.getByRole("button", { name: "Next gallery page" }).click();
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toHaveAttribute("data-record-id", "g-500");
+});
