@@ -81,3 +81,19 @@ export function listOfficeFilesFromBoard(
     };
   });
 }
+
+/** The editor must not render until the server has confirmed block type and role. */
+export function officeFileAccess(
+  board: { blocks: unknown; viewerRole?: string } | null, kind: OfficeKind, blockId: string,
+): { authorized: boolean; viewer: boolean } {
+  const role = board?.viewerRole;
+  const viewer = role === "VIEWER";
+  if (!board || (role !== "OWNER" && role !== "EDITOR" && role !== "VIEWER")) {
+    return { authorized: false, viewer: true };
+  }
+  const blocks = board.blocks;
+  const block = Array.isArray(blocks)
+    ? blocks.find((item) => isRecord(item) && item.id === blockId)
+    : isRecord(blocks) ? blocks[blockId] : undefined;
+  return { authorized: officeKindOfBlock(block) === kind, viewer };
+}
