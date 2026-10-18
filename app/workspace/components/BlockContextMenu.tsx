@@ -14,6 +14,7 @@ import { BlockContextImageFlyout } from "./BlockContextImageFlyout";
 import { toggleBlockCollapse } from "../utils/toggleBlockCollapse";
 import { arrangeMapContaining } from "../utils/arrangeMapContaining";
 import { currentMapLayout } from "../layout/mapRoot";
+import { officeEditorUrl, officeKindOfBlock } from "@/lib/office/catalog";
 
 export interface BlockContextMenuProps {
   blockId: BlockId;
@@ -65,6 +66,8 @@ export const BlockContextMenu: React.FC<BlockContextMenuProps> = ({
   const updateBlock = useWorkspaceStore((state) => state.updateBlock);
   const setPendingEditBlockId = useWorkspaceStore((state) => state.setPendingEditBlockId);
   const currentBlock = blocks[blockId];
+  const officeKind = officeKindOfBlock(currentBlock);
+  const boardId = useWorkspaceStore((state) => state.boardId);
   const isTreeBlock = currentBlock?.type === "text";
   const isFlowchart = currentBlock ? currentMapLayout(useWorkspaceStore.getState(), blockId).family === "flowchart" : false;
   const hasParent = Boolean(currentBlock?.parentId);
@@ -143,6 +146,7 @@ export const BlockContextMenu: React.FC<BlockContextMenuProps> = ({
       }}
     >
       <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+      {officeKind && boardId && <BlockContextMenuItem onClick={close(() => window.open(officeEditorUrl(officeKind, boardId, blockId), "_blank", "noopener,noreferrer"))}>Open in Office</BlockContextMenuItem>}
 
       {isTreeBlock && !isFlowchart && <>
         <BlockContextMenuItem onClick={close(() => setPendingEditBlockId(blockId))}>

@@ -239,6 +239,8 @@ export interface CanvasBlock<T extends BlockType = BlockType> {
   mapId?: string;
   transform: DualTransform;
   data: BlockDataMap[T];
+  /** Optional file name shown in Office; the canvas block remains canonical. */
+  officeTitle?: string;
   style?: BlockStyle;
   /** Optional single emoji rendered as a small badge on the block's corner. */
   icon?: string;

@@ -22,9 +22,9 @@ const THEMED_EDITOR_CSS = ".slide-deck-themed .workspace-doc-rich-editor .ProseM
  *  notes/background, filmstrip drag-reorder, and a fullscreen Present mode.
  *  See types/slide.ts for the deliberate scope note on why this isn't a
  *  free-form nested canvas. */
-export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ block, isSelected, onChange }) => {
+export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ block, isSelected, onChange, readOnly = false }) => {
   const data = normalizeSlideDeckData(block.data);
-  const actions = useSlideDeckActions(data, onChange);
+  const actions = useSlideDeckActions(data, (patch) => { if (!readOnly) onChange(patch); });
   useSlidePresentationRequest(block.id, actions.startPresenting);
   const [isEditingBody, setIsEditingBody] = useState(false);
 
@@ -33,10 +33,11 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const setEditingBlockId = useWorkspaceStore((state) => state.setEditingBlockId);
 
   const startEditingBody = useCallback(() => {
+    if (readOnly) return;
     useWorkspaceStore.getState().setSelection([block.id]);
     setIsEditingBody(true);
     setEditingBlockId(block.id);
-  }, [block.id, setEditingBlockId]);
+  }, [block.id, readOnly, setEditingBlockId]);
   const stopEditingBody = useCallback(() => {
     setIsEditingBody(false);
     if (useWorkspaceStore.getState().editingBlockId === block.id) setEditingBlockId(null);
@@ -109,7 +110,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
             key={activeSlide.id}
             blockId={block.id}
             html={activeSlide.html}
-            isEditing={isEditingBody}
+            isEditing={isEditingBody && !readOnly}
             onChange={(next) => actions.updateHtml(activeSlide.id, next)}
             onStopEditing={stopEditingBody}
           />
