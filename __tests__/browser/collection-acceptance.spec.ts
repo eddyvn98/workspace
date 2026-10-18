@@ -312,3 +312,32 @@ test("rapid Kanban status toggles retain the final selection after reload", asyn
   const reopened = page.getByTestId("collection-block");
   await expect(reopened.getByRole("combobox", { name: "Status for Rapid toggle" })).toHaveValue("Done");
 });
+
+test("Calendar initially bounds crowded days and expands on demand", async ({ page }) => {
+  await page.goto("/collection-acceptance");
+  await page.getByRole("button", { name: "Insert content" }).click();
+  await page.getByRole("button", { name: "Add Collection" }).click();
+  await page.getByTestId("collection-block").getByRole("button", { name: "Open collection" }).click();
+  const block = page.getByTestId("collection-block");
+  const fixture = {
+    version: 1, title: "Crowded calendar",
+    fields: [{ id: "name", name: "Name", type: "text" }, { id: "date", name: "Start", type: "date" }],
+    records: Array.from({ length: 41 }, (_, i) => ({
+      id: "d-" + i, values: { name: "Task " + i, date: "2026-10-17" },
+    })),
+    views: [{ id: "calendar", name: "Calendar", kind: "calendar", dateFieldId: "date" }],
+    activeViewId: "calendar",
+  };
+  page.once("dialog", dialog => { void dialog.accept(); });
+  await block.locator('input[type="file"]').setInputFiles({
+    name: "calendar.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(fixture)),
+  });
+  const calendar = block.getByTestId("collection-calendar");
+  await calendar.getByLabel("Calendar selected day").fill("2026-10-17");
+  const day = calendar.locator('[data-date="2026-10-17"]');
+  await expect(day.locator("[data-record-id]")).toHaveCount(20);
+  await day.getByRole("button", { name: "Show all records for 2026-10-17" }).click();
+  await expect(day.locator("[data-record-id]")).toHaveCount(41);
+  await day.getByRole("button", { name: "Show fewer records for 2026-10-17" }).click();
+  await expect(day.locator("[data-record-id]")).toHaveCount(20);
+});
