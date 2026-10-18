@@ -23,15 +23,17 @@ import { addField, addRecord, addView, dateField, deleteRecord, endDateField, FI
 import { downloadCollection, exportCollectionCsv, importCollectionCsv, importCollectionJson } from "../collections/io";
 
 interface Props { blockId: string; data: CollectionBlockPayload; sources?: CollectionSources;
+  standalone?: boolean;
   revisionNotice?: { stale: boolean; refreshing: boolean; error: string; refresh: () => Promise<void> };
   onChange: (next: CollectionBlockPayload) => void; readOnly: boolean }
 
-export function CollectionSurface({ blockId, data, sources = {}, revisionNotice, onChange, readOnly }: Props) {
+export function CollectionSurface({ blockId, data, sources = {}, revisionNotice, standalone = false, onChange, readOnly }: Props) {
   const [search, setSearch] = useState("");
   const [localViewId, setLocalViewId] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [full, setFull] = useState(false);
+  const expanded = full || standalone;
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const fileInput = useRef<HTMLInputElement>(null);
   const openCollectionButton = useRef<HTMLButtonElement>(null);
@@ -130,9 +132,9 @@ export function CollectionSurface({ blockId, data, sources = {}, revisionNotice,
     tabIndex={full ? -1 : undefined} onKeyDown={keepFocusInScreen}
     className={"flex h-full w-full flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 " + (full ? "fixed inset-0 z-[9999] p-0" : "")}
     onPointerDown={(e) => { if (!(e.target as HTMLElement).closest("[data-collection-drag-handle]")) e.stopPropagation(); }} onDoubleClick={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
-    {full && <div className="flex shrink-0 flex-col gap-2 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-200 sm:min-h-16 sm:flex-row sm:items-center sm:gap-3 sm:px-8 sm:py-0">
+    {expanded && <div className="flex shrink-0 flex-col gap-2 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-200 sm:min-h-16 sm:flex-row sm:items-center sm:gap-3 sm:px-8 sm:py-0">
       <div className="flex min-w-0 items-center gap-2 sm:flex-1 sm:gap-3">
-        <button ref={backToWorkspaceButton} type="button" className={btnClass + " shrink-0"} aria-label="Back to Workspace" onClick={closeFull}>← Workspace</button>
+        {full ? <button ref={backToWorkspaceButton} type="button" className={btnClass + " shrink-0"} aria-label="Back to Workspace" onClick={closeFull}>← Workspace</button> : null}
         <span className="hidden h-7 border-l border-slate-200 sm:block" />
         <input aria-label="Collection title" className="min-w-0 flex-1 bg-transparent text-base font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:text-lg" title={data.title} value={data.title} disabled={readOnly} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </div>
@@ -140,10 +142,10 @@ export function CollectionSurface({ blockId, data, sources = {}, revisionNotice,
         <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 sm:inline-flex">{data.records.length} records</span>
         <button type="button" aria-pressed={settings} className={btnClass + (settings ? " bg-slate-100 text-slate-900" : "")} onClick={() => { setSettings(!settings); setShowHistory(false); }}>Settings</button>
         <button type="button" aria-pressed={showHistory} className={btnClass + (showHistory ? " bg-slate-100 text-slate-900" : "")} onClick={() => { setShowHistory(!showHistory); setSettings(false); }}>{showHistory ? "Hide history" : "History"}</button>
-        <button type="button" className={btnClass + " shrink-0 bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"} aria-label="Exit collection screen" onClick={closeFull}>Exit</button>
+        {full && <button type="button" className={btnClass + " shrink-0 bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"} aria-label="Exit collection screen" onClick={closeFull}>Exit</button>}
       </div>
     </div>}
-    {!full && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
+    {!expanded && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
       {!full && <span data-collection-drag-handle title="Drag collection on canvas" className="cursor-move select-none rounded border px-2 py-1 text-xs text-slate-400">⋮⋮</span>}
       {!full && <input aria-label="Collection title" className="min-w-24 flex-1 bg-transparent text-sm font-semibold outline-none" value={data.title} disabled={readOnly} onChange={(e) => onChange({ ...data, title: e.target.value })} />}
       <span className="text-xs text-slate-400">{data.records.length} records</span>
@@ -242,6 +244,7 @@ export function CollectionSurface({ blockId, data, sources = {}, revisionNotice,
     </div>
   </div>;
   if (full && typeof document !== "undefined") return createPortal(content, document.body);
+  if (standalone) return content;
   const previewRecords = visibleRecords(data, view, "", sources).slice(0, 3);
   return <section data-testid="collection-block" aria-label={`${data.title || "Untitled collection"} preview`}
     className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
