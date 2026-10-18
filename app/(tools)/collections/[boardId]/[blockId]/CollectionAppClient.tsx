@@ -7,7 +7,7 @@ import { useWorkspacePersistence } from "@/app/workspace/hooks/useWorkspacePersi
 import { useWorkspaceExternalSync } from "@/app/workspace/hooks/useWorkspaceExternalSync";
 import { useBoardViewerRole } from "@/app/workspace/hooks/useBoardViewerRole";
 import { useCollectionRevisionNotice } from "@/app/workspace/hooks/useCollectionRevisionNotice";
-import { normalizeCollection, type CollectionSources } from "@/app/workspace/collections/model";
+import { isCollectionBlockPayload, normalizeCollection, type CollectionSources } from "@/app/workspace/collections/model";
 import { CollectionSurface } from "@/app/workspace/renderers/CollectionSurface";
 import { fetchRemoteBoard } from "@/app/workspace/hooks/workspaceBoardApi";
 
@@ -23,7 +23,7 @@ function LoadedCollection({ boardId, blockId, viewer }: { boardId: string; block
   const sources = useMemo<CollectionSources>(() => Object.fromEntries(Object.entries(blocks)
     .filter(([id, item]) => id !== blockId && item.type === "collection")
     .map(([id, item]) => [id, normalizeCollection(item.data as never)])), [blocks, blockId]);
-  const data = block?.type === "collection" ? normalizeCollection(block.data) : null;
+  const data = block?.type === "collection" && isCollectionBlockPayload(block.data) ? normalizeCollection(block.data) : null;
   const update = useWorkspaceStore(s => s.updateBlock);
   return <div className="flex min-h-0 flex-1 flex-col">
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-800 dark:bg-slate-950">
