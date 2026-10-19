@@ -85,3 +85,21 @@ pnpm exec vitest run __tests__/workspace/slide-scene-v2.test.ts __tests__/worksp
 pnpm test:workspace
 pnpm build
 ```
+
+### Additional implementation (same branch)
+
+- Added per-object **visual timeline** (effect, trigger, duration, delay, track preview).
+- Enabled `wipe` among the motion presets in the browser; PPTX export includes a slide-level wipe transition.
+- Added direct image upload through Workspace's existing asset storage; the resulting image is a movable scene object.
+- This is not a full PowerPoint timing engine: click build timing is basic, emphasis/exit and PPTX object animation are pending.
+- No environment-backed success claim: GitHub commits are confirmed, but local TypeScript/test/build/browser validation still needs the local agent.
+
+### Acceptance checks for new controls
+
+1. Drag each corner handle; verify exact geometry after reload and both slide ratios.
+2. Select two elements with Shift+click; align and nudge without modifying unselected elements.
+3. Undo and redo geometry, layer and text changes; repeat after a collaborative update to check conflicts.
+4. Upload an image, save/reopen, and export to PPTX; confirm the image uses the persisted Workspace URL.
+5. Edit each object animation's timing using the timeline, including click, with-previous and after-previous.
+6. Confirm deck AI input accepts `composition` + `designStyle`, with corresponding background palette.
+7. Inspect slides in PowerPoint, LibreOffice and browser; report visual discrepancies and unsupported effects.
