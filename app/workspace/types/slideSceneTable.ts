@@ -1,7 +1,8 @@
-export type SceneTableCell={text:string;fill?:string;color?:string;fontSize?:number;fontFamily?:string;bold?:boolean;italic?:boolean;underline?:boolean;align?:"left"|"center"|"right";verticalAlign?:"top"|"middle"|"bottom"};
+import { normalizeSceneRichText, sceneRichTextPlainText, type SceneRichText } from "./slideSceneText";
+export type SceneTableCell={text:string;richText?:SceneRichText;fill?:string;color?:string;fontSize?:number;fontFamily?:string;bold?:boolean;italic?:boolean;underline?:boolean;strike?:boolean;align?:"left"|"center"|"right";verticalAlign?:"top"|"middle"|"bottom"};
 export type SceneTableMerge={row:number;column:number;rowSpan:number;colSpan:number};
 export type SceneTableData={rows:SceneTableCell[][];columnWidths:number[];rowHeights:number[];merges:SceneTableMerge[];headerRow:boolean};
-export const SCENE_TABLE_LIMITS={rows:30,columns:15,cellText:2000,totalText:20000} as const;
+export const SCENE_TABLE_LIMITS={rows:30,columns:15,cellText:2000,totalText:20000,cellRuns:256,cellParagraphs:64,totalRuns:4096,totalParagraphs:1200} as const;
 const record=(v:unknown):Record<string,unknown>=>v&&typeof v==="object"&&!Array.isArray(v)?v as Record<string,unknown>:{};
 const cssColor=(v:unknown)=>typeof v==="string"&&(/^(?:#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|[a-z]{2,20})$/i.test(v)||/^(?:rgb|rgba|hsl|hsla)\([\d\s,%.+-]+\)$/i.test(v))?v:undefined;
 function weights(input:unknown,count:number):number[]|undefined{
@@ -13,20 +14,30 @@ export function normalizeSceneTable(input:unknown):SceneTableData|undefined{
   const data=record(input),raw=data.rows;
   if(!Array.isArray(raw)||raw.length<1||raw.length>SCENE_TABLE_LIMITS.rows)return;
   const columns=Array.isArray(raw[0])?raw[0].length:0;if(columns<1||columns>SCENE_TABLE_LIMITS.columns)return;
-  let totalText=0;const rows:SceneTableCell[][]=[];
+  let totalText=0,totalRuns=0,totalParagraphs=0;const rows:SceneTableCell[][]=[];
   for(const rawRow of raw){
     if(!Array.isArray(rawRow)||rawRow.length!==columns)return;
     const row:SceneTableCell[]=[];
     for(const value of rawRow){
       const cell:Record<string,unknown>=typeof value==="string"||typeof value==="number"||typeof value==="boolean"?{text:String(value)}:record(value);
-      if(typeof cell.text!=="string"||cell.text.length>SCENE_TABLE_LIMITS.cellText)return;
-      totalText+=cell.text.length;if(totalText>SCENE_TABLE_LIMITS.totalText)return;
-      const next:SceneTableCell={text:cell.text},fill=cssColor(cell.fill),color=cssColor(cell.color);
+      let richText:SceneRichText|undefined;
+      if(cell.richText!==undefined){
+        const rich=record(cell.richText),paragraphs=rich.paragraphs;
+        if(!Array.isArray(paragraphs)||paragraphs.length>SCENE_TABLE_LIMITS.cellParagraphs)return;
+        const runs=paragraphs.reduce((n,p)=>n+(Array.isArray(record(p).runs)?(record(p).runs as unknown[]).length:SCENE_TABLE_LIMITS.cellRuns+1),0);
+        totalRuns+=runs;totalParagraphs+=paragraphs.length;
+        if(runs>SCENE_TABLE_LIMITS.cellRuns||totalRuns>SCENE_TABLE_LIMITS.totalRuns||totalParagraphs>SCENE_TABLE_LIMITS.totalParagraphs)return;
+        richText=normalizeSceneRichText(cell.richText);if(!richText)return;
+      }
+      const text=richText?sceneRichTextPlainText(richText):cell.text;
+      if(typeof text!=="string"||text.length>SCENE_TABLE_LIMITS.cellText)return;
+      totalText+=text.length;if(totalText>SCENE_TABLE_LIMITS.totalText)return;
+      const next:SceneTableCell={text,...(richText?{richText}:{})},fill=cssColor(cell.fill),color=cssColor(cell.color);
       if(cell.fill!==undefined&&!fill||cell.color!==undefined&&!color)return;
       if(fill)next.fill=fill;if(color)next.color=color;
       if(typeof cell.fontSize==="number"&&Number.isFinite(cell.fontSize))next.fontSize=Math.min(120,Math.max(8,cell.fontSize));
       if(typeof cell.fontFamily==="string"&&/^[\w\s,'"-]{1,100}$/.test(cell.fontFamily))next.fontFamily=cell.fontFamily;
-      for(const key of ["bold","italic","underline"] as const){const value=cell[key];if(typeof value==="boolean")next[key]=value;}
+      for(const key of ["bold","italic","underline","strike"] as const){const v=cell[key];if(typeof v==="boolean")next[key]=v;}
       if(["left","center","right"].includes(String(cell.align)))next.align=cell.align as SceneTableCell["align"];
       if(["top","middle","bottom"].includes(String(cell.verticalAlign)))next.verticalAlign=cell.verticalAlign as SceneTableCell["verticalAlign"];
       row.push(next);
@@ -56,7 +67,7 @@ export function createSceneTable(rows=4,columns=3):SceneTableData{
 }
 export function tableMergeAt(table:SceneTableData,row:number,column:number):SceneTableMerge|undefined{return table.merges.find(m=>row>=m.row&&row<m.row+m.rowSpan&&column>=m.column&&column<m.column+m.colSpan);}
 export type SceneTableCellFrame={row:number;column:number;rowSpan:number;colSpan:number;x:number;y:number;w:number;h:number;cell:SceneTableCell};
-/** Relative object-frame geometry, shared by canvas/PDF; covered cell values remain in the table data. */
+/** Relative object-frame geometry; covered cell rich text remains stored for unmerge. */
 export function sceneTableLayout(table:SceneTableData):SceneTableCellFrame[]{
   const sumW=table.columnWidths.reduce((a,b)=>a+b,0),sumH=table.rowHeights.reduce((a,b)=>a+b,0),xs=[0],ys=[0];
   table.columnWidths.forEach(w=>xs.push(xs[xs.length-1]+w/sumW));table.rowHeights.forEach(h=>ys.push(ys[ys.length-1]+h/sumH));
