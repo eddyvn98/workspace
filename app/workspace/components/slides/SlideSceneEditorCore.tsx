@@ -1,13 +1,13 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Clapperboard, Layers3, PanelRightClose, PanelRightOpen, Redo2, Undo2, ImagePlus } from "lucide-react";
+import { Layers3 } from "lucide-react";
 import { sceneObject, scenePatchObject, type SlideScene, type SlideSceneObject, type SceneObjectKind } from "../../types/slideScene";
 import { sceneTextSignature } from "../../types/slideSceneText";
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { SlideSceneProperties, sceneField as field } from "./SlideSceneProperties";
 import { SlideSceneRichTextEditor } from "./SlideSceneRichTextEditor";
-import { SlideSceneDiagramInsert } from "./SlideSceneDiagramInsert";
+import { SlideSceneRibbon } from "./SlideSceneRibbon";
 import { useSlideSceneHistory } from "../../hooks/useSlideSceneHistory";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
@@ -16,7 +16,7 @@ import { resizeSceneSelection, rotateSceneSelection, sceneSelectionBounds } from
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
 type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string;slideNumber?:number};
 export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF",slideNumber}:Props){
-  const editor=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null),timeline=useRef<HTMLDivElement>(null);
+  const editor=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null);
   const [selectedIds,setSelectedIds]=useState<string[]>([]),[selected,setSelected]=useState<string|null>(null),[textEdit,setTextEdit]=useState<{id:string;signature:string}|null>(null);
   const [richEdit,setRichEdit]=useState<{object:SlideSceneObject;signature:string}|null>(null);
   const [snap,setSnap]=useState(true),[imageUrl,setImageUrl]=useState(""),[uploading,setUploading]=useState(false),[message,setMessage]=useState("");
@@ -72,38 +72,17 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
   };
   const scaleSelection=(scale:number)=>{const bounds=sceneSelectionBounds(scene,ids);if(!bounds)return;const delta=1-scale;commit(resizeSceneSelection(scene,ids,{x:bounds.x+bounds.w*delta/2,y:bounds.y+bounds.h*delta/2,w:bounds.w*scale,h:bounds.h*scale}));};
   return <div ref={editor} tabIndex={0} aria-label="Slide scene editor" onKeyDown={keyDown} onPointerDownCapture={e=>{const target=e.target as HTMLElement;if(target.closest("[data-scene-object]")&&!target.closest("textarea,input,[contenteditable]"))editor.current?.focus({preventScroll:true});}} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
-    <div aria-label="Slide editing tools" className="flex min-h-12 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-slate-200 bg-white px-3 py-2 text-sm">
-      <span className="shrink-0 font-semibold text-slate-800">Design</span>
-      <span className="mx-1 h-5 shrink-0 border-l border-slate-200" aria-hidden="true"/>
-      <button type="button" className={field} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled={readOnly||!history.canUndo} onClick={history.undo}><Undo2 className="h-4 w-4"/></button>
-      <button type="button" className={field} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled={readOnly||!history.canRedo} onClick={history.redo}><Redo2 className="h-4 w-4"/></button>
-      <label className="flex shrink-0 items-center gap-2 rounded border border-slate-300 bg-white px-2 py-1">
-        Insert
-        <select aria-label="Insert slide object" className="max-w-32 bg-transparent text-sm outline-none" value="" disabled={readOnly||scene.objects.length>=120}
-          onChange={e=>{const kind=e.target.value as SceneObjectKind;if(kind)add(kind);}}>
-          <option value="">Choose...</option><option value="text">Text box</option><option value="shape">Shape</option><option value="image">Image URL</option><option value="chart">Chart</option><option value="table">Table</option>
-        </select>
-      </label>
-      <button type="button" className={field+" flex items-center gap-1"} disabled={readOnly||uploading||scene.objects.length>=120} onClick={()=>fileInput.current?.click()}>
-        <ImagePlus className="h-4 w-4"/>{uploading?"Uploading...":"Upload image"}
-      </button>
-      <SlideSceneDiagramInsert scene={scene} readOnly={readOnly} onInsert={next=>commit(next)}/>
-      <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/>
-      <details className="shrink-0 text-xs"><summary className="flex cursor-pointer list-none items-center gap-1 rounded px-2 py-1.5 text-slate-600 hover:bg-slate-100">Image link <ChevronDown className="h-3 w-3"/></summary>
-        <div className="flex items-center gap-1 py-1"><input aria-label="Image URL" className={field+" w-36"} disabled={readOnly} placeholder="Paste image URL" value={imageUrl} onChange={e=>setImageUrl(e.target.value)}/>
-          <button type="button" className={field} disabled={readOnly||!imageUrl.trim()||scene.objects.length>=120} onClick={()=>add("image")}>Add</button></div>
-      </details>
-      <label className="flex shrink-0 items-center gap-1 text-xs text-slate-600"><input type="checkbox" aria-label="Snap to grid" checked={snap} onChange={e=>setSnap(e.target.checked)}/> Snap</label>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        <span className="text-xs text-slate-500">{scene.objects.length} objects</span>
-        <button type="button" className={field+" flex items-center gap-1"} aria-pressed={showTimeline} aria-label="Toggle animation timeline" onClick={()=>setShowTimeline(v=>!v)}>
-          <Clapperboard className="h-4 w-4"/> Animation
-        </button>
-        <button type="button" className={field+" flex items-center gap-1"} aria-pressed={showInspector} aria-label="Toggle inspector" onClick={()=>setShowInspector(v=>!v)}>
-          {showInspector?<PanelRightClose className="h-4 w-4"/>:<PanelRightOpen className="h-4 w-4"/>} Inspector
-        </button>
-      </div>
-    </div>
+    <SlideSceneRibbon scene={scene} item={item} selectedCount={ids.length} selectedLocked={locked}
+      readOnly={readOnly} uploading={uploading} canUndo={history.canUndo} canRedo={history.canRedo}
+      snap={snap} showInspector={showInspector} showTimeline={showTimeline}
+      imageUrl={imageUrl} onImageUrl={setImageUrl} onAdd={add} onUpload={()=>fileInput.current?.click()}
+      onDiagram={next=>commit(next)} onUndo={history.undo} onRedo={history.redo}
+      onDuplicate={duplicate} onDelete={remove}
+      onGroup={()=>commit(groupSceneObjects(scene,ids,()=>crypto.randomUUID()))}
+      onUngroup={()=>commit(ungroupSceneObjects(scene,ids))}
+      onPatch={patch} onFormat={()=>{if(item)beginRichText(item.id);}}
+      onSnap={setSnap} onToggleInspector={()=>setShowInspector(v=>!v)} onToggleTimeline={()=>setShowTimeline(v=>!v)}/>
+    <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/>
     {message&&<p role="status" className="px-3 py-1 text-xs text-amber-900">{message}</p>}
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
       <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-slate-200 p-4" style={{containerType:"size"}}>
@@ -144,7 +123,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
         </>}
       </aside>}
     </div>
-    {showTimeline && <div ref={timeline} tabIndex={-1} className="max-h-[36%] shrink-0 overflow-auto"><SlideSceneTimeline scene={scene} selected={selected} onSelect={select} onChange={next=>commit(next)} readOnly={readOnly} backgroundColor={backgroundColor}/></div>}
+    {showTimeline && <div className="max-h-[36%] shrink-0 overflow-auto"><SlideSceneTimeline scene={scene} selected={selected} onSelect={select} onChange={next=>commit(next)} readOnly={readOnly} backgroundColor={backgroundColor}/></div>}
     {richEdit&&!readOnly&&<SlideSceneRichTextEditor key={richEdit.object.id} object={richEdit.object} backgroundColor={backgroundColor} onCancel={()=>setRichEdit(null)} onApply={richText=>{
       const current=scene.objects.find(o=>o.id===richEdit.object.id);if(!current||current.locked||sceneTextSignature(current)!==richEdit.signature)return false;
       const next=scenePatchObject(scene,current.id,{richText});if(JSON.stringify(next)!==JSON.stringify(scene)&&!commit(next))return false;setRichEdit(null);return true;
