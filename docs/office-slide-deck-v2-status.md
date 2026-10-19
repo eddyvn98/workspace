@@ -56,3 +56,32 @@ Manual test:
 - **Phase F**: performance, collaborative editing, file recovery, security, export cross-app regression suite.
 
 This branch is a real working **foundation**, NOT final feature parity.
+
+## Progress update — 2026-10-19, next implementation batch
+
+Committed further work on the same PR branch:
+- Corner resize handles in Scene Surface, geometry snapping and reusable resize/align/distribute/duplicate/nudge operations.
+- Shift-click multi-selection and alignment, object duplication and arrow-key movement.
+- Editor-local undo/redo (60 snapshots) and keyboard shortcuts; not a collaboration-aware transaction history.
+- AI compositions: hero, split, metric, statement, columns, using editorial/technology/minimal/playful design tokens. Agent create_slide_deck and update_slide can now accept composition and designStyle or custom scene objects.
+- Style-derived background on generated slides; AI composition tests.
+- Corrected PPTX text rotation and explicit slide size parameter; no PPTX object animation export yet.
+- Fixed legacy editor double-click conflict and stale selection after delete/duplicate.
+- Added geometry and design composition regression tests.
+
+### Still required before production
+- Run tsc/vitest/build/Playwright and perform manual rendering checks; not run here because repository/dependencies cannot be cloned into local runtime.
+- Verify CSS resize handles and timeline interactions in real browsers; visual QA still pending.
+- Implement advanced shapes, editable charts, media, text editing directly on canvas, crop/mask, grouping and object-level timeline UI.
+- Implement PPTX import/roundtrip, object-level animation/transition interoperability and full formatting fidelity.
+- Add a render-and-critique AI design loop, error handling and visual QA for generated decks.
+- Add role-safe collaborative undo/redo and large-deck performance profiling.
+
+### Local test commands
+```sh
+pnpm install
+pnpm exec tsc --noEmit
+pnpm exec vitest run __tests__/workspace/slide-scene-v2.test.ts __tests__/workspace/slide-scene-geometry.test.ts __tests__/workspace/slide-scene-compositions.test.ts
+pnpm test:workspace
+pnpm build
+```
