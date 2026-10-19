@@ -27,7 +27,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
   const redo = () => {const next=history.current.redo.pop();if(!next)return;history.current.undo.push(scene);onChange(next);setHistoryVersion(v=>v+1);};
   const item = useMemo(() => scene.objects.find(o => o.id === selected), [scene, selected]);
   const patch = (values: Partial<SlideSceneObject>) => { if (item && !readOnly && !item.locked) commit(scenePatchObject(scene, item.id, values)); };
-  const add = (kind: "text" | "shape" | "image") => {
+  const add = (kind: "text" | "shape" | "image" | "chart") => {
     if (readOnly) return;
     if (kind === "image" && !/^https?:\/\/|^\/(?!\/)/i.test(imageUrl)) return;
     if (scene.objects.length >= 120) return;
@@ -59,7 +59,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
       <strong>Scene editor</strong>
       <button className={field} disabled={readOnly || !history.current.undo.length} onClick={undo}>Undo</button><button className={field} disabled={readOnly || !history.current.redo.length} onClick={redo}>Redo</button>
       <button className={field} disabled={readOnly} onClick={() => add("text")}>+ Text</button>
-      <button className={field} disabled={readOnly} onClick={() => add("shape")}>+ Shape</button>
+      <button className={field} disabled={readOnly} onClick={() => add("shape")}>+ Shape</button><button className={field} disabled={readOnly} onClick={() => add("chart")}>+ Chart</button>
       <input className={field + " w-40"} aria-label="Image URL" value={imageUrl} placeholder="Image URL" onChange={e => setImageUrl(e.target.value)} />
       <button className={field} disabled={readOnly || !imageUrl} onClick={() => add("image")}>+ Image URL</button>
       <button className={field} disabled={readOnly||uploading} onClick={()=>imageFileInput.current?.click()}>{uploading?"Uploading…":"Upload image"}</button>
@@ -83,6 +83,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
         {item && <div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button key={direction} className={field} disabled={readOnly || item.locked} onClick={()=>commit(alignSceneObjects(scene,selectedIds.length?selectedIds:[item.id],direction))}>{direction}</button>)}</div>}
         {item && <>
           <hr/><strong className="block">Object properties</strong>
+          {item.kind === "chart" && <label className="block">Chart data (label, value per line)<textarea rows={4} className={field+" mt-1 w-full"} disabled={readOnly||item.locked} value={(item.series||[]).map(x=>`${x.label},${x.value}`).join("\n")} onChange={e=>{const series=e.target.value.split("\n").filter(Boolean).map(row=>{const comma=row.lastIndexOf(",");return {label:row.slice(0,comma).trim(),value:Number(row.slice(comma+1))};}); if(series.length>=1 && series.length<=24 && series.every(x=>x.label && Number.isFinite(x.value) && x.value>=0)) patch({series});}} /></label>}
           {item.kind === "text" && <label className="block">Text<textarea className={field + " mt-1 w-full"} rows={3} value={item.text || ""} disabled={readOnly} onChange={e => patch({ text: e.target.value })}/></label>}
           {(["x","y","w","h","rotation","opacity"] as const).map(k => <label key={k} className="flex items-center justify-between gap-2 capitalize">{k}<input className={field + " w-24"} type="number" step={k === "opacity" ? 0.1 : 1} value={item[k] ?? 0} disabled={readOnly || item.locked} onChange={e => patch({ [k]: Number(e.target.value) })}/></label>)}
           {item.kind === "text" && <label className="flex items-center justify-between">Font size<input type="number" className={field + " w-24"} value={item.fontSize || 44} disabled={readOnly} onChange={e => patch({fontSize:Number(e.target.value)})}/></label>}
