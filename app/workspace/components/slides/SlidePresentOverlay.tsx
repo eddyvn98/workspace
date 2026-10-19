@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { usePresentationKeys } from "../../hooks/usePresentationKeys";
 import { animateSlide } from "../../utils/slideMotion";
 import { SLIDE_TYPOGRAPHY_CSS } from "../../utils/slideTypography";
@@ -33,7 +33,13 @@ export interface SlidePresentOverlayProps {
  *  viewers") is out of scope here since this workspace has no concept of a
  *  distinct "presenter vs viewer" role during a session yet. */
 export function SlidePresentOverlay({ data, index, showGrid, showNotes, onToggleGrid, onToggleNotes, onNext, onPrev, onJump, onExit }: SlidePresentOverlayProps) {
-  usePresentationKeys(true, onNext, onPrev, onExit, onJump, data.slideOrder.length);
+  const [step, setStep] = useState(0);
+  const current = data.slides[data.slideOrder[index]];
+  const clickCount = current?.scene?.objects.filter(o => o.motion?.trigger === "on-click").length ?? 0;
+  const next = () => { if (step < clickCount) setStep(v => v + 1); else onNext(); };
+  const prev = () => { if (step > 0) setStep(v => v - 1); else onPrev(); };
+  usePresentationKeys(true, next, prev, onExit, onJump, data.slideOrder.length);
+  useEffect(() => setStep(0), [index]);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const slideId = data.slideOrder[index];
   const slide = slideId ? data.slides[slideId] : undefined;
@@ -66,7 +72,7 @@ export function SlidePresentOverlay({ data, index, showGrid, showNotes, onToggle
               {/* Same fixed-light-background/no-color-class gap as
                   SlideMiniPreview.tsx - without this the body text inherits
                   the app's dark-mode foreground and disappears here too. */}
-              {slide.scene ? <SlideSceneSurface scene={slide.scene}/> : <div className="slide-html h-full w-full overflow-auto" style={{ ...slideTextStyle(data.theme), padding: "4cqw" }} dangerouslySetInnerHTML={{ __html: safeHtml }} />}
+              {slide.scene ? <SlideSceneSurface scene={slide.scene} step={step}/> : <div className="slide-html h-full w-full overflow-auto" style={{ ...slideTextStyle(data.theme), padding: "4cqw" }} dangerouslySetInnerHTML={{ __html: safeHtml }} />}
               {data.showSlideNumbers && (
                 <span className="absolute bottom-2 right-3 text-xs opacity-60" style={slideTextStyle(data.theme)}>{index + 1}</span>
               )}
