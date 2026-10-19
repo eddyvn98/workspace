@@ -7,6 +7,7 @@ import { addPptxChart } from "./pptx-chart";
 import { addPptxNotes, addPptxPackage } from "./pptx-package";
 import { slideExportImages, type SlideImageReader } from "./slide-export-images";
 import { slideExportLayout } from "./slide-export-layout";
+import { sceneImageLayout } from "./slide-image-layout";
 import { slideExportStyle } from "./slide-export-style";
 
 export const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -40,7 +41,8 @@ export async function exportBoardPptx(
           zip.file(`ppt/media/image${picture.index}.png`, picture.buffer);
           const relId = `rId${relationships.length + 1}`;
           relationships.push({ id: relId, type: "image", target: `../media/image${picture.index}.png` });
-          shapes.push(imageShape(id,relId,obj.id,obj.x*factor,obj.y*factor,obj.w*factor,obj.h*factor));
+          const layout=sceneImageLayout({x:obj.x*factor,y:obj.y*factor,w:obj.w*factor,h:obj.h*factor},picture,obj.imageFit);
+          shapes.push(imageShape(id,relId,obj.id,layout.rect.x,layout.rect.y,layout.rect.w,layout.rect.h,layout.crop));
         } else shapes.push(exportSceneShape(obj,id,factor));
       }
     }
