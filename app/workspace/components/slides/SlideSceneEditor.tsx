@@ -1,164 +1,135 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import type { SlideScene, SlideSceneObject } from "../../types/slideScene";
-import { sceneObject, scenePatchObject } from "../../types/slideScene";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { sceneObject, scenePatchObject, type SlideScene, type SlideSceneObject, type SceneObjectKind } from "../../types/slideScene";
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
+import { SlideSceneProperties, sceneField as field } from "./SlideSceneProperties";
+import { useSlideSceneHistory } from "../../hooks/useSlideSceneHistory";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, moveSceneSelectionLayer, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
 import { resizeSceneSelection, rotateSceneSelection, sceneSelectionBounds } from "../../utils/slideSceneGroupTransform";
-import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
-
-type Props = { scene: SlideScene; onChange: (next: SlideScene) => void; readOnly?: boolean; backgroundColor?:string };
-const field = "rounded border border-slate-300 bg-white px-2 py-1 text-slate-900";
-export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundColor="#FFFFFF" }: Props) {
-  const editorRef=useRef<HTMLDivElement>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [snapEnabled,setSnapEnabled]=useState(true);
-  const select = (id:string,additive=false) => {
-    const found=expandSceneSelection(scene,[id]);
-    const members=found.length?found:[id];
-    const updated=additive ? (members.every(x=>selectedIds.includes(x))?selectedIds.filter(x=>!members.includes(x)):[...new Set([...selectedIds,...members])]) : members;
-    setSelected(updated.includes(id)?id:updated[0]??null);
-    setSelectedIds(updated);
+type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string};
+export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF"}:Props){
+  const editor=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null),timeline=useRef<HTMLDivElement>(null);
+  const [selectedIds,setSelectedIds]=useState<string[]>([]),[selected,setSelected]=useState<string|null>(null);
+  const [textEdit,setTextEdit]=useState<{id:string;original:string}|null>(null);
+  const [snap,setSnap]=useState(true),[imageUrl,setImageUrl]=useState(""),[uploading,setUploading]=useState(false),[message,setMessage]=useState("");
+  const history=useSlideSceneHistory(scene,onChange,readOnly),{commit}=history;
+  const item=scene.objects.find(o=>o.id===selected);
+  const locked=scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked);
+  const warnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]);
+  const ids=selectedIds.length?selectedIds:selected?[selected]:[];
+  const select=(id:string,additive=false,source=scene)=>{
+    const expanded=expandSceneSelection(source,[id]),members=expanded.length?expanded:[id];
+    const next=additive?(members.every(key=>selectedIds.includes(key))?selectedIds.filter(key=>!members.includes(key)):[...new Set([...selectedIds,...members])]):members;
+    setSelectedIds(next);setSelected(next.includes(id)?id:next[0]??null);
   };
-  const [imageUrl, setImageUrl] = useState("");
-  const imageFileInput = useRef<HTMLInputElement>(null);
-  const [uploading,setUploading] = useState(false);
-  const sceneFingerprint=useMemo(()=>JSON.stringify(scene),[scene]);
-  const currentSceneFingerprint=useRef(sceneFingerprint);
-  currentSceneFingerprint.current=sceneFingerprint;
-  const history = useRef<{undo:SlideScene[];redo:SlideScene[];expected:string}>({undo:[],redo:[],expected:sceneFingerprint});
-  const [historyVersion,setHistoryVersion] = useState(0);
-  // An external Workspace sync may replace the scene. Never undo it with stale local snapshots.
-  useEffect(()=>{if(history.current.expected===sceneFingerprint)return;
-    history.current={undo:[],redo:[],expected:sceneFingerprint};
-    setHistoryVersion(v=>v+1);
-  },[sceneFingerprint]);
-  const commit = (next:SlideScene) => {if(readOnly||next===scene)return;
-    const nextFingerprint=JSON.stringify(next);if(nextFingerprint===sceneFingerprint)return;
-    history.current.undo.push(scene);if(history.current.undo.length>60)history.current.undo.shift();
-    history.current.redo=[];history.current.expected=nextFingerprint;setHistoryVersion(v=>v+1);onChange(next);
+  useEffect(()=>{
+    const existing=new Set(scene.objects.map(o=>o.id));
+    setSelectedIds(current=>current.every(id=>existing.has(id))?current:current.filter(id=>existing.has(id)));
+    if(selected&&!existing.has(selected))setSelected(null);
+    if(textEdit&&(!existing.has(textEdit.id)||readOnly))setTextEdit(null);
+  },[scene.objects,selected,textEdit,readOnly]);
+  const patch=(values:Partial<SlideSceneObject>)=>{if(item&&!readOnly&&!item.locked)commit(scenePatchObject(scene,item.id,values));};
+  const beginText=(id:string)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object?.kind==="text"&&!object.locked)setTextEdit({id,original:object.text??""});};
+  const finishText=(id:string,text:string)=>{
+    const object=scene.objects.find(o=>o.id===id);
+    if(object&&textEdit?.id===id&&(object.text??"")!==textEdit.original)setMessage("This text was changed elsewhere. Your draft was not applied over it.");
+    else if(object&&!object.locked&&!readOnly)commit(scenePatchObject(scene,id,{text}));
+    setTextEdit(null);
   };
-  const undo = () => {if(readOnly)return;const prior=history.current.undo.pop();if(!prior)return;
-    history.current.redo.push(scene);history.current.expected=JSON.stringify(prior);onChange(prior);setHistoryVersion(v=>v+1);
+  const duplicate=()=>{
+    const next=duplicateSceneSelection(scene,ids,()=>crypto.randomUUID());
+    if(next!==scene&&commit(next)){
+      const added=next.objects.filter(o=>!scene.objects.some(before=>before.id===o.id));
+      setSelectedIds(added.map(o=>o.id));setSelected(added[0]?.id??null);
+    }
   };
-  const redo = () => {if(readOnly)return;const next=history.current.redo.pop();if(!next)return;
-    history.current.undo.push(scene);history.current.expected=JSON.stringify(next);onChange(next);setHistoryVersion(v=>v+1);
+  const remove=()=>{if(readOnly)return;commit(deleteSceneSelection(scene,ids));setSelected(null);setSelectedIds([]);};
+  const add=(kind:SceneObjectKind)=>{
+    if(readOnly||scene.objects.length>=120)return;
+    const next=sceneObject(kind,80+(scene.objects.length%12)*16,100+(scene.objects.length%12)*12);
+    if(kind==="image")next.src=imageUrl.trim();
+    const draft={...scene,objects:[...scene.objects,next]};
+    if(commit(draft)){select(next.id,false,draft);setMessage("");}else setMessage("The object could not be inserted. Check its image URL or data.");
   };
-  const item = useMemo(() => scene.objects.find(o => o.id === selected), [scene, selected]);
-  const selectionLocked=useMemo(()=>scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked),[scene,selectedIds]);
-  const qualityWarnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]);
-  const patch = (values: Partial<SlideSceneObject>) => { if (item && !readOnly && !item.locked) commit(scenePatchObject(scene, item.id, values)); };
-  const add = (kind: "text" | "shape" | "image" | "chart") => {
-    if (readOnly) return;
-    if (kind === "image" && !/^https?:\/\/|^\/(?!\/)/i.test(imageUrl)) return;
-    if (scene.objects.length >= 120) return;
-    const next = sceneObject(kind, 80 + scene.objects.length * 16, 100 + scene.objects.length * 12);
-    if (kind === "image") next.src = imageUrl;
-    commit({ ...scene, objects: [...scene.objects, next] });
-    select(next.id);
-  };
-  const uploadImage=async(file?:File)=>{
+  const upload=async(file?:File)=>{
     if(!file||readOnly||uploading||scene.objects.length>=120)return;
-    const startedAt=sceneFingerprint;
-    setUploading(true);
-    try { const result=await uploadWorkspaceImageWithOriginal(file);
-      if(!result?.url) throw new Error("Upload failed");
-      if(currentSceneFingerprint.current!==startedAt) throw new Error("Slide changed during upload. Retry inserting the image to avoid overwriting other edits.");
-      const next=sceneObject("image",100,100);next.src=result.url;
-      commit({...scene,objects:[...scene.objects,next]});select(next.id);
-    } catch(error){window.alert(error instanceof Error?error.message:"Image upload failed");}
-    finally {setUploading(false);}
+    const started=history.signature;setUploading(true);setMessage("");
+    try{
+      const result=await uploadWorkspaceImageWithOriginal(file);
+      if(!result?.url)throw new Error("Image upload failed.");
+      if(!history.isCurrent(started))throw new Error("The slide changed during upload. Insert the image again to avoid overwriting newer edits.");
+      const object=sceneObject("image",100,100);object.src=result.url;
+      const draft={...scene,objects:[...scene.objects,object]};
+      if(commit(draft))select(object.id,false,draft);
+    }catch(error){setMessage(error instanceof Error?error.message:"Image upload failed.");}
+    finally{setUploading(false);}
   };
-  useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(readOnly)return;const target=e.target as HTMLElement;if(!editorRef.current?.contains(target))return;if(target?.closest("input,textarea,select,[contenteditable=true]"))return;
-    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
-    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return;}
-    if(editingTextId || !selected)return;
-    if(e.key==="Enter"||e.key==="F2"){const targetObject=scene.objects.find(o=>o.id===selected);if(targetObject?.kind==="text"&&!targetObject.locked){e.preventDefault();setEditingTextId(selected);}return;}
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="g"){e.preventDefault();const ids=selectedIds.length?selectedIds:[selected];commit(e.shiftKey?ungroupSceneObjects(scene,ids):groupSceneObjects(scene,ids,()=>crypto.randomUUID()));return;}
-    if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();commit(deleteSceneSelection(scene,selectedIds.length?selectedIds:[selected]));setSelected(null);setSelectedIds([]);return;}
-    const direction:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
-    if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(translateSceneSelection(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
-  };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,editingTextId,readOnly,historyVersion]);
-  return <div ref={editorRef} tabIndex={0} onPointerDownCapture={event => {const target = event.target as HTMLElement; if (target.closest("[data-scene-object]") && !target.closest("textarea,input,[contenteditable]")) editorRef.current?.focus({preventScroll:true});}} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
+  const keyDown=(e:React.KeyboardEvent)=>{
+    if(readOnly||e.isDefaultPrevented()||e.nativeEvent.isComposing)return;
+    const target=e.target as HTMLElement;
+    if(target.closest('input,textarea,select,button,[contenteditable="true"]'))return;
+    const consume=()=>{e.preventDefault();e.stopPropagation();};
+    const modifier=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
+    if(modifier&&key==="z"){consume();e.shiftKey?history.redo():history.undo();return;}
+    if(modifier&&key==="y"){consume();history.redo();return;}
+    if(modifier&&key==="a"){consume();setSelectedIds(scene.objects.map(o=>o.id));setSelected(scene.objects[0]?.id??null);return;}
+    if(textEdit||!selected)return;
+    if(e.key==="F2"||e.key==="Enter"){consume();beginText(selected);return;}
+    if(modifier&&key==="g"){consume();commit(e.shiftKey?ungroupSceneObjects(scene,ids):groupSceneObjects(scene,ids,()=>crypto.randomUUID()));return;}
+    if(modifier&&key==="d"){consume();duplicate();return;}
+    if(e.key==="Delete"||e.key==="Backspace"){consume();remove();return;}
+    if(e.key==="Escape"){consume();setSelected(null);setSelectedIds([]);return;}
+    const move:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+    if(!modifier&&move[e.key]){consume();const [dx,dy]=move[e.key],amount=e.shiftKey?10:1;commit(translateSceneSelection(scene,ids,dx*amount,dy*amount));}
+  };
+  const scaleSelection=(scale:number)=>{const bounds=sceneSelectionBounds(scene,ids);if(!bounds)return;const delta=1-scale;commit(resizeSceneSelection(scene,ids,{x:bounds.x+bounds.w*delta/2,y:bounds.y+bounds.h*delta/2,w:bounds.w*scale,h:bounds.h*scale}));};
+  return <div ref={editor} tabIndex={0} aria-label="Slide scene editor" onKeyDown={keyDown}
+    onPointerDownCapture={e=>{const target=e.target as HTMLElement;if(target.closest("[data-scene-object]")&&!target.closest("textarea,input,[contenteditable]"))editor.current?.focus({preventScroll:true});}}
+    className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-white p-2 text-xs">
-      <strong>Scene editor</strong><label className="flex items-center gap-1"><input aria-label="Snap to grid" type="checkbox" checked={snapEnabled} onChange={e=>setSnapEnabled(e.target.checked)}/>Snap 8px</label>
-      <button className={field} disabled={readOnly || !history.current.undo.length} onClick={undo}>Undo</button><button className={field} disabled={readOnly || !history.current.redo.length} onClick={redo}>Redo</button>
-      <button className={field} disabled={readOnly} onClick={() => add("text")}>+ Text</button>
-      <button className={field} disabled={readOnly} onClick={() => add("shape")}>+ Shape</button><button className={field} disabled={readOnly} onClick={() => add("chart")}>+ Chart</button>
-      <input className={field + " w-40"} aria-label="Image URL" value={imageUrl} placeholder="Image URL" onChange={e => setImageUrl(e.target.value)} />
-      <button className={field} disabled={readOnly || !imageUrl} onClick={() => add("image")}>+ Image URL</button>
-      <button className={field} disabled={readOnly||uploading} onClick={()=>imageFileInput.current?.click()}>{uploading?"Uploading…":"Upload image"}</button>
-      <input ref={imageFileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void uploadImage(file);}}/>
+      <strong>Scene editor</strong><label className="flex items-center gap-1"><input aria-label="Snap to grid" type="checkbox" checked={snap} onChange={e=>setSnap(e.target.checked)}/>Snap 8px</label>
+      <button type="button" className={field} disabled={readOnly||!history.canUndo} onClick={history.undo}>Undo</button><button type="button" className={field} disabled={readOnly||!history.canRedo} onClick={history.redo}>Redo</button>
+      {(["text","shape","chart"] as const).map(kind=><button type="button" key={kind} className={field} disabled={readOnly||scene.objects.length>=120} onClick={()=>add(kind)}>+ {kind}</button>)}
+      <input className={field+" w-40"} aria-label="Image URL" disabled={readOnly} value={imageUrl} placeholder="Image URL" onChange={e=>setImageUrl(e.target.value)}/>
+      <button type="button" className={field} disabled={readOnly||!imageUrl.trim()} onClick={()=>add("image")}>+ Image URL</button>
+      <button type="button" className={field} disabled={readOnly||uploading} onClick={()=>fileInput.current?.click()}>{uploading?"Uploading...":"Upload image"}</button>
+      <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/>
       <span className="ml-auto text-slate-500">{scene.objects.length} objects</span>
     </div>
-    <div className="flex min-h-0 flex-1 overflow-hidden">
-      <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-3">
-        <div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{ aspectRatio: `${scene.width} / ${scene.height}`,backgroundColor }}
-          onPointerDown={e => { if(editingTextId) return; editorRef.current?.focus({preventScroll:true});if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
+    {message&&<p role="status" className="px-3 py-1 text-xs text-amber-900">{message}</p>}
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+      <div className="flex min-h-24 min-w-0 flex-1 items-center justify-center overflow-auto p-3">
+        <div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{aspectRatio:`${scene.width}/${scene.height}`,backgroundColor}}
+          onPointerDown={e=>{if(textEdit)return;editor.current?.focus({preventScroll:true});if(!(e.target as Element).closest("[data-scene-object],[data-slide-selection-box]")){setSelected(null);setSelectedIds([]);}}}>
           <SlideSceneSurface scene={scene} selected={selected} selectedIds={selectedIds} editing={!readOnly} onSelect={select}
-            editingTextId={editingTextId} onRequestTextEdit={setEditingTextId} onTextCancel={() => setEditingTextId(null)}
-            onTextCommit={(id,text) => {const old = scene.objects.find(o=>o.id===id); if(old && !old.locked && !readOnly) commit(scenePatchObject(scene,id,{text})); setEditingTextId(null);}}
-            onMove={(id, x, y) => { if(readOnly)return;const original=scene.objects.find(o=>o.id===id);if(!original||original.locked)return;
-              const snapped=snapSceneRect({...original,x,y},snapEnabled);const ids=selectedIds.includes(id)?selectedIds:[id];
-              commit(translateSceneSelection(scene,ids,snapped.x-original.x,snapped.y-original.y)); }}
-            onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snapEnabled))); }}
-            onTransformSelection={next=>commit(next)} />
+            editingTextId={textEdit?.id} onRequestTextEdit={beginText} onTextCancel={()=>setTextEdit(null)} onTextCommit={finishText}
+            onMove={(id,x,y)=>{const original=scene.objects.find(o=>o.id===id);if(!original||readOnly||original.locked)return;const next=snapSceneRect({...original,x,y},snap);commit(translateSceneSelection(scene,selectedIds.includes(id)?selectedIds:[id],next.x-original.x,next.y-original.y));}}
+            onResize={(id,rect)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object&&!object.locked)commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snap)));}}
+            onTransformSelection={next=>commit(next)}/>
         </div>
       </div>
-      <aside className="hidden w-56 shrink-0 space-y-3 overflow-auto border-l bg-white p-3 text-xs lg:block">
+      <aside className="max-h-52 shrink-0 space-y-3 overflow-auto border-l bg-white p-3 text-xs md:max-h-none md:w-60">
         <strong className="block">Layers</strong>
-        {qualityWarnings.length>0 && <details className="rounded border border-amber-300 p-2"><summary className="cursor-pointer">{qualityWarnings.length} layout warnings</summary>{qualityWarnings.map((w,i)=><button type="button" key={`${w.objectId}-${i}`} onClick={()=>select(w.objectId)} className="mt-1 block w-full text-left text-amber-800">{w.code}: {w.message}</button>)}</details>}
-        {[...scene.objects].reverse().map(o => <button key={o.id} onClick={(e) => select(o.id,e.shiftKey)}
-          className={`block w-full truncate rounded px-2 py-1 text-left ${selectedIds.includes(o.id) ? "bg-indigo-100" : "hover:bg-slate-100"}`}>{o.locked ? "🔒 " : ""}{o.kind} · {o.text?.slice(0, 18) || o.id.slice(0, 8)}</button>)}
-        {selectedIds.length > 1 && <p className="text-indigo-700">{selectedIds.length} selected (Shift+click). Align selected objects:</p>}
-        {selectedIds.length > 1 && !readOnly && !scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked) && <div className="flex flex-wrap gap-1" aria-label="Group transformations">
-          <button className={field} type="button" onClick={()=>commit(rotateSceneSelection(scene,selectedIds,-15))}>Rotate −15°</button>
-          <button className={field} type="button" onClick={()=>commit(rotateSceneSelection(scene,selectedIds,15))}>Rotate +15°</button>
-          {[0.9,1.1].map(scale=><button className={field} key={scale} type="button" onClick={()=>{const b=sceneSelectionBounds(scene,selectedIds);if(!b)return;const delta=1-scale;commit(resizeSceneSelection(scene,selectedIds,{x:b.x+b.w*delta/2,y:b.y+b.h*delta/2,w:b.w*scale,h:b.h*scale}));}}>{scale<1?"Scale −10%":"Scale +10%"}</button>)}
+        {warnings.length>0&&<details className="rounded border border-amber-300 p-2"><summary>{warnings.length} layout warnings</summary>{warnings.map((w,i)=><button type="button" key={`${w.objectId}-${i}`} onClick={()=>select(w.objectId)} className="mt-1 block w-full text-left text-amber-800">{w.code}: {w.message}</button>)}</details>}
+        {[...scene.objects].reverse().map(o=><button type="button" key={o.id} onClick={e=>select(o.id,e.shiftKey)} className={`block w-full truncate rounded px-2 py-1 text-left ${selectedIds.includes(o.id)?"bg-indigo-100":"hover:bg-slate-100"}`}>{o.locked?"[Locked] ":""}{o.kind}: {o.text?.slice(0,18)||o.id.slice(0,8)}</button>)}
+        {ids.length>1&&<p className="text-indigo-700">{ids.length} selected</p>}
+        {ids.length>1&&!readOnly&&<div className="flex flex-wrap gap-1">
+          <button type="button" className={field} disabled={locked} onClick={()=>commit(groupSceneObjects(scene,ids,()=>crypto.randomUUID()))}>Group</button><button type="button" className={field} disabled={locked} onClick={()=>commit(ungroupSceneObjects(scene,ids))}>Ungroup</button>
+          {[-15,15].map(degrees=><button type="button" key={degrees} className={field} disabled={locked} onClick={()=>commit(rotateSceneSelection(scene,ids,degrees))}>Rotate {degrees}°</button>)}
+          {[0.9,1.1].map(scale=><button type="button" key={scale} className={field} disabled={locked} onClick={()=>scaleSelection(scale)}>Scale {scale<1?"-10%":"+10%"}</button>)}
         </div>}
-        {selectedIds.length > 2 && !readOnly && !selectionLocked && <div className="flex flex-wrap gap-1"><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"x"))}>Distribute H</button><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"y"))}>Distribute V</button></div>}
-        {selectedIds.length > 1 && !readOnly && !selectionLocked && <div className="flex flex-wrap gap-1"><button className={field} type="button" title="Group (Ctrl/Cmd+G)" onClick={()=>commit(groupSceneObjects(scene,selectedIds,()=>crypto.randomUUID()))}>Group</button><button className={field} type="button" title="Ungroup (Ctrl/Cmd+Shift+G)" onClick={()=>commit(ungroupSceneObjects(scene,selectedIds))}>Ungroup</button></div>}
-        {item && <div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button key={direction} className={field} disabled={readOnly || selectionLocked} onClick={()=>commit(alignSceneObjects(scene,selectedIds.length?selectedIds:[item.id],direction))}>{direction}</button>)}</div>}
-        {item && <>
-          <hr/><strong className="block">Object properties</strong>
-          {item.kind === "image" && <label className="block">Image fit<select className={field+" mt-1 w-full"} value={item.imageFit||"cover"} disabled={readOnly||item.locked} onChange={e=>patch({imageFit:e.target.value as "cover"|"contain"|"fill"})}><option value="cover">Crop to fill (cover)</option><option value="contain">Fit entire image (contain)</option><option value="fill">Stretch to fill</option></select></label>}
-          {item.kind === "image" && <div className="space-y-2">
-            {(["imageFocusX","imageFocusY"] as const).map((axis)=><label key={axis} className="block">
-              <span className="flex justify-between"><span>{axis === "imageFocusX"?"Horizontal focus":"Vertical focus"}</span><span>{Math.round((item[axis]??0.5)*100)}%</span></span>
-              <input aria-label={axis === "imageFocusX"?"Horizontal crop focus":"Vertical crop focus"} type="range" min={0} max={100} step={1} className="w-full"
-                disabled={readOnly||item.locked||item.imageFit==="fill"}
-                value={Math.round((item[axis]??0.5)*100)}
-                onChange={e=>patch({[axis]:Number(e.target.value)/100})}/>
-            </label>)}
-            <button type="button" className={field} disabled={readOnly||item.locked} onClick={()=>patch({imageFocusX:0.5,imageFocusY:0.5})}>Center image focus</button>
-          </div>}
-          {item.kind === "chart" && <label className="block">Chart data (label, value per line)<textarea rows={4} className={field+" mt-1 w-full"} disabled={readOnly||item.locked} value={(item.series||[]).map(x=>`${x.label},${x.value}`).join("\n")} onChange={e=>{const series=e.target.value.split("\n").filter(Boolean).map(row=>{const comma=row.lastIndexOf(",");return {label:row.slice(0,comma).trim(),value:Number(row.slice(comma+1))};}); if(series.length>=1 && series.length<=24 && series.every(x=>x.label && Number.isFinite(x.value) && x.value>=0)) patch({series});}} /></label>}
-          {item.kind === "text" && !readOnly && !item.locked && <button className={field+" w-full"} type="button" onClick={()=>setEditingTextId(item.id)}>Edit text on slide</button>}
-          {item.kind === "text" && <label className="block">Text<textarea className={field + " mt-1 w-full"} rows={3} value={item.text || ""} disabled={readOnly || !!item.locked} onChange={e => patch({ text: e.target.value })}/></label>}
-          {(["x","y","w","h","rotation","opacity"] as const).map(k => <label key={k} className="flex items-center justify-between gap-2 capitalize">{k}<input className={field + " w-24"} type="number" step={k === "opacity" ? 0.1 : 1} value={item[k] ?? 0} disabled={readOnly || item.locked} onChange={e => patch({ [k]: Number(e.target.value) })}/></label>)}
-          {item.kind === "text" && <label className="flex items-center justify-between">Font size<input type="number" className={field + " w-24"} value={item.fontSize || 44} disabled={readOnly || !!item.locked} onChange={e => patch({fontSize:Number(e.target.value)})}/></label>}
-          <label className="flex items-center justify-between">Color<input className={field + " w-24"} value={item.kind === "text" ? item.color || "" : item.fill || ""} disabled={readOnly || !!item.locked} onChange={e => patch(item.kind === "text" ? { color: e.target.value } : { fill: e.target.value })}/></label>
-          <label className="flex items-center justify-between">Locked<input type="checkbox" checked={!!item.locked} disabled={readOnly} onChange={e => commit(scenePatchObject(scene,item.id,{locked:e.target.checked}))}/></label>
-          <strong className="block">Animation</strong>
-          <label className="block">Effect<select className={field + " w-full"} value={item.motion?.kind || "none"} disabled={readOnly || !!item.locked} onChange={e => patch({motion:{kind:e.target.value as NonNullable<SlideSceneObject["motion"]>["kind"],trigger:item.motion?.trigger||"with-previous",durationMs:item.motion?.durationMs||450,delayMs:item.motion?.delayMs||0}})}>
-            {["none","fade","rise","slide","zoom","wipe"].map(v => <option key={v} value={v}>{v}</option>)}</select></label>
-          <label className="block">Trigger<select className={field + " w-full"} value={item.motion?.trigger || "with-previous"} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:e.target.value as NonNullable<SlideSceneObject["motion"]>["trigger"],durationMs:item.motion?.durationMs||450,delayMs:item.motion?.delayMs||0}})}>
-            {["with-previous","after-previous","on-click"].map(v => <option key={v}>{v}</option>)}</select></label>
-          <label className="flex items-center justify-between">Duration ms<input className={field + " w-24"} type="number" value={item.motion?.durationMs || 450} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:item.motion?.trigger||"with-previous",durationMs:Number(e.target.value),delayMs:item.motion?.delayMs||0}})}/></label>
-          <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120 || !!item.locked} onClick={()=>{const next=duplicateSceneSelection(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());if(next!==scene){commit(next);select(next.objects[next.objects.length-1].id);}}}>Duplicate</button>
-            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(moveSceneSelectionLayer(scene,selectedIds.length?selectedIds:[item.id],-1))}>Back</button>
-            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(moveSceneSelectionLayer(scene,selectedIds.length?selectedIds:[item.id],1))}>Front</button>
-            <button className={field} disabled={readOnly || !!item.locked} onClick={() => {commit(deleteSceneSelection(scene,selectedIds.length?selectedIds:[item.id]));setSelected(null);setSelectedIds([]);}}>Delete</button>
-          </div>
+        {item&&<div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button type="button" key={direction} className={field} disabled={readOnly||locked} onClick={()=>commit(alignSceneObjects(scene,ids,direction))}>{direction}</button>)}
+          {ids.length>2&&(["x","y"] as const).map(axis=><button type="button" key={axis} className={field} disabled={readOnly||locked} onClick={()=>commit(distributeSceneObjects(scene,ids,axis))}>Distribute {axis==="x"?"H":"V"}</button>)}
+        </div>}
+        {item&&<><hr/><SlideSceneProperties key={item.id} object={item} readOnly={readOnly} onPatch={patch} onLock={value=>{if(!readOnly)commit(scenePatchObject(scene,item.id,{locked:value}));}} onEditText={()=>beginText(item.id)} onTimeline={()=>{timeline.current?.scrollIntoView({block:"nearest"});timeline.current?.focus();}}/>
+          <div className="flex flex-wrap gap-1"><button type="button" className={field} disabled={readOnly||locked||scene.objects.length>=120} onClick={duplicate}>Duplicate</button><button type="button" className={field} disabled={readOnly||locked} onClick={()=>commit(moveSceneSelectionLayer(scene,ids,-1))}>Back</button><button type="button" className={field} disabled={readOnly||locked} onClick={()=>commit(moveSceneSelectionLayer(scene,ids,1))}>Front</button><button type="button" className={field} disabled={readOnly||locked} onClick={remove}>Delete</button></div>
         </>}
       </aside>
     </div>
-    <SlideSceneTimeline scene={scene} selected={selected} onSelect={select} readOnly={readOnly} onChange={commit}/>
+    <div ref={timeline} tabIndex={-1}><SlideSceneTimeline scene={scene} selected={selected} onSelect={select} onChange={next=>commit(next)} readOnly={readOnly} backgroundColor={backgroundColor}/></div>
   </div>;
 }
