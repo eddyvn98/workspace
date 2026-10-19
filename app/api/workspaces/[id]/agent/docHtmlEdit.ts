@@ -98,6 +98,20 @@ function adaptForListItem(added: string, target: HtmlNode): string {
   return items;
 }
 
+function preserveReplacedLine(content: string, target: HtmlNode): string {
+  const nodes = parseHtml(content).filter((node) => node.tag !== '#text' || node.text?.trim());
+  const lineId = attrValue(target, 'data-line-id');
+  if (!lineId || nodes.length !== 1) return content;
+  const replacement = nodes[0];
+  if (!['p', 'h1', 'h2', 'h3', 'li', 'blockquote'].includes(replacement.tag)) return content;
+  // A plain-language rewrite of a heading keeps its type and alignment. Explicit headings still change type.
+  if (replacement.tag === 'p' && /^h[1-3]$/.test(target.tag)) {
+    return `<${target.tag}${target.attrs}>${content.slice(replacement.innerStart, replacement.innerEnd)}</${target.tag}>`;
+  }
+  return content.replace(new RegExp(`^\\s*<${replacement.tag}([^>]*)>`), (_whole, attrs: string) =>
+    `<${replacement.tag}${attrs.replace(/\s+data-line-id=(?:"[^"]*"|'[^']*')/g, '')} data-line-id="${escapeAttr(lineId)}">`);
+}
+
 /**
  * Applies new doc html to stored html without resending the document.
  * Returns null when the heading or lineId anchor cannot be found.
@@ -110,7 +124,8 @@ export function spliceDocHtml(html: string, added: string, options: SpliceOption
     walkNodes(nodes, (node) => { if (attrValue(node, "data-line-id") === options.lineId) { found.push(node); return true; } });
     const target = found[0];
     if (!target) return null;
-    const content = target.tag === "li" ? adaptForListItem(added, target) : added;
+    let content = target.tag === "li" ? adaptForListItem(added, target) : added;
+    if (mode === 'replace') content = preserveReplacedLine(content, target);
     if (mode === "prepend") return html.slice(0, target.start) + content + html.slice(target.start);
     if (mode === "append") return html.slice(0, target.end) + content + html.slice(target.end);
     return html.slice(0, target.start) + withKeptTables(html.slice(target.start, target.end), content) + html.slice(target.end);

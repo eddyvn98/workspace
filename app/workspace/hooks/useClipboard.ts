@@ -12,7 +12,7 @@ import {
   resolveTransform,
 } from "../types/block";
 import { createConnectorId, type CanvasConnector } from "../types/connector";
-import { withoutTableAttachments } from "../utils/tableAttachments";
+import { remapWorkspaceDocReferences } from '../utils/workspaceDocReferences';
 import { collectReferencedBlockIds, remapContainerReferences } from "../utils/blockReferences";
 import { writeWorkspaceImageToClipboard } from "../utils/workspaceImageClipboardWrite";
 import { currentMapLayout, findMapRootId } from "../layout/mapRoot";
@@ -93,7 +93,7 @@ export function useClipboard(): UseClipboardResult {
     for (const id of orderedIds) {
       const block = blocks[id];
       if (block) {
-        clonedBlocks.push({ ...cloneValue(block), data: withoutTableAttachments(block) });
+        clonedBlocks.push(cloneValue(block));
       }
     }
 
@@ -136,7 +136,7 @@ export function useClipboard(): UseClipboardResult {
     for (const id of orderedIds) {
       const block = blocks[id];
       if (block) {
-        clonedBlocks.push({ ...cloneValue(block), data: withoutTableAttachments(block) });
+        clonedBlocks.push(cloneValue(block));
       }
     }
 
@@ -194,7 +194,7 @@ export function useClipboard(): UseClipboardResult {
       const parentId = isClipboardRoot ? destinationId : idMap.get(block.parentId!);
       const isPastedMapRoot = !parentId;
 
-      const newBlock: CanvasBlock = {
+      const newBlock: CanvasBlock = remapWorkspaceDocReferences({
         id: newId,
         type: block.type,
         // A pasted tree must be laid out from its new parent. Keeping the
@@ -202,7 +202,8 @@ export function useClipboard(): UseClipboardResult {
         // old absolute coordinates, so the reflow pass cannot move the
         // branch beside the destination node.
         transform: parentId ? createComputedTransform(newTransform) : createDualTransform(newTransform),
-        data: remapContainerReferences(cloneValue(withoutTableAttachments(block)), idMap),
+        data: remapContainerReferences(cloneValue(block.data), idMap),
+        ...(block.embeddedInDocId ? { embeddedInDocId: block.embeddedInDocId } : {}),
         ...(parentId ? { parentId } : {}),
         ...(block.style ? { style: cloneValue(block.style) } : {}),
         ...(block.icon ? { icon: block.icon } : {}),
@@ -214,7 +215,7 @@ export function useClipboard(): UseClipboardResult {
         ...(isPastedMapRoot && sourceMapLayout ? { mapLayout: cloneValue(sourceMapLayout) } : {}),
         createdAt: now,
         updatedAt: now,
-      };
+      }, idMap);
 
       addBlock(newBlock);
       newBlockIds.push(newId);

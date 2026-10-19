@@ -10,13 +10,14 @@ import { TableBlock } from "../renderers/TableBlock";
 import { WorkspaceTableSelectionToolbar } from "./WorkspaceTableSelectionToolbar";
 import { WORKSPACE_TABLE_CELL_EDITOR_COMMAND_EVENT, type TableCellEditorCommand } from "./table/TableCellEditorToolbar";
 
-export function WorkspaceDocTableNodeView({ node, deleteNode }: NodeViewProps) {
+export function WorkspaceDocTableNodeView({ node, deleteNode, extension }: NodeViewProps) {
   const tableId = String(node.attrs.tableId ?? "");
   const table = useWorkspaceStore((state) => {
     const block = state.blocks[tableId];
     return block?.type === "table" ? block as CanvasBlock<"table"> : null;
   });
-  const isReadOnly = useWorkspaceStore((state) => state.isReadOnly);
+  const storeReadOnly = useWorkspaceStore((state) => state.isReadOnly);
+  const isReadOnly = storeReadOnly || extension.options.readOnly === true;
   const setSelection = useWorkspaceStore((state) => state.setSelection);
   const selectedBlockIds = useWorkspaceStore((state) => state.selectedBlockIds);
   const updateBlock = useWorkspaceStore((state) => state.updateBlock);
@@ -46,8 +47,9 @@ export function WorkspaceDocTableNodeView({ node, deleteNode }: NodeViewProps) {
   }, [selectEmbeddedTable]);
 
   const onCellCommand = useCallback((command: TableCellEditorCommand) => {
+    if (isReadOnly) return;
     window.dispatchEvent(new CustomEvent(WORKSPACE_TABLE_CELL_EDITOR_COMMAND_EVENT, { detail: command }));
-  }, []);
+  }, [isReadOnly]);
 
   useEffect(() => {
     if (!tableSelected) return;
@@ -71,7 +73,7 @@ export function WorkspaceDocTableNodeView({ node, deleteNode }: NodeViewProps) {
 
   return (
     <NodeViewWrapper className="workspace-doc-table-embed" contentEditable={false} data-workspace-doc-table-id={tableId}>
-      {tableSelected && typeof document !== "undefined" && createPortal(
+      {tableSelected && !isReadOnly && typeof document !== "undefined" && createPortal(
         <WorkspaceTableSelectionToolbar
           block={table}
           toolbarRef={toolbarRef}
@@ -83,7 +85,7 @@ export function WorkspaceDocTableNodeView({ node, deleteNode }: NodeViewProps) {
       )}
       <div ref={tableHostRef} className="workspace-doc-table-shell" onPointerDown={stopAndSelectEmbeddedTable}>
         <div className="workspace-doc-table-scroll">
-          <TableBlock block={table} isSelected={tableSelected} isEmbedded onSelectEmbedded={selectEmbeddedTable} onChange={handleChange} />
+          <TableBlock block={table} isSelected={tableSelected} readOnly={isReadOnly} isEmbedded onSelectEmbedded={selectEmbeddedTable} onChange={handleChange} />
         </div>
       </div>
     </NodeViewWrapper>

@@ -2,9 +2,12 @@ import type { BlockId, CanvasBlock } from "../types/block";
 import type { CanvasConnector, ConnectorId } from "../types/connector";
 import { renderSlideDeckMarkdown, slideDeckLabel } from "./markdownSlideExport";
 import { renderMarkdownPipeTable } from "./tableImportParsers";
+import { workspaceDocToMarkdown } from './workspaceDocMarkdown';
+import { includeWorkspaceDocTables } from './workspaceDocReferences';
 
 const DATA_BLOCK_START = "<!--WORKSPACE_DATA";
 const DATA_BLOCK_END = "WORKSPACE_DATA-->";
+const portableJson = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 
 function getBlockLabel(block: CanvasBlock): string {
   let text = "";
@@ -47,6 +50,11 @@ function renderMarkdownNode(
 
   const block = blocks[blockId];
   if (!block) return "";
+  if (block.type === 'table' && block.embeddedInDocId && blocks[block.embeddedInDocId]?.type === 'doc') return '';
+  if (block.type === 'doc') {
+    const content = workspaceDocToMarkdown((block as CanvasBlock<'doc'>).data.html, blocks);
+    return `\n${content || '(Empty document)'}\n\n`;
+  }
 
   const label = getBlockLabel(block);
   const indent = "  ".repeat(depth);
@@ -118,7 +126,7 @@ export function exportToMarkdown(
     connectors: connectors ?? {},
     exportedAt: Date.now(),
   };
-  const dataBlock = `${DATA_BLOCK_START}\n${JSON.stringify(payload)}\n${DATA_BLOCK_END}\n`;
+  const dataBlock = `${DATA_BLOCK_START}\n${portableJson(payload)}\n${DATA_BLOCK_END}\n`;
 
   return `${titleHeader}${outline}\n${dataBlock}`;
 }
@@ -130,8 +138,8 @@ export function exportSelectionToMarkdown(
   title?: string,
   connectors?: Record<ConnectorId, CanvasConnector>
 ): string {
-  const selectedSet = new Set(selectedBlockIds);
-  const selectedBlocks = blockOrder
+  const selectedSet = new Set(includeWorkspaceDocTables(blocks, selectedBlockIds));
+  const selectedBlocks = [...new Set([...blockOrder, ...selectedSet])]
     .filter((id) => selectedSet.has(id))
     .map((id) => blocks[id])
     .filter((b): b is CanvasBlock => Boolean(b));
@@ -164,7 +172,7 @@ export function exportSelectionToMarkdown(
 
   const roots = selectedBlocks.filter((b) => !b.parentId || !selectedSet.has(b.parentId));
   for (const root of roots) {
-    outline += renderMarkdownNode(root.id, 0, visited, blocks, childrenByParent);
+    outline += renderMarkdownNode(root.id, 0, visited, selectedBlocksRecord, childrenByParent);
   }
 
   const docTitle = `${title || "workspace"} (Selection)`;
@@ -177,7 +185,7 @@ export function exportSelectionToMarkdown(
     connectors: selectedConnectors,
     exportedAt: Date.now(),
   };
-  const dataBlock = `${DATA_BLOCK_START}\n${JSON.stringify(payload)}\n${DATA_BLOCK_END}\n`;
+  const dataBlock = `${DATA_BLOCK_START}\n${portableJson(payload)}\n${DATA_BLOCK_END}\n`;
 
   return `${titleHeader}${outline}\n${dataBlock}`;
 }

@@ -1,5 +1,6 @@
 import { addDocTextToBlocks, compactAgentRecord } from "./agentReadSummary";
 import { NextRequest, NextResponse } from "next/server";
+import { withoutDocumentState } from "@/lib/workspace/boardPublicFields";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveWorkspaceCallerAuth, resolveWorkspaceCallerEmail } from "../_auth";
@@ -12,6 +13,9 @@ import {
 } from "../_edit-events";
 import { commitBoardContent } from "@/lib/workspace/boardCommit";
 import { maybeRunResourceOrphanSweep } from "@/lib/workspace/resource-retention";
+import { workspaceRealtimeDeliveryConfigured } from "@/lib/workspace/ws-repository-notify";
+import { repositoryBoardPatch } from "@/lib/workspace/repositoryBoardPatch";
+import { drainWorkspaceRealtimeOutbox, enqueueWorkspaceRealtimePatch } from "@/lib/workspace/realtimeOutbox";
 
 /** GET /api/workspaces/[id] — board snapshot; agent callers get a compact view by default.
  *  Any collaborator (owner, EDITOR, or VIEWER) can read.
@@ -84,7 +88,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       treeCatalogDescendantStyle: board.treeCatalogDescendantStyle,
       view: fullAgentRead ? "full" : "summary",
     }
-    : board;
+    : withoutDocumentState(board);
 
   return NextResponse.json({
     ...boardView,
@@ -169,12 +173,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       params.id, asBlockRecord(existing?.connectors), asBlockRecord(connectors), email,
     ),
   ];
+  if (body.documentState !== undefined) {
+    const { validateDocumentCheckpoint } = await import("@/lib/workspace/document-checkpoint");
+    if (!validateDocumentCheckpoint(body.documentState, blocks)) {
+      return NextResponse.json({ error: "Document checkpoint does not match its content", reason: "invalid_document_state" }, { status: 400 });
+    }
+  }
   const content = {
     title,
     blocks: blocks as Prisma.InputJsonValue,
     blockOrder: blockOrder as Prisma.InputJsonValue,
     connectors: connectors as Prisma.InputJsonValue,
     camera: camera as Prisma.InputJsonValue,
+    ...(typeof body.documentState === "string" ? { documentState: body.documentState } : {}),
     ...(frames !== undefined ? { frames: frames as Prisma.InputJsonValue } : {}),
     ...treeLayoutFields,
   };
@@ -190,6 +201,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     editEvents,
     baseRevision: Number.isInteger(baseRevision) ? (baseRevision as number) : null,
     existing,
+    ...(workspaceRealtimeDeliveryConfigured() ? {
+      writeRealtimeOutbox: (tx, committed) => enqueueWorkspaceRealtimePatch(tx, {
+        boardId: params.id, revision: committed.revision, patch: repositoryBoardPatch(existing, content),
+      }),
+    } : {}),
   });
 
   if ("gone" in outcome) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -200,7 +216,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     );
   }
 
-  return NextResponse.json(outcome.board);
+  await drainWorkspaceRealtimeOutbox(20, params.id).catch(error => console.warn("[workspace] REST save notification will retry", error));
+  return NextResponse.json(withoutDocumentState(outcome.board));
 }
 
 function asOptionalString(value: unknown): string | undefined {

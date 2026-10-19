@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { postWorkspaceAgentPatch, type WorkspaceAgentPatch } from "./ws-repository-notify";
+import { postWorkspaceAgentPatch, workspaceRealtimeDeliveryConfigured, type WorkspaceAgentPatch } from "./ws-repository-notify";
 
 const LEASE_SECONDS = 60;
 const MAX_RETRY_DELAY_MS = 30_000;
@@ -58,9 +58,7 @@ async function claimEvents(limit: number, boardId?: string): Promise<PendingOutb
 }
 
 async function deliverEvent(event: PendingOutboxEvent): Promise<boolean> {
-  const internalUrl = process.env.MINDMAP_WS_INTERNAL_URL;
-  const secret = process.env.MINDMAP_WS_TOKEN_SECRET;
-  if (!internalUrl || !secret) return false;
+  if (!workspaceRealtimeDeliveryConfigured()) return false;
 
   try {
     await postWorkspaceAgentPatch(event.boardId, event.patch as unknown as WorkspaceAgentPatch, event.revision);
@@ -85,7 +83,7 @@ async function deliverEvent(event: PendingOutboxEvent): Promise<boolean> {
 
 /** Delivers oldest pending revisions first per board; duplicate deliveries are safe. */
 export async function drainWorkspaceRealtimeOutbox(limit = 20, boardId?: string): Promise<{ claimed: number; delivered: number }> {
-  if (!process.env.MINDMAP_WS_INTERNAL_URL || !process.env.MINDMAP_WS_TOKEN_SECRET) {
+  if (!workspaceRealtimeDeliveryConfigured()) {
     return { claimed: 0, delivered: 0 };
   }
   const boundedLimit = Math.max(1, Math.min(100, Math.floor(limit)));

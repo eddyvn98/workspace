@@ -1,4 +1,5 @@
 import { collectReferencedBlockIds, remapContainerReferences } from "@/app/workspace/utils/blockReferences";
+import { remapWorkspaceDocReferences, removeWorkspaceDocReferences } from '@/app/workspace/utils/workspaceDocReferences';
 import { fitMapNodeSize } from "./mapNodeSize";
 import { normalizeTable, type JsonMap } from "./operationsTables";
 export type AgentBoardState = {
@@ -234,6 +235,7 @@ export function removeSubtree(state: AgentBoardState, rootId: string): string[] 
     Object.values(state.blocks).forEach((block) => { if (typeof block.parentId === "string" && ids.has(block.parentId) && !ids.has(String(block.id))) { ids.add(String(block.id)); changed = true; } });
   }
   ids.forEach((blockId) => delete state.blocks[blockId]);
+  for (const blockId of ids) state.blocks = removeWorkspaceDocReferences(state.blocks, blockId);
   state.blockOrder = state.blockOrder.filter((blockId) => !ids.has(blockId));
   removeConnectors(state, (item) => ids.has(String(item.fromBlockId)) || ids.has(String(item.toBlockId)));
   return [...ids];
@@ -246,7 +248,7 @@ export function duplicateSubtree(state: AgentBoardState, rootId: string, offsetX
   sourceIds.forEach((sourceId) => {
     const source = state.blocks[sourceId];
     if (!source) return;
-    const copy = structuredClone(source);
+    const copy = remapWorkspaceDocReferences(structuredClone(source), mapping);
     const copyId = mapping.get(sourceId)!;
     copy.id = copyId;
     copy.data = remapContainerReferences(copy.data, mapping);

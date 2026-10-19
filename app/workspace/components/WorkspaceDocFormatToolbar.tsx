@@ -19,12 +19,22 @@ import {
   Quote,
   Strikethrough,
   Underline,
+  Undo2,
+  Redo2,
+  Eraser,
+  Code2,
+  Minus,
+  FileDown,
+  Printer,
 } from "lucide-react";
+import { toast } from "sonner";
 import { WorkspaceSmartPopover } from "../utils/WorkspaceSmartPopover";
 import type { WorkspaceInlineRichEditorActiveMarks, WorkspaceInlineRichEditorCommands } from "../store/useWorkspaceStore";
-import { uploadWorkspaceImageWithOriginal } from "../utils/imageUpload";
-import { requestDocEditor } from "../utils/workspaceDocEditorEvents";
+import { useWorkspaceStore } from "../store/useWorkspaceStore";
+import { workspaceDocEditorUrl } from "../utils/workspaceDocEditorEvents";
 import type { BlockId } from "../types/block";
+import { WorkspaceDocTypographyControls } from "./WorkspaceDocTypographyControls";
+import { downloadWorkspaceDocHtml, printWorkspaceDoc } from "../utils/workspaceDocExportClient";
 
 const buttonClass = "flex items-center gap-1 rounded-lg p-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800";
 const activeButtonClass = `${buttonClass} bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400`;
@@ -50,7 +60,7 @@ export function WorkspaceDocFormatToolbar({
 }: {
   commands: WorkspaceInlineRichEditorCommands;
   marks: WorkspaceInlineRichEditorActiveMarks;
-  /** Needed for "Open in new tab" (requestDocEditor) — omit only where the
+  /** Needed for "Open in new tab" — omit only where the
    *  page IS already that standalone editor (hideExpand below). */
   blockId?: BlockId;
   boardId?: string;
@@ -62,18 +72,17 @@ export function WorkspaceDocFormatToolbar({
   const [open, setOpen] = useState<DocPopoverKey>(null);
   const [linkDraft, setLinkDraft] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const isDocument = useWorkspaceStore(state => Boolean(blockId && state.blocks[blockId]?.type === "doc"));
   const toggle = (key: Exclude<DocPopoverKey, null>) => setOpen((current) => {
     if (current !== "link" && key === "link") setLinkDraft(marks.linkHref ?? "");
     return current === key ? null : key;
   });
 
-  const handleInsertImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInsertImage = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !file.type.startsWith("image/")) return;
-    const uploaded = await uploadWorkspaceImageWithOriginal(file);
-    if (!uploaded) return;
-    commands.insertImage?.(uploaded.url, file.name);
+    void commands.uploadImage?.(file);
   };
 
   const headingLabel = marks.heading1 ? "H1" : marks.heading2 ? "H2" : marks.heading3 ? "H3" : "¶";
@@ -92,6 +101,7 @@ export function WorkspaceDocFormatToolbar({
     ["Underline", Underline, marks.underline, commands.toggleUnderline],
     ["Strikethrough", Strikethrough, marks.strike, commands.toggleStrike],
     ["Code", Code, Boolean(marks.code), () => commands.toggleCode?.()],
+    ["Code block", Code2, Boolean(marks.codeBlock), () => commands.toggleCodeBlock?.()],
   ];
   const alignActions: Array<[label: string, Icon: typeof AlignLeft, active: boolean, run: () => void]> = [
     ["Align left", AlignLeft, marks.align === "left", () => commands.setTextAlign("left")],
@@ -106,7 +116,9 @@ export function WorkspaceDocFormatToolbar({
   ];
 
   return (
-    <>
+    <div role="toolbar" aria-label="Document formatting" className="flex min-w-0 flex-wrap items-center gap-1" onPointerDown={(event) => event.stopPropagation()}>
+      {commands.undo && <button type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled={!marks.canUndo} className={`${buttonClass} disabled:opacity-35`} onClick={commands.undo}><Undo2 className="h-3.5 w-3.5" /></button>}
+      {commands.redo && <button type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled={!marks.canRedo} className={`${buttonClass} disabled:opacity-35`} onClick={commands.redo}><Redo2 className="h-3.5 w-3.5" /></button>}
       <div className="relative">
         <button type="button" title="Heading" aria-label="Heading" aria-expanded={open === "heading"} aria-haspopup="dialog" className={open === "heading" ? activeButtonClass : buttonClass} onClick={() => toggle("heading")}>
           <span className="w-5 text-center font-bold">{headingLabel}</span><ChevronDown className="h-3 w-3 text-slate-400" />
@@ -119,6 +131,8 @@ export function WorkspaceDocFormatToolbar({
           </div>
         </WorkspaceSmartPopover>}
       </div>
+
+      <WorkspaceDocTypographyControls commands={commands} marks={marks} />
 
       <div className="relative">
         <button type="button" title="Text style" aria-label="Text style" aria-expanded={open === "style"} aria-haspopup="dialog" className={open === "style" ? activeButtonClass : buttonClass} onClick={() => toggle("style")}>
@@ -160,6 +174,8 @@ export function WorkspaceDocFormatToolbar({
       </div>
 
       <button type="button" title="Quote" aria-label="Quote" aria-pressed={marks.blockquote} className={marks.blockquote ? activeButtonClass : buttonClass} onClick={commands.toggleBlockquote}><Quote className="h-3.5 w-3.5" /></button>
+      {commands.insertHorizontalRule && <button type="button" title="Insert divider" aria-label="Insert divider" className={buttonClass} onClick={commands.insertHorizontalRule}><Minus className="h-3.5 w-3.5" /></button>}
+      {commands.clearFormatting && <button type="button" title="Clear formatting" aria-label="Clear formatting" className={buttonClass} onClick={commands.clearFormatting}><Eraser className="h-3.5 w-3.5" /></button>}
 
       <div className="relative">
         <button type="button" title="Link" aria-label="Link" aria-expanded={open === "link"} aria-haspopup="dialog" aria-pressed={Boolean(marks.link)} className={open === "link" || marks.link ? activeButtonClass : buttonClass} onClick={() => toggle("link")}><LinkIcon className="h-3.5 w-3.5" /></button>
@@ -183,24 +199,30 @@ export function WorkspaceDocFormatToolbar({
       </div>
 
       <input ref={imageInputRef} type="file" accept="image/*" onChange={handleInsertImage} style={{ display: "none" }} />
-      <button type="button" title="Insert image" aria-label="Insert image" className={buttonClass} onClick={() => imageInputRef.current?.click()}>
+      {commands.uploadImage && <button type="button" title="Insert image" aria-label="Insert image" className={buttonClass} onClick={() => imageInputRef.current?.click()}>
         <ImagePlus className="h-3.5 w-3.5" />
-      </button>
+      </button>}
 
-      {!hideExpand && blockId && (
-        <button
-          type="button"
+      {blockId && isDocument && <>
+        <button type="button" title="Download HTML" aria-label="Download document as HTML" className={buttonClass} onClick={() => { void downloadWorkspaceDocHtml(blockId).catch(error => toast.error(error instanceof Error ? error.message : "Could not export this document.")); }}><FileDown className="h-3.5 w-3.5" /></button>
+        <button type="button" title="Print / Save PDF" aria-label="Print document or save as PDF" className={buttonClass} onClick={() => { void printWorkspaceDoc(blockId).catch(error => toast.error(error instanceof Error ? error.message : "Could not open document printing.")); }}><Printer className="h-3.5 w-3.5" /></button>
+      </>}
+
+      {!hideExpand && blockId && isDocument && (
+        <a
+          href={workspaceDocEditorUrl(blockId, boardId ?? "")}
+          target="_blank"
+          rel="noopener noreferrer"
           title="Open in new tab"
           aria-label="Open in new tab"
           className={buttonClass}
-          onClick={() => requestDocEditor(blockId, boardId ?? "")}
         >
           <Maximize2 className="h-3.5 w-3.5" />
-        </button>
+        </a>
       )}
 
       <div className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-200" aria-hidden="true" />
-    </>
+    </div>
   );
 }
 

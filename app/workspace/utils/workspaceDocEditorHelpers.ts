@@ -16,6 +16,13 @@ export function computeActiveMarks(editor: Editor): WorkspaceInlineRichEditorAct
     code: editor.isActive("code"), heading1: editor.isActive("heading", { level: 1 }), heading2: editor.isActive("heading", { level: 2 }),
     heading3: editor.isActive("heading", { level: 3 }), taskList: editor.isActive("taskList"), link: editor.isActive("link"),
     linkHref: (editor.getAttributes("link").href as string | undefined) ?? "",
+    fontFamily: editor.getAttributes("textStyle").fontFamily ?? "",
+    fontSize: editor.getAttributes("textStyle").fontSize ?? "",
+    textColor: editor.getAttributes("textStyle").color ?? "",
+    highlightColor: editor.getAttributes("highlight").color ?? "",
+    lineHeight: editor.getAttributes("textStyle").lineHeight ?? "",
+    codeBlock: editor.isActive("codeBlock"),
+    canUndo: editor.can().undo(), canRedo: editor.can().redo(),
   };
 }
 

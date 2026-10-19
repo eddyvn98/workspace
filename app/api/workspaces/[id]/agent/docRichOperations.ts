@@ -4,7 +4,7 @@ import { docHasTable, editDocText, embedNodeHtml, hasMarks, normalizeMarks, spli
 import { param, record, targetIds, text, type JsonMap } from "./paritySelectionOperations";
 import type { AgentBoardState } from "./operations";
 
-/** Markdown or html content for a doc block, sanitized (text-align is the only style kept). */
+/** Markdown/HTML sanitized to the supported document schema, including text styles and native table widths. */
 export function docContentHtml(content: string): string {
   return sanitizeAgentHtml(looksLikeHtml(content) ? content : markdownToDocHtml(content), { docAlign: true });
 }
