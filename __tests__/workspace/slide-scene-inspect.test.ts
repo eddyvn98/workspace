@@ -13,6 +13,16 @@ describe("Scene V2 design quality checks",()=>{
     expect(inspectSlideScene(scene).some(x=>x.code==="collision")).toBe(true);
     expect(scene.objects[0].text).toBe("Headline");
   });
+  it("warns before exporting a noncontiguous group as ungrouped objects",()=>{
+    const scene=normalizeSlideScene({version:2,objects:[
+      {...text,id:"first",groupId:"g"},
+      {id:"separator",kind:"shape",x:60,y:300,w:80,h:80,rotation:0},
+      {...text,id:"second",groupId:"g",y:400},
+    ]})!;
+    expect(inspectSlideScene(scene).some(x=>x.code==="group-export")).toBe(true);
+    const adjacent={...scene,objects:[scene.objects[0],scene.objects[2],scene.objects[1]]};
+    expect(inspectSlideScene(adjacent).some(x=>x.code==="group-export")).toBe(false);
+  });
   it("does not report warnings on a clean scene",()=>{
     const scene=normalizeSlideScene({version:2,objects:[text]})!;
     expect(inspectSlideScene(scene)).toEqual([]);
