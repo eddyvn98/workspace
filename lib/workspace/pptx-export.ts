@@ -58,7 +58,7 @@ export async function exportBoardPptx(
       }
       y += height + 14 * scale;
     }
-    const transition = slide.transition === "fade" ? '<p:fade/>' : slide.transition === "slide" ? '<p:push dir="l"/>' : slide.transition === "zoom" ? '<p:zoom dir="in"/>' : "";
+    const transition = slide.transition === "fade" ? '<p:fade/>' : slide.transition === "slide" ? '<p:push dir="l"/>' : slide.transition === "zoom" ? '<p:zoom dir="in"/>' : slide.transition === "wipe" ? '<p:wipe dir="r"/>' : "";
     zip.file(`ppt/slides/slide${i + 1}.xml`, `<?xml version="1.0" encoding="UTF-8"?><p:sld ${NS}><p:cSld name="${xml(slide.name)}"><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${background}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree>${group}${shapes.join("")}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transition ? `<p:transition spd="med">${transition}</p:transition>` : ""}</p:sld>`);
     zip.file(`ppt/slides/_rels/slide${i + 1}.xml.rels`, rels(relationships));
     addPptxNotes(zip, i + 1, slide.presenterNotes ?? "");
