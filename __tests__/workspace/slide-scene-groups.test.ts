@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
-import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, translateSceneSelection, ungroupSceneObjects } from "@/app/workspace/utils/slideSceneGroups";
+import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, moveSceneSelectionLayer, translateSceneSelection, ungroupSceneObjects } from "@/app/workspace/utils/slideSceneGroups";
 
 const base = normalizeSlideScene({version:2,objects:[
   {id:"a",kind:"text",text:"A",x:20,y:40,w:100,h:80,rotation:0},
@@ -39,6 +39,17 @@ describe("Slide Scene logical groups",()=>{
     const locked={...base,objects:base.objects.map(o=>o.id==="b"?{...o,locked:true}:o)};
     expect(groupSceneObjects(locked,["a","b"],()=>"group-2")).toBe(locked);
     expect(translateSceneSelection(locked,["a","b"],10,0).objects.map(o=>o.x)).toEqual([30,180,400]);
+  });
+  it("preserves relative z-order of selected group members when moving a layer",()=>{
+    const interspersed={...grouped,objects:[grouped.objects[0],grouped.objects[2],grouped.objects[1]]};
+    expect(moveSceneSelectionLayer(interspersed,["a"],1).objects.map(o=>o.id)).toEqual(["c","a","b"]);
+    expect(moveSceneSelectionLayer(interspersed,["b"],-1).objects.map(o=>o.id)).toEqual(["a","b","c"]);
+  });
+  it("never moves or duplicates part of a locked logical group",()=>{
+    const locked={...grouped,objects:grouped.objects.map(o=>o.id==="b"?{...o,locked:true}:o)};
+    expect(translateSceneSelection(locked,["a"],20,20).objects.map(o=>o.x)).toEqual([20,180,400]);
+    expect(duplicateSceneSelection(locked,["a"],()=>"new").objects).toHaveLength(3);
+    expect(moveSceneSelectionLayer(locked,["a"],1)).toBe(locked);
   });
   it("returns the input on single-object grouping or no-op",()=>{
     expect(groupSceneObjects(base,["a"],()=>"unused")).toBe(base);
