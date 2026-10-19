@@ -1,6 +1,7 @@
 "use client";
 import { useSlidePresentationRequest } from "../utils/slidePresentationRequest";
 import React, { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { registerBlockRenderer, type BlockRendererProps } from "./registry";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { WorkspaceDocRichEditor } from "./WorkspaceDocRichEditor";
@@ -26,6 +27,13 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const actions = useSlideDeckActions(data, (patch) => { if (!readOnly) onChange(patch); });
   useSlidePresentationRequest(block.id, actions.startPresenting);
   const [isEditingBody, setIsEditingBody] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  useEffect(() => {
+    if (!studioOpen) return;
+    const prior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prior; };
+  }, [studioOpen]);
   const boardId = useWorkspaceStore(state => state.boardId);
   const pendingEditBlockId = useWorkspaceStore((state) => state.pendingEditBlockId);
   const setPendingEditBlockId = useWorkspaceStore((state) => state.setPendingEditBlockId);
@@ -49,12 +57,18 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const activeSlideId = data.activeSlideId ?? data.slideOrder[0];
   const activeSlide = data.slides[activeSlideId];
 
-  return (
-    <div style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: "6px", backgroundColor: "#ffffff",
+  const filmstrip = <SlideFilmstrip data={data} orientation={studioOpen ? "vertical" : "horizontal"}
+    onSelect={actions.selectSlide} onAdd={actions.addSlide} onReorder={actions.reorderSlide}
+    onRename={actions.renameSlide} onDuplicate={actions.duplicateSlide} onDelete={actions.deleteSlide}
+    onSetStatus={actions.updateStatus} onSetBackground={actions.updateBackground}
+    onSetNotes={actions.updateNotes} onSetHidden={actions.updateHidden} />;
+  const editorContent = (
+    <div className="slide-deck-studio" style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: studioOpen ? "0" : "6px", backgroundColor: "#ffffff",
       border: `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#2563eb" : "#e2e8f0"}`,
       boxShadow: isSelected ? "0 0 0 1px #2563eb, 0 4px 6px -1px rgba(0, 0, 0, 0.1)" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
       overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <SlideDeckToolbar blockId={block.id} title={data.title} aspectRatio={data.aspectRatio ?? "16:9"}
+        studioOpen={studioOpen} onToggleStudio={() => setStudioOpen(v => !v)}
         slideCount={data.slideOrder.length} theme={data.theme} readOnly={readOnly}
         showSlideNumbers={data.showSlideNumbers === true}
         onChangeAspectRatio={(aspectRatio) => { if (!readOnly) onChange({ aspectRatio }); }}
@@ -71,6 +85,9 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
             onChange(appendImportedSlides(current, expected, ratio, slides));
           }} />}
       />
+      <div className={`flex min-h-0 flex-1 ${studioOpen ? "flex-row" : "flex-col"}`}>
+        {studioOpen && filmstrip}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {activeSlide && <>
         <SlideMotionControls slide={activeSlide} onChange={(patch) => { if (!readOnly) onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, ...patch } } }); }} />
         <div className="flex items-center gap-2 border-b px-2 py-1 text-xs">
@@ -98,14 +115,27 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
           : activeSlide && <WorkspaceDocRichEditor key={activeSlide.id} blockId={block.id} html={activeSlide.html}
             isEditing={isEditingBody && !readOnly} readOnly={readOnly} onChange={(next) => actions.updateHtml(activeSlide.id, next)} onStopEditing={stopEditingBody} />}
       </div>
-      <SlideFilmstrip data={data} onSelect={actions.selectSlide} onAdd={actions.addSlide} onReorder={actions.reorderSlide}
-        onRename={actions.renameSlide} onDuplicate={actions.duplicateSlide} onDelete={actions.deleteSlide}
-        onSetStatus={actions.updateStatus} onSetBackground={actions.updateBackground} onSetNotes={actions.updateNotes} onSetHidden={actions.updateHidden} />
+        </div>
+      </div>
+      {!studioOpen && filmstrip}
       {actions.isPresenting && <SlidePresentOverlay data={actions.presentData} index={actions.presentIndex}
         showGrid={actions.showGrid} showNotes={actions.showNotes} onToggleGrid={() => actions.setShowGrid((v) => !v)}
         onToggleNotes={() => actions.setShowNotes((v) => !v)} onNext={actions.nextSlide} onPrev={actions.prevSlide}
         onJump={actions.goToIndex} onExit={actions.stopPresenting} />}
     </div>
   );
+  if (!studioOpen || typeof document === "undefined") return editorContent;
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Slide Studio" data-slide-studio
+      className="fixed inset-0 z-[1050] bg-slate-100 text-slate-900"
+      onPointerDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
+      onKeyDown={event => {
+        if (event.key === "Escape" && !event.defaultPrevented && !(event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) {
+          event.stopPropagation(); setStudioOpen(false);
+        }
+      }}>
+      {editorContent}
+    </div>, document.body);
 };
 registerBlockRenderer("slideDeck", SlideDeckBlock);
