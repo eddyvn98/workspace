@@ -12,6 +12,7 @@ import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
 type Props = { scene: SlideScene; onChange: (next: SlideScene) => void; readOnly?: boolean; backgroundColor?:string };
 const field = "rounded border border-slate-300 bg-white px-2 py-1 text-slate-900";
 export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundColor="#FFFFFF" }: Props) {
+  const editorRef=useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const select = (id:string,additive=false) => {
@@ -48,7 +49,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     } catch(error){window.alert(error instanceof Error?error.message:"Image upload failed");}
     finally {setUploading(false);}
   };
-  useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(readOnly)return;const target=e.target as HTMLElement;if(target?.closest("input,textarea,select,[contenteditable=true]"))return;
+  useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(readOnly)return;const target=e.target as HTMLElement;if(!editorRef.current?.contains(target))return;if(target?.closest("input,textarea,select,[contenteditable=true]"))return;
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return;}
     if(!selected)return;
@@ -56,7 +57,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     const direction:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(nudgeSceneObjects(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
   };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,readOnly,historyVersion]);
-  return <div className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
+  return <div ref={editorRef} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-white p-2 text-xs">
       <strong>Scene editor</strong>
       <button className={field} disabled={readOnly || !history.current.undo.length} onClick={undo}>Undo</button><button className={field} disabled={readOnly || !history.current.redo.length} onClick={redo}>Redo</button>
@@ -70,7 +71,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     </div>
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-3">
-        <div className="relative w-full max-w-5xl overflow-hidden border bg-white shadow" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}
+        <div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{ aspectRatio: `${scene.width} / ${scene.height}`,backgroundColor }}
           onPointerDown={e => { if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
           <SlideSceneSurface scene={scene} selected={selected} editing={!readOnly} onSelect={select}
             onMove={(id, x, y) => { if (!readOnly) commit(setSceneObjectGeometry(scene, id, snapSceneRect({...scene.objects.find(o=>o.id===id)!,x,y}))); }}
