@@ -24,11 +24,14 @@ export function animateSlide(surface: HTMLElement, transition: SlideTransition, 
       ], { duration: 350, delay: Math.min(index, 12) * 90, fill: "backwards", easing: "ease-out" }));
     });
   }
+  let sequenceEnd = 0;
   surface.querySelectorAll<HTMLElement>("[data-scene-object]").forEach(el => {
     const kind = el.dataset.motion || "none";
     if (kind === "none" || el.dataset.trigger === "on-click") return;
     const duration = Math.max(100, Math.min(5000, Number(el.dataset.duration) || 450));
-    const delay = Math.max(0, Math.min(10000, Number(el.dataset.delay) || 0));
+    const ownDelay = Math.max(0, Math.min(10000, Number(el.dataset.delay) || 0));
+    const delay = (el.dataset.trigger === "after-previous" ? sequenceEnd : 0) + ownDelay;
+    sequenceEnd = Math.max(sequenceEnd, delay + duration);
     const transform = kind === "rise" ? "translateY(24px)" : kind === "slide" ? "translateX(50px)" : kind === "zoom" ? "scale(.8)" : "none";
     running.push(el.animate([{opacity:0,transform},{opacity:1,transform:"none"}],{duration,delay,fill:"backwards",easing:"ease-out"}));
   });
