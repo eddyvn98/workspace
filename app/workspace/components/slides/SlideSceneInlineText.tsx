@@ -8,7 +8,7 @@ type Props = {
   onCancel: () => void;
 };
 
-/** Commit a complete text editing session as one undoable scene change. */
+/** Plain-text sessions stay lightweight; rich text uses the dedicated formatting editor. */
 export function SlideSceneInlineText({ object, onCommit, onCancel }: Props) {
   const [draft, setDraft] = useState(object.text ?? "");
   const input = useRef<HTMLTextAreaElement>(null);
@@ -37,6 +37,7 @@ export function SlideSceneInlineText({ object, onCommit, onCancel }: Props) {
     onBlur={() => complete(true)}
     onKeyDown={event => {
       event.stopPropagation();
+      if (event.nativeEvent.isComposing) return;
       if (event.key === "Escape") { event.preventDefault(); complete(false); }
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
         event.preventDefault(); complete(true);
@@ -46,6 +47,8 @@ export function SlideSceneInlineText({ object, onCommit, onCancel }: Props) {
       display: "block", width: "100%", height: "100%", padding: 0, margin: 0, border: "1px solid #6366f1",
       borderRadius: 0, outline: "none", resize: "none", background: "transparent",
       color: object.color, fontFamily: object.fontFamily || "Arial", fontWeight: object.fontWeight || "normal",
+      fontStyle: object.italic ? "italic" : "normal",
+      textDecoration: [object.underline ? "underline" : "", object.strike ? "line-through" : ""].filter(Boolean).join(" ") || "none",
       fontSize: "inherit", lineHeight: 1.12, textAlign: object.align || "left",
       overflowWrap: "anywhere", whiteSpace: "pre-wrap",
     }}
