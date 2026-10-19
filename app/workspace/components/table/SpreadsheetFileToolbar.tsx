@@ -8,6 +8,7 @@ import { importedPayload, replacementPatch } from "@/lib/office/spreadsheet/payl
 import { SHEET_LIMITS } from "@/lib/office/spreadsheet/limits";
 import { runWorkbookTask } from "@/lib/office/spreadsheet/workerClient";
 import { writeCsv } from "@/lib/office/spreadsheet/csv";
+import { writeNativeBackup } from "@/lib/office/spreadsheet/nativeBackup";
 import { tableDataSignature } from "./workspaceSpreadsheetEditorUtils";
 import { Root as Dialog, Portal, Overlay, Content as DialogContent, Description as DialogDescription, Title as DialogTitle } from "@radix-ui/react-dialog";
 
@@ -42,8 +43,8 @@ export function SpreadsheetFileToolbar({ getBlock, flush, onChange, allowEdit, t
   const importFile = (file: File) => operation(async (signal) => {
     if (!permission.current) return;
     if (file.size > SHEET_LIMITS.fileBytes) throw new Error("File exceeds 10 MiB.");
-    const format = file.name.toLowerCase().split(".").pop();
-    if (format !== "xlsx" && format !== "csv" && format !== "tsv") throw new Error("Choose an XLSX, UTF-8 CSV or TSV file.");
+    const format = file.name.toLowerCase().endsWith(".workspace.json") ? "native" : file.name.toLowerCase().split(".").pop();
+    if (format !== "xlsx" && format !== "csv" && format !== "tsv" && format !== "native") throw new Error("Choose an XLSX, UTF-8 CSV, TSV or .workspace.json backup.");
     const signature = tableDataSignature(getBlock().data);
     const result = await runWorkbookTask({ type: "import", bytes: new Uint8Array(await file.arrayBuffer()), format }, signal);
     if (result.type === "import" && permission.current && !signal.aborted) setPending({ value: result.value, signature });
@@ -51,8 +52,8 @@ export function SpreadsheetFileToolbar({ getBlock, flush, onChange, allowEdit, t
   const exportFile = (format: "xlsx" | "csv" | "json") => operation(async (signal) => {
     const block = getBlock();
     if (format === "json") {
-      download(JSON.stringify({ version: 1, title, blocks: { [block.id]: block }, blockOrder: [block.id], connectors: {}, exportedAt: Date.now() }, null, 2), filename + ".workspace.json", "application/json");
-      setNotice("Native backup saved. Restore it using Workspace > Import JSON."); return;
+      download(writeNativeBackup(block, title), filename + ".workspace.json", "application/json");
+      setNotice("Native backup saved. Restore it using Import file in this editor."); return;
     }
     if (format === "csv") {
       download(writeCsv(block.data), filename + ".csv", "text/csv;charset=utf-8");
@@ -82,7 +83,7 @@ export function SpreadsheetFileToolbar({ getBlock, flush, onChange, allowEdit, t
       {busy && <><span role="status" className="text-xs">Processing file...</span><button className={button} onClick={() => controller.current?.abort()}>Cancel operation</button></>}
       <span className="text-xs text-slate-500">Up to 20 sheets / 50,000 cells / 10 MiB</span>
     </div>
-    <input ref={input} aria-label="Import spreadsheet file" type="file" accept=".xlsx,.csv,.tsv" hidden onChange={(event) => {
+    <input ref={input} aria-label="Import spreadsheet file" type="file" accept=".xlsx,.csv,.tsv,.json" hidden onChange={(event) => {
       const file = event.target.files?.[0]; event.target.value = ""; if (file) void importFile(file);
     }} />
     {error && <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-400">{error}</p>}
@@ -91,7 +92,7 @@ export function SpreadsheetFileToolbar({ getBlock, flush, onChange, allowEdit, t
       <Portal><Overlay className="fixed inset-0 z-[150] bg-black/50" />
       <DialogContent className="fixed left-1/2 top-1/2 z-[151] flex max-h-[85vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-auto rounded-xl border bg-white p-6 shadow-xl dark:bg-slate-900">
         <DialogTitle>Replace this workbook?</DialogTitle>
-        <DialogDescription>All current sheets will be replaced. Cancel and export a Native backup first to keep an exact copy.</DialogDescription>
+        <DialogDescription>All current sheets will be replaced. Cancel and export a Native backup first to keep an exact copy. Imported backups keep this Office file identity.</DialogDescription>
         <p className="text-sm">{pending?.value.sheets.length} sheets: {pending?.value.sheets.map((s) => s.name).join(", ")}</p>
         <div className="space-y-2 text-sm">{pending?.value.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>
         <div className="flex justify-end gap-2"><button className={button} onClick={() => setPending(null)}>Cancel import</button>
