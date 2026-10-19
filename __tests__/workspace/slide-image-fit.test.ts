@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sceneImageLayout } from "@/lib/workspace/slide-image-layout";
+import { sceneImageLayout, sceneImageRenderRect } from "@/lib/workspace/slide-image-layout";
 import { imageShape } from "@/lib/workspace/pptx-elements";
 import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
 
@@ -22,6 +22,16 @@ describe("Slide image fit parity",()=>{
   });
   it("stretches only with fill",()=>{
     expect(sceneImageLayout(rect,{width:123,height:456},"fill")).toEqual({rect});
+  });
+  it("supports off-centre crop in OOXML and SVG image geometry",()=>{
+    const left=sceneImageLayout(rect,{width:1600,height:400},"cover",0,0.5);
+    const right=sceneImageLayout(rect,{width:1600,height:400},"cover",1,0.5);
+    expect(left.crop).toEqual({l:0,r:50000,t:0,b:0});
+    expect(right.crop).toEqual({l:50000,r:0,t:0,b:0});
+    expect(sceneImageRenderRect(rect,{width:1600,height:400},"cover",0.75,0.5))
+      .toEqual({x:-200,y:150,w:800,h:200});
+    expect(sceneImageLayout(rect,{width:100,height:100},"contain",0.25,0.5).rect)
+      .toEqual({x:150,y:150,w:200,h:200});
   });
   it("preserves fit while normalizing saved image objects",()=>{
     const raw={version:2,objects:[{id:"photo",kind:"image",x:0,y:0,w:300,h:200,rotation:0,src:"/api/workspace-images/ws_photo",imageFit:"contain"}]};
