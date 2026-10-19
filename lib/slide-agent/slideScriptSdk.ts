@@ -1,4 +1,4 @@
-import { emptySlideScene, normalizeSlideScene, type SlideAspectRatio } from "@/app/workspace/types/slideScene";
+import { emptySlideScene, normalizeSlideScene } from "@/app/workspace/types/slideScene";
 import type { SceneMotion, SlideScene, SlideSceneObject } from "@/app/workspace/types/slideScene";
 import { inspectSlideScene, type SlideSceneWarning } from "@/app/workspace/utils/slideSceneInspect";
 
