@@ -58,7 +58,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     const direction:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(nudgeSceneObjects(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
   };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,editingTextId,readOnly,historyVersion]);
-  return <div ref={editorRef} tabIndex={0} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
+  return <div ref={editorRef} tabIndex={0} onPointerDownCapture={event => {const target = event.target as HTMLElement; if (target.closest("[data-scene-object]") && !target.closest("textarea,input,[contenteditable]")) editorRef.current?.focus({preventScroll:true});}} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-white p-2 text-xs">
       <strong>Scene editor</strong>
       <button className={field} disabled={readOnly || !history.current.undo.length} onClick={undo}>Undo</button><button className={field} disabled={readOnly || !history.current.redo.length} onClick={redo}>Redo</button>
