@@ -231,3 +231,23 @@ Known limitations:
 - Groups are logical Scene V2 groups, not native `p:grpSp` PowerPoint groups. The export preserves individual editable elements and their resulting geometry, but not group editability in Microsoft PowerPoint.
 - Group resize is a geometric transform; complex text reflow and rich text are not yet fully faithful across renderers.
 - This commit batch has **not** been run locally or verified through CI in this agent environment. The earlier passing CI at `e80ab90` cannot be attributed to newer commits.
+
+## Native PPTX groups (contiguous objects only)
+
+Additional implementation on the same branch:
+- `lib/workspace/pptx-scene-groups.ts` packages adjacent scene objects sharing `groupId` in native OOXML `p:grpSp` with an identity coordinate transform and unique nonvisual ID.
+- PowerPoint still sees independently editable text, shape, image and chart members inside supported groups.
+- A group whose members have unrelated shapes interspersed across the z-order remains exported as individual shapes. This is intentional to avoid changing stacking or obscuring unrelated content.
+- Regression tests in `slide-pptx-native-groups.test.ts`: contiguous group, disjoint fallback, shape mismatch, generated PPTX XML.
+
+**Limitations:** The native OOXML grouping strategy and PowerPoint/LibreOffice fidelity are not yet visually validated. Group rotation and scaling are baked into member geometry, while the group wrapper uses an identity transform. Nested groups and groups with interspersed members are not preserved as native groups. No claim of full Microsoft PowerPoint parity.
+
+Local verification:
+```sh
+pnpm exec tsc --noEmit
+pnpm exec vitest run __tests__/workspace/slide-pptx-native-groups.test.ts __tests__/workspace/slide-scene-group-transform.test.ts __tests__/workspace/slide-image-fit.test.ts __tests__/workspace/slide-scene-groups.test.ts
+pnpm test:workspace
+pnpm build
+```
+
+Open the generated PowerPoint file and verify: selecting the wrapper selects the grouped contents; Ungroup preserves each child position, font and image; user-editable chart still works after ungrouping. Compare with browser presenter and PDF. Run an interspersed-layer case and ensure the visual stacking is unchanged.
