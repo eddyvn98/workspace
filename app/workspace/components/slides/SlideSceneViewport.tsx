@@ -7,7 +7,7 @@ type View={zoom:number;x:number;y:number};
 type Drag={pointerId:number;startX:number;startY:number;x:number;y:number};
 const clamp=(n:number)=>Math.max(0.5,Math.min(4,Math.round(n*100)/100));
 function isTyping(target:EventTarget|null) {
-  return target instanceof HTMLElement && !!target.closest('input,textarea,select,[contenteditable="true"]');
+  return target instanceof HTMLElement && !!target.closest('input,textarea,select,button,a,[role="button"],[contenteditable="true"]');
 }
 /** Screen-space view only: no document geometry, object position or history write occurs. */
 export function SlideSceneViewport({scene,backgroundColor,children,onStagePointerDown}:{
