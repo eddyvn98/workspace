@@ -23,6 +23,13 @@ function numericValues(data:{count:number;values:Map<number,string>},count:numbe
     const value=Number(raw);if(!Number.isFinite(value)||Math.abs(value)>SCENE_CHART_LIMITS.value)throw new Error("Chart cache contains invalid/out-of-range numeric data.");return value;
   });
 }
+/** Infer the supported includeZero policy from the actual value axis, not the scatter X axis. */
+function includesZero(plot:Element|undefined,source:Element):boolean{
+  const ids=children(source,NS.c,"axId").map(n=>n.getAttribute("val")),axes=children(plot,NS.c,"valAx");
+  const axis=axes.find(n=>child(n,NS.c,"axId")?.getAttribute("val")===ids[ids.length-1])??axes[0];
+  const scaling=child(axis,NS.c,"scaling"),min=child(scaling,NS.c,"min")?.getAttribute("val"),max=child(scaling,NS.c,"max")?.getAttribute("val");
+  return !((min!==undefined&&min!==null&&Number.isFinite(Number(min))&&Number(min)>0)||(max!==undefined&&max!==null&&Number.isFinite(Number(max))&&Number(max)<0));
+}
 export async function readSceneChart(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):Promise<void>{
   const reference=first(node,NS.c,"chart"),rel=ctx.rels.get(reference?.getAttributeNS(NS.r,"id")||"");
   if(!reference||!rel||rel.external||!rel.type.endsWith("/chart")){ctx.notice("graphic","An unsupported graphic or linked chart was omitted; no remote data was fetched.");return;}
@@ -53,7 +60,7 @@ export async function readSceneChart(node:Element,matrix:Matrix,groupId:string|u
   const chartNode=first(document,NS.c,"chart"),titleNode=child(chartNode,NS.c,"title"),title=descendants(titleNode,NS.a,"t").map(t=>t.textContent??"").join("")||first(titleNode,NS.c,"v")?.textContent||"";
   const format=first(document,NS.c,"numFmt")?.getAttribute("formatCode")??first(document,NS.c,"formatCode")?.textContent??"General";
   const numberFormat=format.includes("%")?"percent":format==="0.00"?"decimal":"general";
-  const chart=normalizeSceneChart({version:1,type,categories,series,title,grouping:["bar","column"].includes(type)?grouping:"none",legend:!!child(chartNode,NS.c,"legend"),showValues:bool(child(child(source,NS.c,"dLbls"),NS.c,"showVal")),numberFormat,background:paint(child(first(document,NS.c,"chartSpace"),NS.c,"spPr"),ctx.theme,"#FFFFFF"),includeZero:true});
+  const chart=normalizeSceneChart({version:1,type,categories,series,title,grouping:["bar","column"].includes(type)?grouping:"none",legend:!!child(chartNode,NS.c,"legend"),showValues:bool(child(child(source,NS.c,"dLbls"),NS.c,"showVal")),numberFormat,background:paint(child(first(document,NS.c,"chartSpace"),NS.c,"spPr"),ctx.theme,"#FFFFFF"),includeZero:includesZero(plot,source)});
   if(!chart)throw new Error("Imported chart data exceeds supported limits or contains incompatible signed/stacked values.");
   if(type==="doughnut"&&numeric(child(source,NS.c,"holeSize"),"val",55)!==55||numeric(child(source,NS.c,"firstSliceAng"),"val",0)!==0)ctx.notice("chart-pie-layout","Pie starting angle and doughnut hole size use the editable chart defaults.");
   if(first(source,NS.c,"trendline")||first(source,NS.c,"errBars")||first(document,NS.c,"multiLvlStrCache"))ctx.notice("chart-extras","Trendlines, error bars or multilevel category styling are not reproduced; cached numeric values remain editable.");
