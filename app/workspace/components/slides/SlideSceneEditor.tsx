@@ -1,11 +1,11 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import type { SlideScene, SlideSceneObject } from "../../types/slideScene";
-import { sceneDeleteObject, sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slideScene";
+import { sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slideScene";
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
-import { alignSceneObjects, nudgeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
+import { alignSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
 import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
