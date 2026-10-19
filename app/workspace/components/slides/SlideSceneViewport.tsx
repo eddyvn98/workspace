@@ -80,7 +80,8 @@ export function SlideSceneViewport({scene,backgroundColor,children,onStagePointe
       style={{aspectRatio:`${scene.width}/${scene.height}`,
         width:`min(calc(100cqw - 32px), calc((100cqh - 32px) * ${scene.width/scene.height}))`,
         height:`min(calc((100cqw - 32px) * ${scene.height/scene.width}), calc(100cqh - 32px))`,
-        backgroundColor,transform:`translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,transformOrigin:"center center"}}
+        backgroundColor,transform:`translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,transformOrigin:"center center",
+        "--slide-interaction-scale":1/view.zoom} as React.CSSProperties}
       onPointerDown={onStagePointerDown}>
       {children}
     </div>
