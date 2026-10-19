@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { exportSceneShape } from "./pptx-scene";
+import { exportSceneTable } from "./pptx-scene-table";
 import { groupPptxSceneShapes } from "./pptx-scene-groups";
 import { scenePptxTiming } from "./pptx-scene-timing";
 import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
@@ -11,13 +12,11 @@ import { slideExportImages, type SlideImageReader } from "./slide-export-images"
 import { slideExportLayout } from "./slide-export-layout";
 import { sceneImageLayout } from "./slide-image-layout";
 import { slideExportStyle } from "./slide-export-style";
-export const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-
-/** Editable shapes and native timing; images are read from stored Workspace assets only. */
-export async function exportBoardPptx(board:{title:string;blocks:unknown;blockOrder:unknown},ids:unknown,readImage:SlideImageReader) {
+export const PPTX_MIME="application/vnd.openxmlformats-officedocument.presentationml.presentation";
+/** Native editable objects and timing. Image bytes come from persisted Workspace assets only. */
+export async function exportBoardPptx(board:{title:string;blocks:unknown;blockOrder:unknown},ids:unknown,readImage:SlideImageReader){
   const slides=boardExportSlides(board,ids),width=slides[0].width;
-  const zip=new JSZip(),loadImage=slideExportImages(readImage),style=slideExportStyle();
-  let chartCount=0;
+  const zip=new JSZip(),loadImage=slideExportImages(readImage),style=slideExportStyle();let chartCount=0;
   for(const [i,entry] of slides.entries()){
     const {slide,theme,elements}=entry;
     const scene=normalizeSlideScene(slide.scene,width===960?"4:3":"16:9");
@@ -30,7 +29,8 @@ export async function exportBoardPptx(board:{title:string;blocks:unknown;blockOr
       const factor=width/scene.width;
       for(const [j,obj] of scene.objects.entries()){
         const id=j+2;
-        if(obj.kind==="chart"&&obj.series){
+        if(obj.kind==="table")shapes.push(await exportSceneTable(obj,id,factor));
+        else if(obj.kind==="chart"&&obj.series){
           const index=++chartCount,relId=`rId${relationships.length+1}`;
           await addPptxChart(zip,index,obj.series,accent);
           relationships.push({id:relId,type:"chart",target:`../charts/chart${index}.xml`});
@@ -43,8 +43,7 @@ export async function exportBoardPptx(board:{title:string;blocks:unknown;blockOr
           shapes.push(imageShape(id,relId,obj.id,layout.rect.x,layout.rect.y,layout.rect.w,layout.rect.h,layout.crop,obj.rotation));
         }else shapes.push(exportSceneShape(obj,id,factor));
       }
-      const grouped=groupPptxSceneShapes(scene,shapes,factor);
-      shapes.splice(0,shapes.length,...grouped);
+      const grouped=groupPptxSceneShapes(scene,shapes,factor);shapes.splice(0,shapes.length,...grouped);
     }
     for(const [j,element] of elements.entries()){
       const height=heights[j]*scale,id=j+2;
@@ -68,8 +67,7 @@ export async function exportBoardPptx(board:{title:string;blocks:unknown;blockOr
     const transition=slide.transition==="fade"?'<p:fade/>':slide.transition==="slide"?'<p:push dir="l"/>':slide.transition==="zoom"?'<p:zoom dir="in"/>':slide.transition==="wipe"?'<p:wipe dir="r"/>':"";
     const timing=scene?scenePptxTiming(scene):"";
     zip.file(`ppt/slides/slide${i+1}.xml`,`<?xml version="1.0" encoding="UTF-8"?><p:sld ${NS}><p:cSld name="${xml(slide.name)}"><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${background}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree>${group}${shapes.join("")}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transition?`<p:transition spd="med">${transition}</p:transition>`:""}${timing}</p:sld>`);
-    zip.file(`ppt/slides/_rels/slide${i+1}.xml.rels`,rels(relationships));
-    addPptxNotes(zip,i+1,slide.presenterNotes??"");
+    zip.file(`ppt/slides/_rels/slide${i+1}.xml.rels`,rels(relationships));addPptxNotes(zip,i+1,slide.presenterNotes??"");
   }
   addPptxPackage(zip,slides.length,width,chartCount,board.title,720);
   return {buffer:await zip.generateAsync({type:"nodebuffer",compression:"DEFLATE"}),slideCount:slides.length};
