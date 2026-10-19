@@ -13,7 +13,7 @@ import { SlideDeckToolbar } from "../components/slides/SlideDeckToolbar";
 import { SlideFilmstrip } from "../components/slides/SlideFilmstrip";
 import { SlidePresentOverlay } from "../components/slides/SlidePresentOverlay";
 import { SlideSceneEditor } from "../components/slides/SlideSceneEditor";
-import { emptySlideScene } from "../types/slideScene";
+import { legacyHtmlToScene } from "../utils/slideLegacyToScene";
 import { slideBackground, slideTextStyle } from "../utils/slideTheme";
 import { SLIDE_TYPOGRAPHY_CSS } from "../utils/slideTypography";
 
@@ -95,8 +95,8 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
         <div className="flex items-center gap-2 border-b px-2 py-1 text-xs">
           <button type="button" disabled={readOnly || !!activeSlide.scene} className="rounded border px-2 py-1" onClick={() => {
             if (activeSlide.scene) return;
-            if (activeSlide.html.trim() && !window.confirm("Switch to Scene V2? Existing rich text stays stored but Scene V2 becomes the visible slide.")) return;
-            onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene: emptySlideScene(data.aspectRatio) } } });
+            if (activeSlide.html.trim() && !window.confirm("Convert legacy content to editable V2 objects? Layout is approximate; the original HTML remains saved as backup.")) return;
+            onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene: legacyHtmlToScene(activeSlide.html,data.aspectRatio) } } });
           }}>{activeSlide.scene ? "Scene V2" : "Enable Scene V2"}</button>
           {!activeSlide.scene && <SlideContentTools blockId={block.id} slideId={activeSlide.id} onEdit={startEditingBody} />}
         </div>
