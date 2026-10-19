@@ -127,6 +127,16 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
         {item && <>
           <hr/><strong className="block">Object properties</strong>
           {item.kind === "image" && <label className="block">Image fit<select className={field+" mt-1 w-full"} value={item.imageFit||"cover"} disabled={readOnly||item.locked} onChange={e=>patch({imageFit:e.target.value as "cover"|"contain"|"fill"})}><option value="cover">Crop to fill (cover)</option><option value="contain">Fit entire image (contain)</option><option value="fill">Stretch to fill</option></select></label>}
+          {item.kind === "image" && <div className="space-y-2">
+            {(["imageFocusX","imageFocusY"] as const).map((axis)=><label key={axis} className="block">
+              <span className="flex justify-between"><span>{axis === "imageFocusX"?"Horizontal focus":"Vertical focus"}</span><span>{Math.round((item[axis]??0.5)*100)}%</span></span>
+              <input aria-label={axis === "imageFocusX"?"Horizontal crop focus":"Vertical crop focus"} type="range" min={0} max={100} step={1} className="w-full"
+                disabled={readOnly||item.locked||item.imageFit==="fill"}
+                value={Math.round((item[axis]??0.5)*100)}
+                onChange={e=>patch({[axis]:Number(e.target.value)/100})}/>
+            </label>)}
+            <button type="button" className={field} disabled={readOnly||item.locked} onClick={()=>patch({imageFocusX:0.5,imageFocusY:0.5})}>Center image focus</button>
+          </div>}
           {item.kind === "chart" && <label className="block">Chart data (label, value per line)<textarea rows={4} className={field+" mt-1 w-full"} disabled={readOnly||item.locked} value={(item.series||[]).map(x=>`${x.label},${x.value}`).join("\n")} onChange={e=>{const series=e.target.value.split("\n").filter(Boolean).map(row=>{const comma=row.lastIndexOf(",");return {label:row.slice(0,comma).trim(),value:Number(row.slice(comma+1))};}); if(series.length>=1 && series.length<=24 && series.every(x=>x.label && Number.isFinite(x.value) && x.value>=0)) patch({series});}} /></label>}
           {item.kind === "text" && !readOnly && !item.locked && <button className={field+" w-full"} type="button" onClick={()=>setEditingTextId(item.id)}>Edit text on slide</button>}
           {item.kind === "text" && <label className="block">Text<textarea className={field + " mt-1 w-full"} rows={3} value={item.text || ""} disabled={readOnly || !!item.locked} onChange={e => patch({ text: e.target.value })}/></label>}
