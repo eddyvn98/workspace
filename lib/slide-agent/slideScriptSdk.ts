@@ -8,8 +8,9 @@ import { inspectSlideScene, type SlideSceneWarning } from "@/app/workspace/utils
  * Never run model-authored scripts in the Next.js request process.
  */
 export type SlideScriptRect = { x: number; y: number; w: number; h: number };
-export type SlideScriptTextStyle = Pick<SlideSceneObject, "fontSize" | "fontFamily" | "fontWeight" | "color" | "align" | "rotation" | "opacity">;
-export type SlideScriptShapeStyle = Pick<SlideSceneObject, "stroke" | "radius" | "rotation" | "opacity">;
+export type SlideScriptTextStyle = Partial<Pick<SlideSceneObject, "fontSize" | "fontFamily" | "fontWeight" | "color" | "align" | "rotation" | "opacity">>;
+export type SlideScriptShapeStyle = Partial<Pick<SlideSceneObject, "stroke" | "radius" | "rotation" | "opacity">>;
+export type SlideScriptImageStyle = Partial<Pick<SlideSceneObject, "rotation" | "opacity">>;
 export type SlideScriptOutput = {
   action: {
     type: "create_slide_deck";
@@ -38,17 +39,20 @@ export class SlideScriptSlide {
   constructor(private readonly draft: SlideDraft) {}
   text(value: string, box: SlideScriptRect, style: SlideScriptTextStyle = {}): string {
     const key = id();
-    this.draft.objects.push({ id: key, kind: "text", ...rect(box), rotation: 0, text: value, ...style });
+    const { rotation = 0, ...rest } = style;
+    this.draft.objects.push({ id: key, kind: "text", ...rect(box), rotation, text: value, ...rest });
     return key;
   }
   shape(fill: string, box: SlideScriptRect, style: SlideScriptShapeStyle = {}): string {
     const key = id();
-    this.draft.objects.push({ id: key, kind: "shape", ...rect(box), rotation: 0, fill, ...style });
+    const { rotation = 0, ...rest } = style;
+    this.draft.objects.push({ id: key, kind: "shape", ...rect(box), rotation, fill, ...rest });
     return key;
   }
-  image(src: string, box: SlideScriptRect, style: Pick<SlideSceneObject, "rotation" | "opacity"> = {}): string {
+  image(src: string, box: SlideScriptRect, style: SlideScriptImageStyle = {}): string {
     const key = id();
-    this.draft.objects.push({ id: key, kind: "image", ...rect(box), rotation: 0, src, ...style });
+    const { rotation = 0, ...rest } = style;
+    this.draft.objects.push({ id: key, kind: "image", ...rect(box), rotation, src, ...rest });
     return key;
   }
   chart(series: Array<{ label: string; value: number }>, box: SlideScriptRect, fill = "#4F46E5"): string {
