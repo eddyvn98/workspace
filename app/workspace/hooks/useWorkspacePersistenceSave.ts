@@ -1,8 +1,9 @@
 "use client";
+import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 
 import { useCallback, useRef, useState } from "react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
-import { checkBoardAccess, getKnownContent, saveRemoteBoard } from "./workspaceBoardApi";
+import { checkBoardAccess, getKnownContent, saveRemoteBoard, rememberRevision } from "./workspaceBoardApi";
 import { mergeBoardContent } from "../utils/mergeBoardConflict";
 import { notifyMergeConflicts } from "../utils/restoreMergeConflicts";
 import { boardKey, upsertIndexEntry, type BoardSnapshot } from "./workspaceBoardIndex";
@@ -102,7 +103,7 @@ export function useWorkspacePersistenceSave(
           }
           // Taken before checkBoardAccess below replaces it with the server's.
           const base = getKnownContent(id);
-          const authoritative = await checkBoardAccess(id);
+          const authoritative = await checkBoardAccess(id, { remember: false });
           if (boardIdRef.current !== id) return;
           if (authoritative.status === "ok" && base) {
             // Another writer moved the board on: fold this tab's edits into
@@ -118,6 +119,15 @@ export function useWorkspacePersistenceSave(
                 connectors: authoritative.board.connectors as never,
               },
             );
+            if (merged.conflicts && hasSpreadsheetBlock(mine.blocks)) {
+              // Do not replace a workbook with the server winner and then
+              // report the automatic retry as a successful save. Keep the
+              // draft and the old CAS base until the user resolves it.
+              hasPendingSaveRef.current = false;
+              setSaveError("Spreadsheet conflict: your draft is kept on this device. Export a Native backup before reloading the server version.");
+              return;
+            }
+            rememberRevision(authoritative.board);
             ignoreNextStoreChangeRef.current = true;
             adopt({ ...authoritative.board, blocks: merged.blocks, blockOrder: merged.blockOrder, connectors: merged.connectors } as never, id);
             lastSaveOkRef.current = merged.conflicts === 0;

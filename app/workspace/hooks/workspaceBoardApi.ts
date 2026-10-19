@@ -167,13 +167,13 @@ export function forgetBoardRevision(id: string): void {
   knownRevisions.delete(id);
 }
 
-export async function checkBoardAccess(id: string): Promise<BoardAccessResult> {
+export async function checkBoardAccess(id: string, options: { remember?: boolean } = {}): Promise<BoardAccessResult> {
   try {
     const res = await fetch(`/api/workspaces/${id}`);
     if (res.status === 404 || res.status === 403) return { status: "not_found_or_denied" };
     if (!res.ok) return { status: "error" };
     const board = (await res.json()) as RemoteBoard;
-    rememberRevision(board);
+    if (options.remember !== false) rememberRevision(board);
     return { status: "ok", board };
   } catch {
     return { status: "error" };

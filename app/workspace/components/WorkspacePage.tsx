@@ -71,7 +71,7 @@ export function WorkspacePage() {
   // Fallback for what the live room cannot deliver (no room, or a dropped
   // push): without it a board changed by another person or the AI outside
   // this tab's own chat turn stayed stale until a manual reload.
-  useWorkspaceExternalSync(boardId ?? "", { live: realtime.live, hasUnsavedLocalChanges: isSavePending });
+  useWorkspaceExternalSync(boardId ?? "", { live: realtime.live, hasUnsavedLocalChanges: isSavePending || Boolean(saveError) });
   useBoardViewerRole(boardId ?? "");
   useWorkspaceSeenMarker(boardId);
   useImagePasteFromClipboard();

@@ -1,3 +1,4 @@
+import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 /**
  * POST /api/workspaces/[id]/ws-token — mints the short-lived token a browser
  * needs to open a live session on this board.
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   if (!board) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const role = await resolveAccessRole(board, email);
   if (!role) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (hasSpreadsheetBlock(board.blocks)) return NextResponse.json({ error: "Spreadsheet boards use revisioned REST saves", reason: "spreadsheet_requires_rest" }, { status: 409 });
 
   try {
     getWorkspaceWsSigningSecret();

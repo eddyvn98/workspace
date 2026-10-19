@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   notify: vi.fn(), realtime: vi.fn(() => false), consume: vi.fn(() => null),
 }));
 vi.mock("@/app/workspace/hooks/workspaceBoardApi", () => ({
-  saveRemoteBoard: mocks.save, checkBoardAccess: mocks.access, getKnownContent: mocks.getKnown,
+  saveRemoteBoard: mocks.save, checkBoardAccess: mocks.access, getKnownContent: mocks.getKnown, rememberRevision: vi.fn(),
 }));
 vi.mock("@/app/workspace/hooks/workspaceBoardIndex", () => ({
   boardKey: (id: string) => `board:${id}`, upsertIndexEntry: mocks.index,
@@ -44,6 +44,18 @@ function mount() {
 }
 
 describe("Workspace REST save failure safety", () => {
+  it("keeps a conflicting spreadsheet draft without adopting or automatically reporting a retry as saved", async () => {
+    const block = (text: string) => ({ id: "s", type: "table", data: { mode: "spreadsheet", rows: 1, cols: 1, cells: [[text]] } });
+    mocks.getKnown.mockReturnValue({ blocks: { s: block("base") }, blockOrder: ["s"], connectors: {} });
+    mocks.access.mockResolvedValue({ status: "ok", board: { id: "board", blocks: { s: block("remote") }, blockOrder: ["s"], connectors: {}, revision: 2 } });
+    mocks.save.mockResolvedValue({ ok: false, conflict: true });
+    useWorkspaceStore.setState({ blocks: { s: block("local draft") } as never, blockOrder: ["s"] });
+    const host = mount(); act(() => host.api.save());
+    expect(await host.api.flushPendingSave()).toBe(false);
+    expect(host.adopted).not.toHaveBeenCalled(); expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(useWorkspaceStore.getState().blocks.s.data).toMatchObject({ cells: [["local draft"]] });
+    host.unmount();
+  });
   it("keeps an unsaved draft after a transient 503 even if GET would succeed", async () => {
     mocks.save.mockResolvedValue({ ok: false, error: "Service unavailable", conflict: false });
     const host = mount();

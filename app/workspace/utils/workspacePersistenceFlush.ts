@@ -1,3 +1,4 @@
+import { flushWorkspaceEditors } from "./workspaceEditorFlush";
 import { isWorkspaceRealtimeLive } from "./workspaceRealtimeProjection";
 import { flushWorkspaceRealtimePendingSave } from "./workspaceRealtimeFlush";
 
@@ -13,10 +14,9 @@ let activeFlush: { boardId: string; flush: FlushFn } | null = null;
  *  before the AI reads the board over REST. Returns an unregister function to
  *  call on unmount/board change so a stale flush is never invoked. */
 export function registerWorkspacePersistenceFlush(boardId: string, flush: FlushFn): () => void {
-  activeFlush = { boardId, flush };
-  return () => {
-    if (activeFlush?.boardId === boardId) activeFlush = null;
-  };
+  const lease = { boardId, flush };
+  activeFlush = lease;
+  return () => { if (activeFlush === lease) activeFlush = null; };
 }
 
 export function hasWorkspacePersistenceFlush(boardId: string): boolean {
@@ -32,6 +32,7 @@ export function hasWorkspacePersistenceFlush(boardId: string): boolean {
  *  ack not landing within its wait window) — callers must not silently treat
  *  that as a successful flush. */
 export async function flushWorkspacePendingSave(boardId: string): Promise<boolean> {
+  if (!await flushWorkspaceEditors(boardId)) return false;
   if (isWorkspaceRealtimeLive(boardId)) return flushWorkspaceRealtimePendingSave(boardId);
   if (activeFlush?.boardId === boardId) return activeFlush.flush();
   return true;

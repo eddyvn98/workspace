@@ -1,4 +1,5 @@
 "use client";
+import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 import { getKnownRevision, rememberRevision } from "./workspaceBoardApi";
 import { useCollectionRevisionWatch } from "./useCollectionRevisionWatch";
 
@@ -74,6 +75,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   // Collection records require REST CAS + per-record 3-way merge. The current
   // room protocol stores whole blocks and can lose concurrent record writes.
   const hasCollection = useWorkspaceStore((state) => Object.values(state.blocks).some((b) => b.type === "collection"));
+  const hasSpreadsheet = useWorkspaceStore((state) => hasSpreadsheetBlock(state.blocks));
   useCollectionRevisionWatch(remoteBoardId ?? boardId, enabled && hasCollection, false);
   const [live, setLive] = useState(false);
   const [peers, setPeers] = useState<WorkspacePeer[]>([]);
@@ -82,7 +84,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   const flushRealtimePendingSave = useWorkspaceRealtimePublisher(boardId, remoteBoardId, handleRef);
 
   useEffect(() => {
-    if (!enabled || !remoteBoardId || hasCollection) return;
+    if (!enabled || !remoteBoardId || hasCollection || hasSpreadsheet) return;
     let cancelled = false;
 
     void (async () => {
@@ -115,12 +117,23 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
         userEmail: useWorkspaceStore.getState().currentUserEmail,
         initialBoard,
         onRevision: (revision) => {
+          if (cancelled) return;
           const current = useWorkspaceStore.getState();
           rememberRevision({ id: remoteBoardId, revision, blocks: current.blocks, blockOrder: current.blockOrder, connectors: current.connectors });
         },
         onBoard: (board) => {
+          if (cancelled) return;
+          if (hasSpreadsheetBlock(board.blocks)) {
+            // A remote client introduced a workbook while this room was live.
+            // Leave the whole-block writer before accepting any new revision.
+            cancelled = true;
+            unregisterFlushRef.current?.(); unregisterFlushRef.current = null;
+            handleRef.current?.destroy(); handleRef.current = null;
+            setLive(false); setWorkspaceRealtimeLive(null); setPeers([]);
+            return;
+          }
           const current = useWorkspaceStore.getState();
-          if (Object.values(current.blocks).some((b) => b.type === "collection")) return;
+          if (Object.values(current.blocks).some((b) => b.type === "collection") || hasSpreadsheetBlock(current.blocks) || hasSpreadsheetBlock(board.blocks)) return;
           if (board.revision !== undefined && board.revision < (getKnownRevision(remoteBoardId) ?? -1)) return;
           // A newly-connected Yjs room can briefly announce its empty
           // initial document before REST hydration has finished. Do not let
@@ -224,7 +237,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
       setWorkspaceRealtimeLive(null);
       setPeers([]);
     };
-  }, [enabled, hasCollection, remoteBoardId, flushRealtimePendingSave]);
+  }, [enabled, hasCollection, hasSpreadsheet, remoteBoardId, flushRealtimePendingSave]);
 
   // Broadcasts what this person is looking at. Subscribed rather than polled,
   // and de-duplicated inside the handle, so a selection that did not move
