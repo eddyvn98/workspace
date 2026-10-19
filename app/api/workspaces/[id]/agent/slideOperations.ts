@@ -172,7 +172,10 @@ export function applySlideAction(raw: JsonMap, block: JsonMap, type: string, out
       return false;
     }
     notes.push(...fields.notes);
-    data.slides = { ...slides, [id]: applyFields(slides[id], fields) };
+    const patch = applyFields(slides[id], fields);
+    // Legacy HTML updates explicitly revert to rich-text mode; scene edits preserve HTML backup.
+    if (fields.set.html !== undefined && fields.set.scene === undefined) delete patch.scene;
+    data.slides = { ...slides, [id]: patch };
     data.activeSlideId = id;
   } else {
     out.reason = `Unsupported slide action ${type}.`;
