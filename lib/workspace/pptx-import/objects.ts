@@ -5,11 +5,11 @@ import { appendObjects, type ImportAsset, type NoticeSink, type Theme } from "./
 import { paint, readText, opacity } from "./style";
 import { loadAsset } from "./media";
 import { PptxArchive } from "./archive";
-export type ObjectContext = {
+import { readNativeTable } from "./table";
+export type ObjectContext={
   archive:PptxArchive;rels:Map<string,Relationship>;assets:Map<string,ImportAsset>;
   theme:Theme;rootScale:number;notice:NoticeSink;objects:SlideSceneObject[];
-  nextId:()=>string;placeholders:Element[];
-  onImported?:(source:Element,objects:SlideSceneObject[])=>void;
+  nextId:()=>string;placeholders:Element[];onImported?:(source:Element,objects:SlideSceneObject[])=>void;
 };
 function shapeProperties(node:Element):Element|undefined{return child(node,NS.p,"spPr");}
 function placeholder(node:Element):Element|undefined{return first(node,NS.p,"ph");}
@@ -59,27 +59,9 @@ async function picture(node:Element,matrix:Matrix,groupId:string|undefined,ctx:O
   if(preset&&preset!=="rect")ctx.notice("image-mask","A picture mask was imported as a rectangular image.");
   appendObjects(ctx.objects,[{id:ctx.nextId(),kind:"image",...geometry,src:asset.src,groupId,imageFit:hasCrop?"cover":"fill",imageFocusX:l+r>0?Math.max(0,Math.min(1,l/(l+r))):0.5,imageFocusY:t+b>0?Math.max(0,Math.min(1,t/(t+b))):0.5}]);
 }
-function table(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):void{
-  const widths=children(child(node,NS.a,"tblGrid"),NS.a,"gridCol").map(c=>numeric(c,"w"));
-  const rows=children(node,NS.a,"tr"),heights=rows.map(r=>numeric(r,"h"));
-  const tw=widths.reduce((a,b)=>a+b,0),th=heights.reduce((a,b)=>a+b,0),tableId=groupId||ctx.nextId();
-  if(!tw||!th)throw new Error("Invalid table dimensions");
-  ctx.notice("table","Table cells are imported as editable text and rectangles, not a native table.");
-  let y=0;
-  rows.forEach((row,ri)=>{let x=0;
-    children(row,NS.a,"tc").forEach((cell,ci)=>{
-      const width=widths[ci]||widths[widths.length-1];
-      if(cell.getAttribute("hMerge")==="1"||cell.getAttribute("vMerge")==="1"||cell.hasAttribute("gridSpan")||cell.hasAttribute("rowSpan"))ctx.notice("table-merge","Merged table cells require layout review.");
-      const m=subFrame(matrix,x/tw,y/th,width/tw,heights[ri]/th),f=frame(m,ctx.notice),id=ctx.nextId();
-      const body=child(cell,NS.a,"txBody"),fill=paint(child(cell,NS.a,"tcPr"),ctx.theme,"#F1F5F9");
-      appendObjects(ctx.objects,[{id:`${id}-bg`,kind:"shape",...f,fill,stroke:"#CBD5E1",groupId:tableId}]);
-      if(body)appendObjects(ctx.objects,[{id:`${id}-text`,kind:"text",...f,...readText(body,ctx.theme,ctx.rootScale,ctx.notice),groupId:tableId}]);
-      x+=width;
-    });y+=heights[ri];
-  });
-}
 async function graphic(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):Promise<void>{
-  const tab=first(node,NS.a,"tbl");if(tab){table(tab,matrix,groupId,ctx);return;}
+  const table=first(node,NS.a,"tbl");
+  if(table){appendObjects(ctx.objects,[readNativeTable(table,matrix,groupId,ctx)]);return;}
   const reference=first(node,NS.c,"chart"),rel=ctx.rels.get(reference?.getAttributeNS(NS.r,"id")||"");
   if(!reference||!rel||rel.external||!rel.type.endsWith("/chart")){ctx.notice("graphic","An unsupported graphic, diagram or embedded object was omitted.");return;}
   const chart=await ctx.archive.xml(rel.target),series=descendants(chart,NS.c,"ser");
@@ -107,8 +89,7 @@ export async function readObjects(tree:Element|undefined,parent:Matrix,ctx:Objec
       const matrix=transform(child(child(node,NS.p,"grpSpPr"),NS.a,"xfrm"),parent,true);
       if(!matrix){ctx.notice("group-transform","A group with invalid transform was omitted.");continue;}
       if(groupId)ctx.notice("nested-group","Nested groups were flattened into their outer editable group.");
-      await readObjects(node,matrix,ctx,groupId||ctx.nextId(),depth+1);
-      ctx.onImported?.(node,ctx.objects.slice(before));continue;
+      await readObjects(node,matrix,ctx,groupId||ctx.nextId(),depth+1);ctx.onImported?.(node,ctx.objects.slice(before));continue;
     }
     const matrix=objectMatrix(node,parent,ctx);
     if(!matrix){ctx.notice("object-position",`Object ${node.localName} lacks supported position data and was omitted.`);continue;}
