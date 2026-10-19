@@ -125,8 +125,8 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
         style={{ backgroundColor: slideBackground(activeSlide?.backgroundColor, data.theme), ...slideTextStyle(data.theme) }}
         onClick={(e) => { if (activeSlide?.scene || e.detail < 2 || isEditingBody) return; e.stopPropagation(); startEditingBody(); }}>
         <style>{THEMED_EDITOR_CSS + SLIDE_TYPOGRAPHY_CSS}</style>
-        {data.showSlideNumbers && <span className="pointer-events-none absolute bottom-1 right-2 z-10 text-xs opacity-60">{data.slideOrder.indexOf(activeSlideId) + 1}</span>}
-        {activeSlide?.scene ? <SlideSceneEditor key={activeSlide.id} scene={activeSlide.scene}
+        {data.showSlideNumbers && !activeSlide?.scene && <span className="pointer-events-none absolute bottom-1 right-2 z-10 text-xs opacity-60">{data.slideOrder.indexOf(activeSlideId) + 1}</span>}
+        {activeSlide?.scene ? <SlideSceneEditor key={activeSlide.id} scene={activeSlide.scene} slideNumber={data.showSlideNumbers ? data.slideOrder.indexOf(activeSlideId)+1 : undefined}
           backgroundColor={slideBackground(activeSlide.backgroundColor, data.theme)} readOnly={readOnly}
           onChange={scene => { if (!readOnly) onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene } } }); }} />
           : activeSlide && <WorkspaceDocRichEditor key={activeSlide.id} blockId={block.id} html={activeSlide.html}
