@@ -44,7 +44,7 @@ async function sceneObjectSvg(object: SlideSceneObject, index: number, loadImage
   if (object.kind === "chart") child = sceneChart(object);
   if (object.kind === "image" && object.src) {
     const image = await loadImage(object.src);
-    child = `<image x="${object.x}" y="${object.y}" width="${object.w}" height="${object.h}" preserveAspectRatio="xMidYMid slice" href="data:image/png;base64,${image.buffer.toString("base64")}"/>`;
+    child = `<image x="${object.x}" y="${object.y}" width="${object.w}" height="${object.h}" preserveAspectRatio="${object.imageFit==="fill"?"none":object.imageFit==="contain"?"xMidYMid meet":"xMidYMid slice"}" href="data:image/png;base64,${image.buffer.toString("base64")}"/>`;
   }
   const rotation = Number.isFinite(object.rotation) ? object.rotation : 0;
   const opacity = object.opacity ?? 1;
