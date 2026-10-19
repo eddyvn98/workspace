@@ -9,9 +9,9 @@ import { alignSceneObjects, duplicateSceneObjects, nudgeSceneObjects, snapSceneR
 import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
 
-type Props = { scene: SlideScene; onChange: (next: SlideScene) => void; readOnly?: boolean };
+type Props = { scene: SlideScene; onChange: (next: SlideScene) => void; readOnly?: boolean; backgroundColor?:string };
 const field = "rounded border border-slate-300 bg-white px-2 py-1 text-slate-900";
-export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
+export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundColor="#FFFFFF" }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const select = (id:string,additive=false) => {
@@ -27,7 +27,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
   const undo = () => {const prior=history.current.undo.pop();if(!prior)return;history.current.redo.push(scene);onChange(prior);setHistoryVersion(v=>v+1);};
   const redo = () => {const next=history.current.redo.pop();if(!next)return;history.current.undo.push(scene);onChange(next);setHistoryVersion(v=>v+1);};
   const item = useMemo(() => scene.objects.find(o => o.id === selected), [scene, selected]);
-  const qualityWarnings=useMemo(()=>inspectSlideScene(scene),[scene]);
+  const qualityWarnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]);
   const patch = (values: Partial<SlideSceneObject>) => { if (item && !readOnly && !item.locked) commit(scenePatchObject(scene, item.id, values)); };
   const add = (kind: "text" | "shape" | "image" | "chart") => {
     if (readOnly) return;
