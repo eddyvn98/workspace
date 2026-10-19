@@ -1,5 +1,6 @@
 import type { SlideScene, SlideSceneObject } from "@/app/workspace/types/slideScene";
 import { xml } from "./pptx-elements";
+import { sceneImageRenderRect } from "./slide-image-layout";
 import { wrapExportText } from "./slide-export-layout";
 import type { ExportImage } from "./slide-export-images";
 
@@ -44,7 +45,8 @@ async function sceneObjectSvg(object: SlideSceneObject, index: number, loadImage
   if (object.kind === "chart") child = sceneChart(object);
   if (object.kind === "image" && object.src) {
     const image = await loadImage(object.src);
-    child = `<image x="${object.x}" y="${object.y}" width="${object.w}" height="${object.h}" preserveAspectRatio="${object.imageFit==="fill"?"none":object.imageFit==="contain"?"xMidYMid meet":"xMidYMid slice"}" href="data:image/png;base64,${image.buffer.toString("base64")}"/>`;
+    const fit=sceneImageRenderRect({x:object.x,y:object.y,w:object.w,h:object.h},image,object.imageFit,object.imageFocusX,object.imageFocusY);
+    child = `<image x="${fit.x}" y="${fit.y}" width="${fit.w}" height="${fit.h}" preserveAspectRatio="none" href="data:image/png;base64,${image.buffer.toString("base64")}"/>`;
   }
   const rotation = Number.isFinite(object.rotation) ? object.rotation : 0;
   const opacity = object.opacity ?? 1;
