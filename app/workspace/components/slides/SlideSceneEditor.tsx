@@ -1,12 +1,12 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import type { SlideScene, SlideSceneObject } from "../../types/slideScene";
-import { sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slideScene";
+import { sceneObject, scenePatchObject } from "../../types/slideScene";
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
-import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
+import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, moveSceneSelectionLayer, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
 import { resizeSceneSelection, rotateSceneSelection, sceneSelectionBounds } from "../../utils/slideSceneGroupTransform";
 import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
@@ -151,8 +151,8 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
             {["with-previous","after-previous","on-click"].map(v => <option key={v}>{v}</option>)}</select></label>
           <label className="flex items-center justify-between">Duration ms<input className={field + " w-24"} type="number" value={item.motion?.durationMs || 450} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:item.motion?.trigger||"with-previous",durationMs:Number(e.target.value),delayMs:item.motion?.delayMs||0}})}/></label>
           <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120 || !!item.locked} onClick={()=>{const next=duplicateSceneSelection(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());if(next!==scene){commit(next);select(next.objects[next.objects.length-1].id);}}}>Duplicate</button>
-            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(sceneMoveObject(scene,item.id,-1))}>Back</button>
-            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(sceneMoveObject(scene,item.id,1))}>Front</button>
+            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(moveSceneSelectionLayer(scene,selectedIds.length?selectedIds:[item.id],-1))}>Back</button>
+            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(moveSceneSelectionLayer(scene,selectedIds.length?selectedIds:[item.id],1))}>Front</button>
             <button className={field} disabled={readOnly || !!item.locked} onClick={() => {commit(deleteSceneSelection(scene,selectedIds.length?selectedIds:[item.id]));setSelected(null);setSelectedIds([]);}}>Delete</button>
           </div>
         </>}
