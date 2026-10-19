@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
-import { AlignCenter, AlignLeft, AlignRight, ChartColumn, Clapperboard, Copy, ImagePlus, Layers3, PanelRightClose, PanelRightOpen, Redo2, Shapes, Table2, Trash2, Type, Undo2 } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, ChartColumn, Clapperboard, Copy, ImagePlus, PanelRightClose, PanelRightOpen, Redo2, Shapes, Table2, Trash2, Type, Undo2 } from "lucide-react";
+import { SCENE_SHAPES, type SceneShapeKind } from "../../types/slideSceneShape";
 import type { SlideScene, SlideSceneObject, SceneObjectKind } from "../../types/slideScene";
 import { SlideSceneDiagramInsert } from "./SlideSceneDiagramInsert";
 
@@ -13,7 +14,7 @@ type Props = {
   onUndo:()=>void; onRedo:()=>void; onDuplicate:()=>void; onDelete:()=>void;
   onGroup:()=>void; onUngroup:()=>void;
   onPatch:(patch:Partial<SlideSceneObject>)=>void; onFormat:()=>void;
-  onAlign:(direction:"left"|"center"|"right")=>void;
+  onShowProperties:()=>void;
   onSnap:(value:boolean)=>void; onToggleInspector:()=>void; onToggleTimeline:()=>void;
 };
 const button="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-40";
@@ -57,7 +58,21 @@ export function SlideSceneRibbon(p:Props) {
         })}
         <button type="button" className={button} disabled={!editable} onClick={p.onFormat}>Format selected text...</button>
       </>}
-      {selected&&!isText&&<span className="text-xs text-slate-600">{p.item?.kind} selected</span>}
+      {p.item?.kind==="shape"&&<>
+        <label className="flex shrink-0 items-center gap-1 text-xs text-slate-600">Shape
+          <select aria-label="Selected shape type" className="rounded border border-slate-300 bg-white px-1 py-1.5" disabled={!editable}
+            value={p.item.shapeKind??"rect"} onChange={e=>p.onPatch({shapeKind:e.target.value as SceneShapeKind})}>
+            {SCENE_SHAPES.map(shape=><option key={shape} value={shape}>{shape}</option>)}
+          </select>
+        </label>
+      </>}
+      {selected&&(isText||p.item?.kind==="shape")&&<label className="flex items-center gap-1 text-xs text-slate-600">
+        Color <input aria-label="Object color" type="color" className="h-7 w-9 cursor-pointer rounded border border-slate-300 bg-white p-0.5"
+          disabled={!editable} value={p.item?.kind==="text"&&/^#[\da-f]{6}$/i.test(p.item.color??"")?p.item.color
+            :p.item?.kind==="shape"&&/^#[\da-f]{6}$/i.test(p.item.fill??"")?p.item.fill:"#4f46e5"}
+          onChange={e=>p.onPatch(p.item?.kind==="text"?{color:e.target.value}:{fill:e.target.value})}/>
+      </label>}
+      {selected&&!isText&&<button type="button" className={button} onClick={p.onShowProperties}>{p.item?.kind} settings</button>}
       {!selected&&<span className="text-xs text-slate-500">Select an object to edit text, color, size or position.</span>}
       {selected&&<div className="ml-auto flex flex-wrap items-center gap-1.5">
         {p.selectedCount>1&&<>
