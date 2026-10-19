@@ -3,11 +3,8 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "re
 import type { SlideScene } from "../../types/slideScene";
 import { resizeSceneRect, type SceneResizeHandle } from "../../utils/slideSceneGeometry";
 import { compileSceneTimeline, createScenePlayback, sceneBuildState, type ScenePlaybackController } from "../../utils/slideScenePlayback";
-import { SlideSceneInlineText } from "./SlideSceneInlineText";
-import { SlideSceneTextView } from "./SlideSceneTextView";
-import { SlideSceneShapeView } from "./SlideSceneShapeView";
+import { SlideSceneObjectContent } from "./SlideSceneObjectContent";
 import { SlideSceneSelectionHandles } from "./SlideSceneSelectionHandles";
-import { SlideSceneTableView } from "./SlideSceneTableView";
 type Props={
   scene:SlideScene;selected?:string|null;selectedIds?:string[];editing?:boolean;
   onSelect?:(id:string,additive?:boolean)=>void;onMove?:(id:string,x:number,y:number)=>void;
@@ -68,15 +65,11 @@ export function SlideSceneSurface({scene,selected,selectedIds=[],editing=false,o
         }} onDoubleClick={e=>{if(editing&&!o.locked&&o.kind==="text"){e.stopPropagation();onRequestTextEdit?.(o.id);}}}
         className={editing&&!o.locked?"cursor-move":""}
         style={{position:"absolute",left:`${(rect.x+(movePreview?offset.x:0))/scene.width*100}%`,top:`${(rect.y+(movePreview?offset.y:0))/scene.height*100}%`,width:`${rect.w/scene.width*100}%`,height:`${rect.h/scene.height*100}%`,transform:`rotate(${o.rotation}deg)`,opacity:o.opacity??1,
-          outline:editing&&(selected===o.id||selectedIds.includes(o.id))?"2px solid #6366f1":undefined,transformOrigin:"center",overflow:presenting?"visible":"hidden",pointerEvents:editing?"auto":"none"}}>
+          outline:editing&&(selected===o.id||selectedIds.includes(o.id))?"2px solid #6366f1":undefined,transformOrigin:"center",overflow:"visible",pointerEvents:editing?"auto":"none"}}>
         {editing&&selected===o.id&&selectedIds.length<=1&&!o.locked&&(["nw","ne","sw","se"] as SceneResizeHandle[]).map(handle=><div key={handle} data-resize-handle={handle} role="button" aria-label={`Resize ${handle}`} onPointerDown={e=>{e.stopPropagation();e.preventDefault();setResize({id:o.id,handle,startX:e.clientX,startY:e.clientY,x:o.x,y:o.y,w:o.w,h:o.h,ratio:e.shiftKey});setResizeOffset({dx:0,dy:0});}} style={{position:"absolute",width:12,height:12,background:"#fff",border:"2px solid #4f46e5",borderRadius:2,zIndex:10,cursor:`${handle}-resize`,left:handle.includes("w")?0:undefined,right:handle.includes("e")?0:undefined,top:handle.includes("n")?0:undefined,bottom:handle.includes("s")?0:undefined}}/>)}
-        <div data-scene-motion={o.id} className="h-full w-full" style={{opacity:before.visible?1:0}}><div className="h-full w-full overflow-hidden">
-          {o.kind==="text"&&<div className="h-full w-full" style={{color:o.color,fontSize:`${(o.fontSize||44)/scene.width*100}cqw`,fontFamily:o.fontFamily||"Arial",fontWeight:o.fontWeight,textAlign:o.align,whiteSpace:"pre-wrap",overflowWrap:"anywhere",lineHeight:1.12}}>{editingTextId===o.id?<SlideSceneInlineText object={o} onCommit={text=>onTextCommit?.(o.id,text)} onCancel={()=>onTextCancel?.()}/>:<SlideSceneTextView object={o} sceneWidth={scene.width}/>}</div>}
-          {o.kind==="shape"&&<SlideSceneShapeView object={o}/>}
-          {o.kind==="table"&&o.table&&<SlideSceneTableView object={o} sceneWidth={scene.width}/>}
-          {o.kind==="chart"&&o.series&&<div className="flex h-full w-full flex-col justify-end gap-1 rounded bg-white p-[3%]"><div className="flex min-h-0 flex-1 items-end justify-around gap-2 border-b border-slate-300">{o.series.map((item,i)=><div key={i} title={`${item.label}: ${item.value}`} className="min-w-0 flex-1 rounded-t" style={{background:o.fill||"#4f46e5",height:`${Math.max(0,item.value/Math.max(1,...o.series!.map(x=>x.value))*100)}%`}}/>)}</div><div className="flex justify-around gap-2">{o.series.map((item,i)=><span key={i} className="min-w-0 flex-1 truncate text-center" style={{fontSize:"1.25cqw"}}>{item.label}</span>)}</div></div>}
-          {o.kind==="image"&&o.src&&<img alt="" src={o.src} draggable={false} className="h-full w-full" style={{objectFit:o.imageFit||"cover",objectPosition:`${(o.imageFocusX??0.5)*100}% ${(o.imageFocusY??0.5)*100}%`}}/>}
-        </div></div>
+        <div data-scene-motion={o.id} className="h-full w-full" style={{opacity:before.visible?1:0}}>
+          <SlideSceneObjectContent object={o} sceneWidth={scene.width} editingText={editingTextId===o.id} onTextCommit={text=>onTextCommit?.(o.id,text)} onTextCancel={onTextCancel}/>
+        </div>
       </div>;
     })}
     {editing&&selectedIds.length>1&&!editingTextId&&!scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked)&&<SlideSceneSelectionHandles scene={previewScene} ids={selectedIds} surfaceRef={ref} onPreview={setTransformPreview} onCommit={next=>onTransformSelection?.(next)}/>}
