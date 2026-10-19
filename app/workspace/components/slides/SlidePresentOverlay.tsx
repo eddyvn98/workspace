@@ -92,8 +92,8 @@ export function SlidePresentOverlay({ data, index, showGrid, showNotes, onToggle
         total={data.slideOrder.length}
         showGrid={showGrid}
         showNotes={showNotes}
-        onPrev={onPrev}
-        onNext={onNext}
+        onPrev={prev}
+        onNext={next}
         onToggleGrid={onToggleGrid}
         onToggleNotes={onToggleNotes}
         onExit={onExit}
