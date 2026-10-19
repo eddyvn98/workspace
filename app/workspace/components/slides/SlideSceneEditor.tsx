@@ -51,6 +51,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     history.current.undo.push(scene);history.current.expected=JSON.stringify(next);onChange(next);setHistoryVersion(v=>v+1);
   };
   const item = useMemo(() => scene.objects.find(o => o.id === selected), [scene, selected]);
+  const selectionLocked=useMemo(()=>scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked),[scene,selectedIds]);
   const qualityWarnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]);
   const patch = (values: Partial<SlideSceneObject>) => { if (item && !readOnly && !item.locked) commit(scenePatchObject(scene, item.id, values)); };
   const add = (kind: "text" | "shape" | "image" | "chart") => {
@@ -121,9 +122,9 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
           <button className={field} type="button" onClick={()=>commit(rotateSceneSelection(scene,selectedIds,15))}>Rotate +15°</button>
           {[0.9,1.1].map(scale=><button className={field} key={scale} type="button" onClick={()=>{const b=sceneSelectionBounds(scene,selectedIds);if(!b)return;const delta=1-scale;commit(resizeSceneSelection(scene,selectedIds,{x:b.x+b.w*delta/2,y:b.y+b.h*delta/2,w:b.w*scale,h:b.h*scale}));}}>{scale<1?"Scale −10%":"Scale +10%"}</button>)}
         </div>}
-        {selectedIds.length > 2 && !readOnly && <div className="flex flex-wrap gap-1"><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"x"))}>Distribute H</button><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"y"))}>Distribute V</button></div>}
-        {selectedIds.length > 1 && !readOnly && <div className="flex flex-wrap gap-1"><button className={field} type="button" title="Group (Ctrl/Cmd+G)" onClick={()=>commit(groupSceneObjects(scene,selectedIds,()=>crypto.randomUUID()))}>Group</button><button className={field} type="button" title="Ungroup (Ctrl/Cmd+Shift+G)" onClick={()=>commit(ungroupSceneObjects(scene,selectedIds))}>Ungroup</button></div>}
-        {item && <div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button key={direction} className={field} disabled={readOnly || item.locked} onClick={()=>commit(alignSceneObjects(scene,selectedIds.length?selectedIds:[item.id],direction))}>{direction}</button>)}</div>}
+        {selectedIds.length > 2 && !readOnly && !selectionLocked && <div className="flex flex-wrap gap-1"><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"x"))}>Distribute H</button><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"y"))}>Distribute V</button></div>}
+        {selectedIds.length > 1 && !readOnly && !selectionLocked && <div className="flex flex-wrap gap-1"><button className={field} type="button" title="Group (Ctrl/Cmd+G)" onClick={()=>commit(groupSceneObjects(scene,selectedIds,()=>crypto.randomUUID()))}>Group</button><button className={field} type="button" title="Ungroup (Ctrl/Cmd+Shift+G)" onClick={()=>commit(ungroupSceneObjects(scene,selectedIds))}>Ungroup</button></div>}
+        {item && <div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button key={direction} className={field} disabled={readOnly || selectionLocked} onClick={()=>commit(alignSceneObjects(scene,selectedIds.length?selectedIds:[item.id],direction))}>{direction}</button>)}</div>}
         {item && <>
           <hr/><strong className="block">Object properties</strong>
           {item.kind === "image" && <label className="block">Image fit<select className={field+" mt-1 w-full"} value={item.imageFit||"cover"} disabled={readOnly||item.locked} onChange={e=>patch({imageFit:e.target.value as "cover"|"contain"|"fill"})}><option value="cover">Crop to fill (cover)</option><option value="contain">Fit entire image (contain)</option><option value="fill">Stretch to fill</option></select></label>}
