@@ -12,6 +12,8 @@ import { SlideContentTools } from "../components/slides/SlideContentTools";
 import { SlideDeckToolbar } from "../components/slides/SlideDeckToolbar";
 import { SlideFilmstrip } from "../components/slides/SlideFilmstrip";
 import { SlidePresentOverlay } from "../components/slides/SlidePresentOverlay";
+import { SlideSceneEditor } from "../components/slides/SlideSceneEditor";
+import { emptySlideScene } from "../types/slideScene";
 import { slideBackground, slideTextStyle } from "../utils/slideTheme";
 import { SLIDE_TYPOGRAPHY_CSS } from "../utils/slideTypography";
 
@@ -90,7 +92,14 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
 
       {activeSlide && <>
         <SlideMotionControls slide={activeSlide} onChange={(patch) => onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, ...patch } } })} />
-        <SlideContentTools blockId={block.id} slideId={activeSlide.id} onEdit={startEditingBody} />
+        <div className="flex items-center gap-2 border-b px-2 py-1 text-xs">
+          <button type="button" disabled={readOnly} className="rounded border px-2 py-1" onClick={() => {
+            if (activeSlide.scene) return;
+            if (activeSlide.html.trim() && !window.confirm("Switch to Scene V2? Existing rich text stays stored but Scene V2 becomes the visible slide.")) return;
+            onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene: emptySlideScene(data.aspectRatio) } } });
+          }}>{activeSlide.scene ? "Scene V2" : "Enable Scene V2"}</button>
+          {!activeSlide.scene && <SlideContentTools blockId={block.id} slideId={activeSlide.id} onEdit={startEditingBody} />}
+        </div>
       </>}
       <div
         className="slide-deck-themed slide-cq relative flex-1 overflow-hidden"
@@ -105,7 +114,9 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
         {data.showSlideNumbers && (
           <span className="pointer-events-none absolute bottom-1 right-2 z-10 text-xs opacity-60">{data.slideOrder.indexOf(activeSlideId) + 1}</span>
         )}
-        {activeSlide && (
+        {activeSlide?.scene ? (
+          <SlideSceneEditor key={activeSlide.id} scene={activeSlide.scene} readOnly={readOnly} onChange={scene => onChange({slides:{...data.slides,[activeSlide.id]:{...activeSlide,scene}}})}/>
+        ) : activeSlide && (
           <WorkspaceDocRichEditor
             key={activeSlide.id}
             blockId={block.id}
