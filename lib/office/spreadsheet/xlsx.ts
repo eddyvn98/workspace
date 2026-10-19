@@ -42,11 +42,14 @@ function readSheet(ws: Worksheet, warnings: Warnings): TableWorkbookSheet {
   const rows = Math.max(1, ws.rowCount), cols = Math.max(1, ws.columnCount);
   assertDimensions(rows, cols);
   const data: TableBlockPayload = { rows, cols, cells: Array.from({ length: rows }, () => Array(cols).fill("")), mode: "spreadsheet" };
-  ws.eachRow({ includeEmpty: false }, (row, ri) => row.eachCell({ includeEmpty: false }, (cell, ci) => {
-    const r = ri - 1, c = ci - 1;
+  // Excel templates regularly style empty cells. eachRow/eachCell without
+  // includeEmpty silently skips those cells, dropping borders, fills and
+  // validations on import. The bounded grid (<= 50k cells) is safe to scan.
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const cell = ws.getCell(r + 1, c + 1);
     readValue(cell, data, r, c, warnings); readStyle(cell, data, r, c, warnings); readBorder(cell, data, r, c, warnings);
     readValidation(cell, data, `${r}_${c}`, warnings);
-  }));
+  }
   data.rowHeights = Array.from({ length: rows }, (_, r) => (ws.getRow(r + 1).height ?? 21) * 4 / 3);
   data.columnWidths = Array.from({ length: cols }, (_, c) => Math.round((ws.getColumn(c + 1).width ?? 15) * 7 + 5));
   data.hiddenRows = Array.from({ length: rows }, (_, r) => r).filter((r) => ws.getRow(r + 1).hidden);
