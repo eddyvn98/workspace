@@ -55,7 +55,7 @@ export function SlideThumbnail({
         onDrop();
       }}
       onClick={onSelect}
-      className={`group relative flex ${vertical ? "w-full" : "w-28 shrink-0"} cursor-pointer flex-col gap-1 rounded-md p-1.5 ${
+      className={`group relative flex ${vertical ? "w-28 shrink-0 md:w-full" : "w-28 shrink-0"} cursor-pointer flex-col gap-1 rounded-md p-1.5 ${
         isActive ? "bg-blue-50 ring-2 ring-blue-500 dark:bg-blue-950/40" : "hover:bg-slate-100 dark:hover:bg-slate-800"
       } ${slide.hidden ? "opacity-50" : ""}`}
     >
