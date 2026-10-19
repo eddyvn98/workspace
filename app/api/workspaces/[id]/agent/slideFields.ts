@@ -1,4 +1,5 @@
 import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
+import { inspectSlideScene } from "@/app/workspace/utils/slideSceneInspect";
 import { composeSlideScene, SLIDE_SCENE_STYLES, type SceneComposition, type SceneDesignStyle } from "@/app/workspace/utils/slideSceneCompositions";
 import { SLIDE_ANIMATIONS, SLIDE_TRANSITIONS, validSlideMotion } from "@/app/workspace/utils/slideMotion";
 import { sanitizeAgentHtml } from "./agentHtmlSanitize";
@@ -66,6 +67,7 @@ export function parseSlideFields(raw: JsonMap, options: { allowLayout: boolean; 
     set.scene = composeSlideScene({title:String(param(raw,"title") ?? ""),subtitle:String(param(raw,"subtitle")??""),bullets:Array.isArray(param(raw,"bullets"))?param(raw,"bullets") as string[]:[],imageUrl:String(param(raw,"imageUrl")??""),metric:String(param(raw,"metric")??""),metricLabel:String(param(raw,"metricLabel")??"")},selectedStyle as SceneDesignStyle,composition as SceneComposition);
     set.backgroundColor = SLIDE_SCENE_STYLES[selectedStyle as SceneDesignStyle].background;
     notes.push("Generated editable Scene V2 composition with consistent design tokens.");
+    notes.push(...inspectSlideScene(set.scene as NonNullable<ReturnType<typeof normalizeSlideScene>>,String(set.backgroundColor)).map(w=>`Scene warning [${w.code}] on ${w.objectId}: ${w.message}`));
   }
   const sceneInput = param(raw, "scene");
   if (sceneInput !== undefined && composition !== undefined) return {ok:false,reason:"Give either scene or composition, not both."};
@@ -73,6 +75,7 @@ export function parseSlideFields(raw: JsonMap, options: { allowLayout: boolean; 
     const scene = normalizeSlideScene(sceneInput, param(raw,"aspectRatio") === "4:3" ? "4:3" : "16:9");
     if (!scene) return { ok: false, reason: "Invalid Scene V2. Provide an objects array (max 120) containing text, shape or image objects with safe dimensions." };
     set.scene = scene;
+    notes.push(...inspectSlideScene(scene,typeof set.backgroundColor==="string"?set.backgroundColor:"#FFFFFF").map(w=>`Scene warning [${w.code}] on ${w.objectId}: ${w.message}`));
   }
   const html = param(raw, "html");
   const layoutInput = options.allowLayout ? param(raw, "layout") : undefined;
