@@ -9,7 +9,7 @@ import { SHEET_LIMITS } from "@/lib/office/spreadsheet/limits";
 import { runWorkbookTask } from "@/lib/office/spreadsheet/workerClient";
 import { writeCsv } from "@/lib/office/spreadsheet/csv";
 import { tableDataSignature } from "./workspaceSpreadsheetEditorUtils";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Root as Dialog, Portal, Overlay, Content as DialogContent, Description as DialogDescription, Title as DialogTitle } from "@radix-ui/react-dialog";
 
 interface Props {
   getBlock: () => CanvasBlock<"table">;
@@ -88,14 +88,15 @@ export function SpreadsheetFileToolbar({ getBlock, flush, onChange, allowEdit, t
     {error && <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-400">{error}</p>}
     {notice && <p role="status" className="mt-2 text-xs text-slate-600 dark:text-slate-300">{notice}</p>}
     <Dialog open={Boolean(pending)} onOpenChange={(open) => { if (!open) setPending(null); }}>
-      <DialogContent className="max-h-[85vh] overflow-auto">
+      <Portal><Overlay className="fixed inset-0 z-[150] bg-black/50" />
+      <DialogContent className="fixed left-1/2 top-1/2 z-[151] flex max-h-[85vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-auto rounded-xl border bg-white p-6 shadow-xl dark:bg-slate-900">
         <DialogTitle>Replace this workbook?</DialogTitle>
         <DialogDescription>All current sheets will be replaced. Cancel and export a Native backup first to keep an exact copy.</DialogDescription>
         <p className="text-sm">{pending?.value.sheets.length} sheets: {pending?.value.sheets.map((s) => s.name).join(", ")}</p>
         <div className="space-y-2 text-sm">{pending?.value.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>
         <div className="flex justify-end gap-2"><button className={button} onClick={() => setPending(null)}>Cancel import</button>
           <button className={button} disabled={!allowEdit} onClick={() => void confirmImport()}>Replace workbook</button></div>
-      </DialogContent>
+      </DialogContent></Portal>
     </Dialog>
   </div>;
 }

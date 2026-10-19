@@ -4,7 +4,7 @@ import { flushWorkspaceRealtimePendingSave } from "./workspaceRealtimeFlush";
 
 /** Resolves to whether the flush is known to have reached the database —
  *  `false` means the caller must not treat the board as freshly persisted. */
-type FlushFn = () => Promise<boolean>;
+type FlushFn = (retryFailed?: boolean) => Promise<boolean>;
 
 let activeFlush: { boardId: string; flush: FlushFn } | null = null;
 
@@ -31,9 +31,9 @@ export function hasWorkspacePersistenceFlush(boardId: string): boolean {
  *  could not confirm persistence (a failed REST save, or the realtime room's
  *  ack not landing within its wait window) — callers must not silently treat
  *  that as a successful flush. */
-export async function flushWorkspacePendingSave(boardId: string): Promise<boolean> {
+export async function flushWorkspacePendingSave(boardId: string, retryFailed = false): Promise<boolean> {
   if (!await flushWorkspaceEditors(boardId)) return false;
   if (isWorkspaceRealtimeLive(boardId)) return flushWorkspaceRealtimePendingSave(boardId);
-  if (activeFlush?.boardId === boardId) return activeFlush.flush();
+  if (activeFlush?.boardId === boardId) return retryFailed ? activeFlush.flush(true) : activeFlush.flush();
   return true;
 }

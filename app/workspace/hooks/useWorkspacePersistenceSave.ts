@@ -24,6 +24,7 @@ export function useWorkspacePersistenceSave(
   const hasPendingSaveRef = useRef(false);
   const saveInFlightPromiseRef = useRef<Promise<void> | null>(null);
   const lastSaveOkRef = useRef(true);
+  const lastSaveConflictRef = useRef(false);
   const [isSavePending, setIsSavePending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -93,6 +94,7 @@ export function useWorkspacePersistenceSave(
         // the newly opened board with this response or its conflict state.
         if (boardIdRef.current !== id) return;
         lastSaveOkRef.current = result.ok;
+        lastSaveConflictRef.current = Boolean(result.conflict);
         if (!result.ok) {
           // Network errors and 5xx are not revision conflicts. A healthy GET
           // after a failed PUT does NOT prove this draft was saved; replacing
@@ -146,6 +148,7 @@ export function useWorkspacePersistenceSave(
         // masquerade as persisted state during an AI preflight flush.
         if (boardIdRef.current === id) {
           lastSaveOkRef.current = false;
+          lastSaveConflictRef.current = false;
           setSaveError(error instanceof Error ? error.message : "Failed to save workspace");
         }
       } finally {
@@ -159,8 +162,15 @@ export function useWorkspacePersistenceSave(
     saveInFlightPromiseRef.current = executeRemoteSave();
   }, [adopt, remoteLoadSettledRef]);
 
-  const flushPendingSave = useCallback(async (): Promise<boolean> => {
+  const flushPendingSave = useCallback(async (retryFailed = false): Promise<boolean> => {
     if (typeof window === "undefined") return true;
+    // Only an explicit Save retries a completed network failure. AI preflight
+    // never auto-retries; a revision conflict always requires reconciliation.
+    if (retryFailed && !lastSaveOkRef.current && !lastSaveConflictRef.current
+      && !isSaveInFlightRef.current && debounceRef.current === null) {
+      setIsSavePending(true);
+      save();
+    }
     // An edit may schedule another debounce *while* a preceding request is
     // in flight. Re-check the timer after every await so AI never reads a
     // "successfully flushed" board that still has local queued changes.

@@ -30,6 +30,8 @@ export function readCsv(text: string, delimiter: "," | "\t" = ","): TableBlockPa
 export function writeCsv(data: TableBlockPayload): string {
   assertDimensions(data.rows, data.cols);
   const lines: string[] = [];
+  const encoder = new TextEncoder();
+  let byteSize = 3; // UTF-8 BOM
   for (let r = 0; r < data.rows; r++) {
     const fields: string[] = [];
     for (let c = 0; c < data.cols; c++) {
@@ -37,7 +39,10 @@ export function writeCsv(data: TableBlockPayload): string {
       assertCellText(value);
       // Includes leading whitespace/control-character tricks when opened by Excel.
       if (/^[\s\u0000-\u001f]*[=+\-@]/.test(value) || /^[\t\r\n]/.test(value)) value = "'" + value;
-      fields.push('"' + value.replace(/"/g, '""') + '"');
+      const field = '"' + value.replace(/"/g, '""') + '"';
+      byteSize += encoder.encode(field).length + (c === data.cols - 1 ? 2 : 1);
+      if (byteSize > SHEET_LIMITS.fileBytes) throw new Error("CSV export exceeds 10 MiB.");
+      fields.push(field);
     }
     lines.push(fields.join(","));
   }

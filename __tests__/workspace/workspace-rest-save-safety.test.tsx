@@ -69,6 +69,27 @@ describe("Workspace REST save failure safety", () => {
     host.unmount();
   });
 
+  it("explicit Save retries one completed network failure without requiring another edit", async () => {
+    mocks.save.mockResolvedValueOnce({ ok: false, error: "503", conflict: false }).mockResolvedValue({ ok: true });
+    const host = mount();
+    act(() => host.api.save());
+    expect(await host.api.flushPendingSave()).toBe(false);
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(await host.api.flushPendingSave(true)).toBe(true);
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    host.unmount();
+  });
+
+  it("explicit Save does not silently retry an unresolved workbook conflict", async () => {
+    mocks.save.mockResolvedValue({ ok: false, conflict: true });
+    mocks.getKnown.mockReturnValue(undefined);
+    const host = mount(); act(() => host.api.save());
+    expect(await host.api.flushPendingSave()).toBe(false);
+    expect(await host.api.flushPendingSave(true)).toBe(false);
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    host.unmount();
+  });
+
   it("serializes a second edit while the first request is in flight", async () => {
     let resolveFirst!: (result: { ok: boolean }) => void;
     mocks.save.mockReturnValueOnce(new Promise(resolve => { resolveFirst = resolve; }))

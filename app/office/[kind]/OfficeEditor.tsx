@@ -105,7 +105,7 @@ function Content({ kind, viewer }: { kind: OfficeKind; viewer: boolean }) {
         <span className="text-xs text-slate-500">{readOnly ? "View only" : saveError ? "Save failed" : hasEditorDraft ? "Editing cell..." : isSavePending ? "Saving..." : "Saved"}</span>
       </div>
       <div className="flex items-center gap-3 text-xs">
-        <button type="button" disabled={readOnly} onClick={() => void flushWorkspacePendingSave(boardId).then(ok => ok ? toast.success("Saved") : toast.error("Save not confirmed"))} className="rounded border px-3 py-1.5 disabled:opacity-50">Save</button>
+        <button type="button" disabled={readOnly} onClick={() => void flushWorkspacePendingSave(boardId, true).then(ok => ok ? toast.success("Saved") : toast.error("Save not confirmed"))} className="rounded border px-3 py-1.5 disabled:opacity-50">Save</button>
         <button type="button" onClick={() => void saveAndNavigate(`/workspace?id=${encodeURIComponent(boardId)}`)} className="text-indigo-600 hover:underline">Open on canvas</button>
       </div>
     </header>

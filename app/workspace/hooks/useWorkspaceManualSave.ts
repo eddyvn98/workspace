@@ -36,7 +36,7 @@ export function useWorkspaceManualSave(boardId: string | null) {
 
       // Use the existing writer to avoid racing a pending autosave or realtime flush.
       if (hasWorkspacePersistenceFlush(boardId)) {
-        if (!await flushWorkspacePendingSave(boardId)) {
+        if (!await flushWorkspacePendingSave(boardId, true)) {
           toast.error(cached ? "Saved on this device. The server has not confirmed the save; retry when connected." : "The server has not confirmed the save; retry when connected.");
           return false;
         }

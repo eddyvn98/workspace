@@ -80,6 +80,10 @@ describe("bounded spreadsheet files", () => {
     const csv = writeCsv({ rows: 1, cols: 5, cells: [["=1+1", "\t@SUM(A1)", "+2", "-3", "normal"]] });
     expect(csv).toContain('"\'=1+1"'); expect(csv).toContain('"\'\t@SUM(A1)"'); expect(csv).toContain('"normal"');
   });
+  it("bounds CSV export output bytes before constructing an oversized file", () => {
+    const cells = Array.from({ length: 400 }, () => ["x".repeat(32767)]);
+    expect(() => writeCsv({ rows: 400, cols: 1, cells })).toThrow(/10 MiB/);
+  });
   it("rejects unsafe archives before workbook parsing", async () => {
     await expect(inspectXlsx(new Uint8Array(25))).rejects.toThrow();
     const zip = new JSZip(); zip.file("[Content_Types].xml", "<a/>"); zip.file("xl/workbook.xml", "<a/>"); zip.file("xl/vbaProject.bin", "macro");
