@@ -2,7 +2,7 @@
 import { Schema, type Mark, type Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { EditorState, Plugin, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, EditorView } from "@tiptap/pm/view";
-import { baseKeymap } from "@tiptap/pm/commands";
+import { baseKeymap, splitBlock } from "@tiptap/pm/commands";
 import { keymap } from "@tiptap/pm/keymap";
 import { history, undo, redo } from "@tiptap/pm/history";
 import { resolvedSceneTextStyle, sceneParagraphLabels, type SceneRichText, type SceneTextDefaults, type SceneTextParagraph, type SceneTextStyle } from "../types/slideSceneText";
@@ -86,6 +86,14 @@ export function createSceneTextEditor(host: HTMLElement, rich: SceneRichText, de
     "Mod-b": () => toggle("bold"), "Mod-i": () => toggle("italic"), "Mod-u": () => toggle("underline"),
     "Mod-Enter": () => { events.apply(); return true; }, "Escape": () => { events.cancel(); return true; },
     "Shift-Enter": (state, dispatch) => { dispatch?.(state.tr.replaceSelectionWith(schema.nodes.hard_break.create()).scrollIntoView()); return true; },
+    "Enter": (state, dispatch) => {
+      const marks = state.storedMarks ?? state.selection.$from.marks();
+      return splitBlock(state, dispatch ? tr => {
+        const position = tr.selection.$from;
+        if (position.depth && position.parent.type === schema.nodes.paragraph) tr.setNodeMarkup(position.before(), undefined, { ...position.parent.attrs, start: null });
+        tr.ensureMarks(marks); dispatch(tr);
+      } : undefined);
+    },
   });
   view = new EditorView(host, {
     state: EditorState.create({ schema, doc: schema.nodeFromJSON(sceneTextToEditor(rich, defaults)), plugins: [history(), commands, keymap(baseKeymap), defaultMarks, labels] }),
