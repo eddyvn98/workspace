@@ -50,7 +50,7 @@ export function SlideSceneSurface({scene,selected,selectedIds=[],editing=false,o
     window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);window.addEventListener("pointercancel",cancel);
     return ()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",cancel);};
   },[resize,scene.width,scene.height,onResize]);
-  return <div ref={ref} data-scene-width={scene.width} data-scene-height={scene.height} className="absolute inset-0 overflow-hidden" style={{containerType:"size"}}>
+  return <div ref={ref} data-scene-width={scene.width} data-scene-height={scene.height} className={editing?"absolute inset-0 overflow-visible":"absolute inset-0 overflow-hidden"} style={{containerType:"size"}}>
     {previewScene.objects.map(o=>{
       const before=presenting?sceneBuildState(timeline,o.id,step):{visible:true,x:0,y:0};
       const rect=resize?.id===o.id?resizeSceneRect(resize,resize.handle,resizeOffset.dx,resizeOffset.dy,resize.ratio):o;
