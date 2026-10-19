@@ -55,7 +55,7 @@ export function readNativeTable(node:Element,matrix:Matrix,groupId:string|undefi
     return result;
   }));
   const table=normalizeSceneTable({rows:data,columnWidths:widths,rowHeights:heights,merges:merged,headerRow:truth(child(node,NS.a,"tblPr"),"firstRow")});
-  if(!table)throw new Error("Imported table text, styles or merge regions exceed the supported limits.");
+  if(!table)throw new Error("Ambiguous PowerPoint merged-cell flags. Unmerge and re-save this table before import.");
   grid.forEach((cells,r)=>cells.forEach((source,c)=>{
     const merge=tableMergeAt(table,r,c),expectedH=!!merge&&c>merge.column,expectedV=!!merge&&r>merge.row;
     if(truth(source,"hMerge")!==expectedH||truth(source,"vMerge")!==expectedV)throw new Error("Ambiguous PowerPoint merged-cell flags. Unmerge and re-save this table before import.");
