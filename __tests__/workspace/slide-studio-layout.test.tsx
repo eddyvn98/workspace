@@ -27,10 +27,14 @@ describe("Slide Studio editor layout",()=>{
     render(<SlideSceneEditorCore scene={scene} onChange={onChange}/>);
     const button=screen.getByRole("button",{name:"Toggle inspector"});
     expect(screen.getByLabelText("Slide inspector")).not.toBeNull();
+    const splitter=screen.getByRole("separator",{name:"Resize inspector"});
+    fireEvent.keyDown(splitter,{key:"ArrowLeft"});
+    expect(splitter.getAttribute("aria-valuenow")).toBe("304");
     fireEvent.click(button);
     expect(screen.queryByLabelText("Slide inspector")).toBeNull();
     fireEvent.click(button);
     expect(screen.getByLabelText("Slide inspector")).not.toBeNull();
+    expect(screen.getByRole("separator",{name:"Resize inspector"}).getAttribute("aria-valuenow")).toBe("304");
     expect(onChange).not.toHaveBeenCalled();
   });
   it("switches inspector between layers and contextual formatting",()=>{
