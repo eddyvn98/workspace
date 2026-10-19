@@ -120,7 +120,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
           <span className="pointer-events-none absolute bottom-1 right-2 z-10 text-xs opacity-60">{data.slideOrder.indexOf(activeSlideId) + 1}</span>
         )}
         {activeSlide?.scene ? (
-          <SlideSceneEditor key={activeSlide.id} scene={activeSlide.scene} readOnly={readOnly} onChange={scene => onChange({slides:{...data.slides,[activeSlide.id]:{...activeSlide,scene}}})}/>
+          <SlideSceneEditor key={activeSlide.id} scene={activeSlide.scene} backgroundColor={slideBackground(activeSlide.backgroundColor,data.theme)} readOnly={readOnly} onChange={scene => onChange({slides:{...data.slides,[activeSlide.id]:{...activeSlide,scene}}})}/>
         ) : activeSlide && (
           <WorkspaceDocRichEditor
             key={activeSlide.id}
