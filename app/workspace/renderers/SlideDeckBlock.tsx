@@ -33,6 +33,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const studioRef = useRef<HTMLDivElement>(null);
   const previousStudioState = useRef(false);
   const editHistoryBySlide=useRef<Map<string,SlideSceneHistorySlot>>(new Map());
+  const historyOwner=useRef<string|undefined>(undefined);
   useEffect(() => {
     if (!studioOpen) return;
     const prior = document.body.style.overflow;
@@ -50,6 +51,11 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
     previousStudioState.current = studioOpen;
   }, [studioOpen, block.id]);
   const boardId = useWorkspaceStore(state => state.boardId);
+  const historyIdentity=`${boardId??""}:${block.id}`;
+  if(historyOwner.current!==historyIdentity){
+    editHistoryBySlide.current.clear();
+    historyOwner.current=historyIdentity;
+  }
   const pendingEditBlockId = useWorkspaceStore((state) => state.pendingEditBlockId);
   const setPendingEditBlockId = useWorkspaceStore((state) => state.setPendingEditBlockId);
   const setEditingBlockId = useWorkspaceStore((state) => state.setEditingBlockId);
