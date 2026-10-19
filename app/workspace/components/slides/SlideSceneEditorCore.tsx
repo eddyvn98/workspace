@@ -7,6 +7,7 @@ import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { SlideSceneProperties, sceneField as field } from "./SlideSceneProperties";
 import { SlideSceneRichTextEditor } from "./SlideSceneRichTextEditor";
+import { SlideSceneDiagramInsert } from "./SlideSceneDiagramInsert";
 import { useSlideSceneHistory } from "../../hooks/useSlideSceneHistory";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
@@ -86,6 +87,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
       <button type="button" className={field+" flex items-center gap-1"} disabled={readOnly||uploading||scene.objects.length>=120} onClick={()=>fileInput.current?.click()}>
         <ImagePlus className="h-4 w-4"/>{uploading?"Uploading...":"Upload image"}
       </button>
+      <SlideSceneDiagramInsert scene={scene} readOnly={readOnly} onInsert={next=>commit(next)}/>
       <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/>
       <details className="shrink-0 text-xs"><summary className="flex cursor-pointer list-none items-center gap-1 rounded px-2 py-1.5 text-slate-600 hover:bg-slate-100">Image link <ChevronDown className="h-3 w-3"/></summary>
         <div className="flex items-center gap-1 py-1"><input aria-label="Image URL" className={field+" w-36"} disabled={readOnly} placeholder="Paste image URL" value={imageUrl} onChange={e=>setImageUrl(e.target.value)}/>
