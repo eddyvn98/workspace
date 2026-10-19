@@ -35,9 +35,9 @@ export function SlideFilmstrip({
   const vertical = orientation === "vertical";
   return (
     <nav aria-label="Presentation slides" className={vertical
-      ? "flex h-full w-48 shrink-0 flex-col items-stretch gap-2 overflow-y-auto border-r border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900"
+      ? "flex h-28 w-full shrink-0 items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50 p-2 md:h-full md:w-48 md:flex-col md:items-stretch md:overflow-x-hidden md:overflow-y-auto md:border-t-0 md:border-r md:p-3 dark:border-slate-800 dark:bg-slate-900"
       : "flex items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60"}>
-      {vertical && <div className="flex items-center justify-between px-1 text-xs font-semibold text-slate-600 dark:text-slate-300"><span>Slides</span><span>{data.slideOrder.length}</span></div>}
+      {vertical && <div className="hidden items-center justify-between px-1 text-xs font-semibold text-slate-600 md:flex dark:text-slate-300"><span>Slides</span><span>{data.slideOrder.length}</span></div>}
       {data.slideOrder.map((id, index) => {
         const slide = data.slides[id];
         if (!slide) return null;
@@ -68,12 +68,12 @@ export function SlideFilmstrip({
           />
         );
       })}
-      <div className={vertical ? "relative w-full shrink-0" : "relative shrink-0"}>
+      <div className={vertical ? "relative shrink-0 md:w-full" : "relative shrink-0"}>
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => setPickerOpen((v) => !v)}
-          className={vertical ? "flex h-12 w-full items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white text-xs text-slate-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800" : "flex h-16 w-16 items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:border-slate-700"}
+          className={vertical ? "flex h-14 w-14 items-center justify-center gap-2 md:h-12 md:w-full rounded-md border border-dashed border-slate-300 bg-white text-xs text-slate-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800" : "flex h-16 w-16 items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:border-slate-700"}
           aria-label="Add slide"
           title="Add slide"
         >
