@@ -33,6 +33,8 @@ export interface SlideSceneObject {
   radius?: number;
   opacity?: number;
   locked?: boolean;
+  /** Logical editor group; grouped objects remain independent PPTX shapes. */
+  groupId?: string;
   motion?: SceneMotion;
 }
 export interface SlideScene {
@@ -99,6 +101,7 @@ export function normalizeSlideScene(input: unknown, ratio: "16:9" | "4:3" = "16:
       radius: num(obj.radius, 0, 0, 200),
       opacity: num(obj.opacity, 1, 0, 1),
       locked: obj.locked === true,
+      ...(typeof obj.groupId === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(obj.groupId) ? {groupId:obj.groupId} : {}),
       ...(obj.motion != null ? { motion: normalizeSceneMotion(obj.motion) } : {}),
     });
   }
