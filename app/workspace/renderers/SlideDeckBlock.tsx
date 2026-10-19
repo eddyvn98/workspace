@@ -57,7 +57,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const activeSlideId = data.activeSlideId ?? data.slideOrder[0];
   const activeSlide = data.slides[activeSlideId];
 
-  const filmstrip = <SlideFilmstrip data={data} orientation={studioOpen ? "vertical" : "horizontal"}
+  const filmstrip = <SlideFilmstrip data={data} readOnly={readOnly} orientation={studioOpen ? "vertical" : "horizontal"}
     onSelect={actions.selectSlide} onAdd={actions.addSlide} onReorder={actions.reorderSlide}
     onRename={actions.renameSlide} onDuplicate={actions.duplicateSlide} onDelete={actions.deleteSlide}
     onSetStatus={actions.updateStatus} onSetBackground={actions.updateBackground}
