@@ -110,7 +110,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
         className="slide-deck-themed slide-cq relative flex-1 overflow-hidden"
         style={{ backgroundColor: slideBackground(activeSlide?.backgroundColor, data.theme), ...slideTextStyle(data.theme) }}
         onClick={(e) => {
-          if (e.detail < 2 || isEditingBody) return;
+          if (activeSlide?.scene || e.detail < 2 || isEditingBody) return;
           e.stopPropagation();
           startEditingBody();
         }}
