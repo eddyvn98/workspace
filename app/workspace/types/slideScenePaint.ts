@@ -1,11 +1,16 @@
 /** Portable paint data; never raw CSS, SVG, filters or executable markup. */
 import { normalizeSceneShape, type SceneShapeFields, type SceneShapeKind } from "./slideSceneShape";
+import { normalizeSceneImageInsets, type SceneImageInsets } from "./slideSceneImageCrop";
 export type SceneGradientStop = { offset: number; color: string; opacity: number };
 /** Angle is clockwise from the positive X axis, in scene coordinates. */
 export type SceneGradient = { kind: "linear"; angle: number; stops: SceneGradientStop[] };
 export type SceneShadow = { color: string; opacity: number; blur: number; x: number; y: number };
 export type SceneImageMask = SceneShapeFields & { radius?: number };
-export type ScenePaintFields = { gradient?: SceneGradient; shadow?: SceneShadow; imageMask?: SceneImageMask };
+export type ScenePaintFields = {
+  gradient?: SceneGradient; shadow?: SceneShadow; imageMask?: SceneImageMask;
+  /** Exact source crop/destination padding override automatic imageFit/focus while present. */
+  imageCrop?: SceneImageInsets; imageViewport?: SceneImageInsets;
+};
 export const SCENE_IMAGE_MASKS: readonly SceneShapeKind[] = ["rect", "roundRect", "ellipse", "triangle", "diamond", "pentagon", "hexagon", "octagon", "star5", "heart", "custom"];
 const record = (v: unknown): Record<string, unknown> | undefined => v !== null && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : undefined;
 const finite = (v: unknown, min: number, max: number): v is number => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
@@ -48,6 +53,11 @@ export function normalizeScenePaint(kind: string, raw: Record<string, unknown>):
   if (raw.imageMask !== undefined) {
     if (kind !== "image") return;
     const imageMask = normalizeSceneImageMask(raw.imageMask); if (!imageMask) return; result.imageMask = imageMask;
+  }
+  for (const key of ["imageCrop", "imageViewport"] as const) {
+    if (raw[key] === undefined) continue;
+    if (kind !== "image") return;
+    const value = normalizeSceneImageInsets(raw[key]); if (!value) return; result[key] = value;
   }
   return result;
 }
