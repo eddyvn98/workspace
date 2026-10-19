@@ -57,6 +57,7 @@ export function SlideSceneSurface({ scene, selected, selectedIds = [], editing =
           if (!editing || o.locked || editingTextId === o.id) return;
           e.preventDefault();e.stopPropagation();onSelect?.(o.id, e.shiftKey);
           if (e.shiftKey || (o.kind === "text" && e.detail >= 2)) return;
+          if (selectedIds.includes(o.id) && scene.objects.some(item=>selectedIds.includes(item.id)&&item.locked)) return;
           setDrag({id:o.id,x:o.x,y:o.y,left:e.clientX,top:e.clientY});setOffset({x:0,y:0});
         }}
         onDoubleClick={e => { if (editing && !o.locked && o.kind === "text") { e.stopPropagation(); onRequestTextEdit?.(o.id); } }}
