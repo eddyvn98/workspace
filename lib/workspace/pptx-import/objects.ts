@@ -11,10 +11,11 @@ import { readScenePaint } from "./paint-effects";
 import { readScenePicture } from "./picture";
 import { readSceneChart } from "./chart";
 import { readSceneSmartArt } from "./smartart";
+import { readSceneConnector } from "./connector";
 export type ObjectContext={
   archive:PptxArchive;rels:Map<string,Relationship>;assets:Map<string,ImportAsset>;theme:Theme;rootScale:number;notice:NoticeSink;objects:SlideSceneObject[];
   nextId:()=>string;placeholders:Element[];onImported?:(source:Element,objects:SlideSceneObject[])=>void;
-  diagramDepth?:number;
+  diagramDepth?:number;diagramParts?:readonly string[];
 };
 function shapeProperties(node:Element):Element|undefined{return child(node,NS.p,"spPr");}
 function placeholder(node:Element):Element|undefined{return first(node,NS.p,"ph");}
@@ -46,8 +47,7 @@ function shape(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectCon
   appendObjects(ctx.objects,output);
 }
 async function graphic(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):Promise<void>{
-  const table=first(node,NS.a,"tbl");
-  if(table){appendObjects(ctx.objects,[readNativeTable(table,matrix,groupId,ctx)]);return;}
+  const table=first(node,NS.a,"tbl");if(table){appendObjects(ctx.objects,[readNativeTable(table,matrix,groupId,ctx)]);return;}
   if(await readSceneSmartArt(node,matrix,groupId,ctx,readObjects))return;
   await readSceneChart(node,matrix,groupId,ctx);
 }
@@ -62,20 +62,21 @@ export async function readObjects(tree:Element|undefined,parent:Matrix,ctx:Objec
     if(node.localName==="grpSp"){
       const matrix=transform(child(child(node,NS.p,"grpSpPr"),NS.a,"xfrm"),parent,true);
       if(!matrix){ctx.notice("group-transform","A group with invalid transform was omitted.");continue;}
-      const nextPath=[...path,ctx.nextId()];
-      await readObjects(node,matrix,ctx,nextPath[0],depth+1,nextPath);ctx.onImported?.(node,ctx.objects.slice(before));continue;
+      const nextPath=[...path,ctx.nextId()];await readObjects(node,matrix,ctx,nextPath[0],depth+1,nextPath);ctx.onImported?.(node,ctx.objects.slice(before));continue;
     }
-    const matrix=objectMatrix(node,parent,ctx);
-    if(!matrix){ctx.notice("object-position",`Object ${node.localName} lacks supported position data and was omitted.`);continue;}
-    if(node.localName==="sp")shape(node,matrix,groupId,ctx);
-    else if(node.localName==="pic")await readScenePicture(node,matrix,groupId,ctx);
-    else if(node.localName==="graphicFrame")await graphic(node,matrix,groupId,ctx);
-    else ctx.notice("object-kind",`Unsupported object ${node.localName} was omitted.`);
+    if(node.localName==="cxnSp")readSceneConnector(node,parent,groupId,ctx);
+    else{
+      const matrix=objectMatrix(node,parent,ctx);
+      if(!matrix){ctx.notice("object-position",`Object ${node.localName} lacks supported position data and was omitted.`);continue;}
+      if(node.localName==="sp")shape(node,matrix,groupId,ctx);
+      else if(node.localName==="pic")await readScenePicture(node,matrix,groupId,ctx);
+      else if(node.localName==="graphicFrame")await graphic(node,matrix,groupId,ctx);
+      else ctx.notice("object-kind",`Unsupported object ${node.localName} was omitted.`);
+    }
     if(path.length){
       const compound=ctx.objects.length-before>1?ctx.nextId():undefined;
       for(let i=before;i<ctx.objects.length;i++){
-        const current=objectGroupPath(ctx.objects[i]);
-        const suffix=current[0]===groupId?current.slice(1):current;
+        const current=objectGroupPath(ctx.objects[i]),suffix=current[0]===groupId?current.slice(1):current;
         const next=[...path,...(suffix.length?suffix:compound?[compound]:[])];
         if(next.length>16)throw new Error("Imported nested group exceeds 16 levels.");
         ctx.objects[i]=withSceneGroupPath(ctx.objects[i],next);
