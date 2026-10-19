@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import type { SlideScene, SlideSceneObject } from "../../types/slideScene";
 import { sceneDeleteObject, sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slideScene";
 import { SlideSceneSurface } from "./SlideSceneSurface";
+import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { alignSceneObjects, duplicateSceneObjects, nudgeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { useEffect, useRef } from "react";
 
@@ -86,5 +87,6 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
         </>}
       </aside>
     </div>
+    <SlideSceneTimeline scene={scene} selected={selected} onSelect={select} readOnly={readOnly} onChange={commit}/>
   </div>;
 }
