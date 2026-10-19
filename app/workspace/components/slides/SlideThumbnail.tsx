@@ -96,7 +96,7 @@ export function SlideThumbnail({
           </SmartPopover>
         )}
       </div>
-      <SlideMiniPreview html={slide.html} backgroundColor={slide.backgroundColor} theme={theme} aspectRatio={aspectRatio} />
+      <SlideMiniPreview html={slide.html} scene={slide.scene} backgroundColor={slide.backgroundColor} theme={theme} aspectRatio={aspectRatio} />
       <div className="truncate px-0.5 text-[10px] text-slate-500 dark:text-slate-400">{slide.name}</div>
     </div>
   );
