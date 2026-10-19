@@ -3,13 +3,15 @@ import { MAX_OBJECT_EFFECTS, MAX_SCENE_EFFECTS, normalizeSceneMotion, type Scene
 import { createSceneTable, normalizeSceneTable, type SceneTableData } from "./slideSceneTable";
 import { inheritSceneTextStyle, normalizeSceneRichText, sceneRichTextPlainText, type SceneRichText } from "./slideSceneText";
 import { normalizeSceneShape, type SceneShapeFields } from "./slideSceneShape";
+import { normalizeScenePaint, type ScenePaintFields } from "./slideScenePaint";
 export { normalizeSceneMotion } from "./slideSceneMotion";
 export type { SceneMotion, SceneMotionKind, SceneMotionTrigger, SceneMotionPhase, SceneMotionEasing } from "./slideSceneMotion";
 export type { SceneTableData, SceneTableCell, SceneTableMerge } from "./slideSceneTable";
 export type { SceneRichText, SceneTextParagraph, SceneTextRun } from "./slideSceneText";
 export type { SceneShapeKind, SceneVectorPath, ScenePathCommand } from "./slideSceneShape";
+export type { SceneGradient, SceneShadow, SceneImageMask } from "./slideScenePaint";
 export type SceneObjectKind = "text" | "shape" | "image" | "chart" | "table";
-export interface SlideSceneObject extends SceneShapeFields {
+export interface SlideSceneObject extends SceneShapeFields, ScenePaintFields {
   id: string; kind: SceneObjectKind; x: number; y: number; w: number; h: number; rotation: number;
   text?: string; richText?: SceneRichText;
   italic?: boolean; underline?: boolean; strike?: boolean; verticalAlign?: "top" | "middle" | "bottom";
@@ -49,6 +51,7 @@ export function normalizeSlideScene(input: unknown, ratio: "16:9" | "4:3" = "16:
     if (kind === "table" && !table) return undefined;
     const shape = kind === "shape" ? normalizeSceneShape(obj) : undefined;
     if (kind === "shape" && !shape) return undefined;
+    const paint = normalizeScenePaint(kind, obj); if (!paint) return undefined;
     const richText = kind === "text" && obj.richText !== undefined ? normalizeSceneRichText(obj.richText) : undefined;
     if (kind === "text" && obj.richText !== undefined && !richText) return undefined;
     let animations: SceneMotion[] | undefined;
@@ -67,7 +70,7 @@ export function normalizeSlideScene(input: unknown, ratio: "16:9" | "4:3" = "16:
         italic: obj.italic === true, underline: obj.underline === true, strike: obj.strike === true,
         verticalAlign: ["top", "middle", "bottom"].includes(String(obj.verticalAlign)) ? obj.verticalAlign as SlideSceneObject["verticalAlign"] : "top" } : {}),
       ...(src && kind === "image" ? { src, imageFit: ["cover", "contain", "fill"].includes(String(obj.imageFit)) ? obj.imageFit as SlideSceneObject["imageFit"] : "cover", imageFocusX: num(obj.imageFocusX, 0.5, 0, 1), imageFocusY: num(obj.imageFocusY, 0.5, 0, 1) } : {}),
-      ...(series && kind === "chart" ? { series: series as Array<{ label: string; value: number }> } : {}), ...(table ? { table } : {}), ...(shape ?? {}),
+      ...(series && kind === "chart" ? { series: series as Array<{ label: string; value: number }> } : {}), ...(table ? { table } : {}), ...(shape ?? {}), ...paint,
       fill: color(obj.fill, kind === "shape" ? "#4f46e5" : "transparent"), stroke: color(obj.stroke, "transparent"), color: color(obj.color, "#0f172a"),
       fontSize: num(obj.fontSize, kind === "table" ? 22 : 44, 8, 180), fontFamily: typeof obj.fontFamily === "string" && /^[\w\s,'"-]{1,100}$/.test(obj.fontFamily) ? obj.fontFamily : "Arial",
       fontWeight: obj.fontWeight === "bold" ? "bold" : "normal", align: ["left", "center", "right"].includes(String(obj.align)) ? obj.align as SlideSceneObject["align"] : "left",
