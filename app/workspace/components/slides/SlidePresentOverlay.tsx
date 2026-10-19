@@ -10,6 +10,7 @@ import { SlidePresentControls } from "./SlidePresentControls";
 import { SlidePresentGrid } from "./SlidePresentGrid";
 import { slideBackground, slideTextStyle } from "../../utils/slideTheme";
 import { sanitizeSlideHtmlForRender } from "../../utils/slideHtmlRender";
+import { SlideSceneSurface } from "./SlideSceneSurface";
 
 export interface SlidePresentOverlayProps {
   data: SlideDeckPayload;
@@ -65,7 +66,7 @@ export function SlidePresentOverlay({ data, index, showGrid, showNotes, onToggle
               {/* Same fixed-light-background/no-color-class gap as
                   SlideMiniPreview.tsx - without this the body text inherits
                   the app's dark-mode foreground and disappears here too. */}
-              <div className="slide-html h-full w-full overflow-auto" style={{ ...slideTextStyle(data.theme), padding: "4cqw" }} dangerouslySetInnerHTML={{ __html: safeHtml }} />
+              {slide.scene ? <SlideSceneSurface scene={slide.scene}/> : <div className="slide-html h-full w-full overflow-auto" style={{ ...slideTextStyle(data.theme), padding: "4cqw" }} dangerouslySetInnerHTML={{ __html: safeHtml }} />}
               {data.showSlideNumbers && (
                 <span className="absolute bottom-2 right-3 text-xs opacity-60" style={slideTextStyle(data.theme)}>{index + 1}</span>
               )}
