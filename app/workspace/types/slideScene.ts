@@ -22,6 +22,9 @@ export interface SlideSceneObject {
   text?: string;
   src?: string;
   imageFit?: "cover" | "contain" | "fill";
+  /** Crop focus: 0 = start, 0.5 = centre, 1 = end. */
+  imageFocusX?: number;
+  imageFocusY?: number;
   /** Editable numeric series rendered as a chart in web and exported as a native PPTX chart. */
   series?: Array<{ label: string; value: number }>;
   fill?: string;
@@ -90,7 +93,8 @@ export function normalizeSlideScene(input: unknown, ratio: "16:9" | "4:3" = "16:
       w: num(obj.w, 420, 8, 2560), h: num(obj.h, 130, 8, 1920),
       rotation: num(obj.rotation, 0, -360, 360),
       ...(kind === "text" ? { text: String(obj.text ?? "").slice(0, 10000) } : {}),
-      ...(src && kind === "image" ? { src, imageFit: ["cover","contain","fill"].includes(String(obj.imageFit)) ? obj.imageFit as SlideSceneObject["imageFit"] : "cover" } : {}),
+      ...(src && kind === "image" ? { src, imageFit: ["cover","contain","fill"].includes(String(obj.imageFit)) ? obj.imageFit as SlideSceneObject["imageFit"] : "cover",
+        imageFocusX: num(obj.imageFocusX,0.5,0,1),imageFocusY:num(obj.imageFocusY,0.5,0,1) } : {}),
       ...(series && kind === "chart" ? { series: series as Array<{label:string;value:number}> } : {}),
       fill: color(obj.fill, kind === "shape" ? "#4f46e5" : "transparent"),
       stroke: color(obj.stroke, "transparent"),
@@ -113,7 +117,7 @@ export function sceneObject(kind: SceneObjectKind, x = 100, y = 100): SlideScene
   if (kind === "text") return { ...common, text: "Edit this text", fontSize: 48, fontWeight: "bold", color: "#0f172a", fontFamily: "Arial" };
   if (kind === "shape") return { ...common, w: 340, h: 220, fill: "#4f46e5", radius: 24 };
   if (kind === "chart") return { ...common, w: 680, h: 400, fill: "#4f46e5", color: "#0f172a", series: [{label:"Q1",value:24},{label:"Q2",value:38},{label:"Q3",value:31}] };
-  return { ...common, src: "", imageFit: "cover", w: 460, h: 280 };
+  return { ...common, src: "", imageFit: "cover", imageFocusX: 0.5, imageFocusY: 0.5, w: 460, h: 280 };
 }
 export function scenePatchObject(scene: SlideScene, id: string, patch: Partial<SlideSceneObject>): SlideScene {
   const objects = scene.objects.map(o => o.id === id ? { ...o, ...patch, id: o.id, kind: o.kind } : o);
