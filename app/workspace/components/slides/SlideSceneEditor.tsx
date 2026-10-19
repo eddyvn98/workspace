@@ -54,6 +54,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return;}
     if(editingTextId || !selected)return;
+    if(e.key==="Enter"||e.key==="F2"){const targetObject=scene.objects.find(o=>o.id===selected);if(targetObject?.kind==="text"&&!targetObject.locked){e.preventDefault();setEditingTextId(selected);}return;}
     if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();commit(sceneDeleteObject(scene,selected));setSelected(null);setSelectedIds([]);return;}
     const direction:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(nudgeSceneObjects(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
