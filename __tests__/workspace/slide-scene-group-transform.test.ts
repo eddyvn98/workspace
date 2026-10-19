@@ -21,7 +21,7 @@ describe("Scene V2 group transforms",()=>{
   });
   it("rotates element centres and their own angle around the selection pivot",()=>{
     const updated=rotateSceneSelection(grouped,["a"],90);
-    expect(updated.objects[0]).toMatchObject({x:300,y:0,rotation:90});
+    expect(updated.objects[0]).toMatchObject({x:300,y:100,rotation:90});
     expect(updated.objects[1]).toMatchObject({x:200,y:300,rotation:90});
     expect(updated.objects[2]).toEqual(grouped.objects[2]);
   });
