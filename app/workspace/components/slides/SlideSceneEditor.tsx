@@ -11,10 +11,8 @@ const field = "rounded border border-slate-300 bg-white px-2 py-1 text-slate-900
 export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState("");
-  const sceneRef = useRef(scene);
   const history = useRef<{undo:SlideScene[];redo:SlideScene[]}>({undo:[],redo:[]});
   const [historyVersion,setHistoryVersion] = useState(0);
-  useEffect(()=>{sceneRef.current=scene;},[scene]);
   const commit = (next:SlideScene) => { if(readOnly || next===scene || JSON.stringify(next)===JSON.stringify(scene)) return; history.current.undo.push(scene); if(history.current.undo.length>60) history.current.undo.shift(); history.current.redo=[]; setHistoryVersion(v=>v+1);onChange(next); };
   const undo = () => {const prior=history.current.undo.pop();if(!prior)return;history.current.redo.push(scene);onChange(prior);setHistoryVersion(v=>v+1);};
   const redo = () => {const next=history.current.redo.pop();if(!next)return;history.current.undo.push(scene);onChange(next);setHistoryVersion(v=>v+1);};
