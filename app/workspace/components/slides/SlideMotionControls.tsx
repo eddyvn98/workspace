@@ -3,7 +3,7 @@ import type { SlideMeta } from "../../types/slide";
 import { SLIDE_ANIMATIONS, SLIDE_TRANSITIONS } from "../../utils/slideMotion";
 
 export function SlideMotionControls({ slide, onChange, readOnly = false, showContentAnimation = true }: { slide: SlideMeta; onChange: (patch: Partial<SlideMeta>) => void; readOnly?: boolean; showContentAnimation?: boolean }) {
-  return <div className="flex gap-3 border-b bg-white px-2 py-1 text-xs text-slate-700" onPointerDown={(e) => e.stopPropagation()}>
+  return <div className="flex items-center gap-3 text-xs text-slate-700" onPointerDown={(e) => e.stopPropagation()}>
     <label>Transition <select aria-label="Slide transition" disabled={readOnly} value={slide.transition ?? "none"} onChange={(e) => onChange({ transition: e.target.value as SlideMeta["transition"] })}>
       {SLIDE_TRANSITIONS.map((item) => <option key={item}>{item}</option>)}
     </select></label>
