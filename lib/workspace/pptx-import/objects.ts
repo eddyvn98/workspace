@@ -3,10 +3,11 @@ import { child, children, descendants, elements, first, numeric, NS, type Relati
 import { frame, transform, subFrame, type Matrix } from "./geometry";
 import { appendObjects, type ImportAsset, type NoticeSink, type Theme } from "./model";
 import { paint, readText, opacity } from "./style";
-import { loadAsset } from "./media";
 import { PptxArchive } from "./archive";
 import { readNativeTable } from "./table";
 import { readSceneShape } from "./shape";
+import { readScenePaint } from "./paint-effects";
+import { readScenePicture } from "./picture";
 export type ObjectContext={
   archive:PptxArchive;rels:Map<string,Relationship>;assets:Map<string,ImportAsset>;
   theme:Theme;rootScale:number;notice:NoticeSink;objects:SlideSceneObject[];
@@ -24,39 +25,24 @@ function objectMatrix(node:Element,parent:Matrix,ctx:ObjectContext):Matrix|null{
 }
 function shape(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):void{
   const geometry=frame(matrix,ctx.notice),props=shapeProperties(node),body=child(node,NS.p,"txBody");
-  const id=ctx.nextId(),fill=paint(props,ctx.theme,"transparent"),stroke=paint(child(props,NS.a,"ln"),ctx.theme,"transparent");
+  const fallback=paint(first(first(props,NS.a,"gsLst"),NS.a,"gs"),ctx.theme,"transparent");
+  const id=ctx.nextId(),fill=paint(props,ctx.theme,fallback),stroke=paint(child(props,NS.a,"ln"),ctx.theme,"transparent");
   const source=child(props,NS.a,"xfrm")||child(shapeProperties(inherited(node,ctx)||node),NS.a,"xfrm");
   const ext=child(source,NS.a,"ext"),sw=numeric(ext,"cx",geometry.w/ctx.rootScale),sh=numeric(ext,"cy",geometry.h/ctx.rootScale);
   const fontScale=sw>0?Math.hypot(matrix[0],matrix[1])/sw:ctx.rootScale;
-  const shapeFields=readSceneShape(props,geometry,fontScale,ctx.notice);
-  if(first(props,NS.a,"gradFill")||first(props,NS.a,"blipFill")||first(props,NS.a,"effectLst")?.hasChildNodes())ctx.notice("shape-effects","A shape fill/effect needs review; gradients, picture fills and shadows are not reproduced.");
-  const output:SlideSceneObject[]=[];
-  if(fill!=="transparent"||stroke!=="transparent"||!body)output.push({id:`${id}-shape`,kind:"shape",...geometry,...shapeFields,fill,stroke,opacity:opacity(props),groupId});
+  const shapeFields=readSceneShape(props,geometry,fontScale,ctx.notice),effects=readScenePaint(props,ctx.theme,fontScale,ctx.notice);
+  const output:SlideSceneObject[]=[],ownOpacity=opacity(props);
+  const shadow=effects.shadow?{...effects.shadow,opacity:Math.min(1,effects.shadow.opacity/(ownOpacity||1))}:undefined;
+  if(fill!=="transparent"||stroke!=="transparent"||effects.gradient||!body)output.push({id:`${id}-shape`,kind:"shape",...geometry,...shapeFields,...effects,shadow,fill,stroke,opacity:ownOpacity,groupId});
   if(body){
     if(placeholder(node)&&!first(body,NS.a,"rPr")?.hasAttribute("sz"))ctx.notice("placeholder-style","Inherited placeholder text styling requires visual review.");
     const bp=child(body,NS.a,"bodyPr"),left=numeric(bp,"lIns",91440),right=numeric(bp,"rIns",91440),top=numeric(bp,"tIns",45720),bottom=numeric(bp,"bIns",45720);
     const tx=subFrame(matrix,left/sw,top/sh,Math.max(0.01,1-(left+right)/sw),Math.max(0.01,1-(top+bottom)/sh));
     const text=readText(body,ctx.theme,fontScale,ctx.notice);
-    if(text.text)output.push({id:`${id}-text`,kind:"text",...frame(tx,ctx.notice),...text,groupId});
+    if(text.text)output.push({id:`${id}-text`,kind:"text",...frame(tx,ctx.notice),...text,...(!output.length&&effects.shadow?{shadow:effects.shadow}:{}),groupId});
   }
   if(output.length>1&&!groupId)for(const object of output)object.groupId=id;
   appendObjects(ctx.objects,output);
-}
-async function picture(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):Promise<void>{
-  if(first(node,NS.a,"videoFile")||first(node,NS.a,"audioFile"))ctx.notice("media","Embedded audio/video is not activated; only its poster picture is imported.");
-  const blip=first(node,NS.a,"blip"),rel=ctx.rels.get(blip?.getAttributeNS(NS.r,"embed")||blip?.getAttributeNS(NS.r,"link")||"");
-  if(!rel||rel.external||!rel.type.endsWith("/image")){ctx.notice("external-image","A linked or missing picture was omitted; no remote URL was fetched.");return;}
-  const asset=await loadAsset(ctx.archive,rel.target,ctx.assets,ctx.notice);if(!asset)return;
-  const crop=first(node,NS.a,"srcRect"),l=numeric(crop,"l")/100000,r=numeric(crop,"r")/100000,t=numeric(crop,"t")/100000,b=numeric(crop,"b")/100000;
-  const hasCrop=!!(l||r||t||b),geometry=frame(matrix,ctx.notice);
-  if(Math.min(l,r,t,b)<0||l+r>=1||t+b>=1)ctx.notice("image-crop","An extended/invalid source crop was replaced with a cover fit.");
-  else if(hasCrop){
-    const visibleRatio=asset.width*(1-l-r)/(asset.height*(1-t-b));
-    if(l+r>0&&t+b>0||Math.abs(visibleRatio-geometry.w/geometry.h)>0.03)ctx.notice("image-crop","A custom two-axis crop was approximated with cover fit; verify the focal point.");
-  }
-  const props=shapeProperties(node),preset=child(props,NS.a,"prstGeom")?.getAttribute("prst");
-  if(preset&&preset!=="rect")ctx.notice("image-mask","A picture mask was imported as a rectangular image.");
-  appendObjects(ctx.objects,[{id:ctx.nextId(),kind:"image",...geometry,src:asset.src,groupId,imageFit:hasCrop?"cover":"fill",imageFocusX:l+r>0?Math.max(0,Math.min(1,l/(l+r))):0.5,imageFocusY:t+b>0?Math.max(0,Math.min(1,t/(t+b))):0.5}]);
 }
 async function graphic(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):Promise<void>{
   const table=first(node,NS.a,"tbl");
@@ -93,7 +79,7 @@ export async function readObjects(tree:Element|undefined,parent:Matrix,ctx:Objec
     const matrix=objectMatrix(node,parent,ctx);
     if(!matrix){ctx.notice("object-position",`Object ${node.localName} lacks supported position data and was omitted.`);continue;}
     if(node.localName==="sp")shape(node,matrix,groupId,ctx);
-    else if(node.localName==="pic")await picture(node,matrix,groupId,ctx);
+    else if(node.localName==="pic")await readScenePicture(node,matrix,groupId,ctx);
     else if(node.localName==="graphicFrame")await graphic(node,matrix,groupId,ctx);
     else ctx.notice("object-kind",`Unsupported object ${node.localName} was omitted.`);
     ctx.onImported?.(node,ctx.objects.slice(before));
