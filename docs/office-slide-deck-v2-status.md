@@ -196,3 +196,38 @@ Manual acceptance scenarios:
 Current limitations: Groups are logical in Scene V2 and are **not exported as a native PPTX group element**. Resizing a member affects only that member; group bounding-box transform, native PPTX grouping, and rich crop focal-point editing are future tasks.
 
 PR remains draft until this new batch is tested. Do not infer CI results for HEAD from the prior `e80ab90` run.
+
+## Group transformations and image focal cropping — 2026-10-19
+
+Implemented and committed without waiting for CI:
+- Scene selection bounding handles now resize and rotate multiple objects together, including proportional font scaling. Shift constrains rotation in 15-degree increments and preserves aspect ratio while resizing.
+- Objects render transform previews during pointer interaction and commit one scene change when released. Sidebar provides Rotate ±15° and Scale ±10% controls.
+- Images and editable PowerPoint charts now serialize individual OOXML rotations; PDF already honors individual rotation.
+- Added image crop focus X/Y (0–100%) with interactive inspector sliders; HTML preview, PDF SVG, and PPTX asymmetric source crops now use the same values.
+- Improved logical group z-order changes and locked-group atomicity; locked groups cannot be partly deleted, ungrouped, transformed or duplicated.
+- Added regression tests: `slide-scene-group-transform.test.ts`, additional group-layer tests and image focal cropping tests.
+- Updated application docs and PR status; **no new sandbox or coding-agent runtime** was introduced.
+
+Local agent commands:
+```sh
+pnpm install --frozen-lockfile
+pnpm exec tsc --noEmit
+pnpm exec vitest run __tests__/workspace/slide-scene-group-transform.test.ts __tests__/workspace/slide-scene-groups.test.ts __tests__/workspace/slide-image-fit.test.ts
+pnpm test:workspace
+pnpm build
+```
+
+Manual browser QA:
+1. Shift-select 2–4 text/shape/chart/image objects and resize the selection via a corner. Verify text scales, all group members move proportionally, and Undo restores the original state.
+2. Rotate the group by dragging its rotation handle; Shift should snap to 15° increments. Verify the shape/label centres remain correct after save and reload.
+3. Lock one member. The group must refuse partial resize, rotate, delete, reorder or ungroup operations; independent unlocked objects must still be editable.
+4. Use the layer buttons to move a non-contiguous group up and down. Confirm members maintain their relative z-order.
+5. Upload a panoramic image, set Cover, then set focal X to 0, 50, 100; confirm the horizontal crop in the editor, fullscreen presenter, exported PDF and editable PowerPoint image.
+6. Test Contain focal positioning with a portrait photo, and Fill stretching; test both 16:9 and 4:3.
+7. Inspect native PowerPoint chart/image XML for `rot` and image `a:srcRect` attributes. Open actual exports in PowerPoint/LibreOffice and verify crop appearance and rotation before approving.
+
+Known limitations:
+- The selection bounds use the unrotated element boxes; an arbitrary composition of rotated objects can have visual extents outside the selection rectangle.
+- Groups are logical Scene V2 groups, not native `p:grpSp` PowerPoint groups. The export preserves individual editable elements and their resulting geometry, but not group editability in Microsoft PowerPoint.
+- Group resize is a geometric transform; complex text reflow and rich text are not yet fully faithful across renderers.
+- This commit batch has **not** been run locally or verified through CI in this agent environment. The earlier passing CI at `e80ab90` cannot be attributed to newer commits.
