@@ -10,7 +10,7 @@ export function sceneImageLayout(rect:ImageRect, source:{width:number;height:num
   if(fit==="contain"){
     const scale=Math.min(rect.w/source.width,rect.h/source.height);
     const w=source.width*scale,h=source.height*scale;
-    return {rect:{x:rect.x+(rect.w-w)/2,y:rect.y+(rect.h-h)/2,w,h}};
+    return {rect:{x:rect.x+(rect.w-w)*Math.min(1,Math.max(0,focusX)),y:rect.y+(rect.h-h)*Math.min(1,Math.max(0,focusY)),w,h}};
   }
   if(imageRatio>boxRatio){
     const total=1-boxRatio/imageRatio;
@@ -23,4 +23,16 @@ export function sceneImageLayout(rect:ImageRect, source:{width:number;height:num
     return {rect,crop:{l:0,r:0,t,b:Math.round(total*100000)-t}};
   }
   return {rect};
+}
+
+/** The matching CSS object-position geometry used by the PDF SVG renderer. */
+export function sceneImageRenderRect(rect:ImageRect,source:{width:number;height:number},fit:SlideSceneObject["imageFit"]="cover",focusX=0.5,focusY=0.5):ImageRect {
+  if(source.width<=0||source.height<=0||rect.w<=0||rect.h<=0)return rect;
+  if(fit==="fill")return rect;
+  const scale=fit==="contain" ? Math.min(rect.w/source.width,rect.h/source.height)
+    : Math.max(rect.w/source.width,rect.h/source.height);
+  const w=source.width*scale,h=source.height*scale;
+  const x=rect.x+(rect.w-w)*Math.min(1,Math.max(0,focusX));
+  const y=rect.y+(rect.h-h)*Math.min(1,Math.max(0,focusY));
+  return {x,y,w,h};
 }
