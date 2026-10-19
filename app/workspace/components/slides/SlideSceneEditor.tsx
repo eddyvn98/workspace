@@ -1,9 +1,11 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { sceneObject, scenePatchObject, type SlideScene, type SlideSceneObject, type SceneObjectKind } from "../../types/slideScene";
+import { sceneTextSignature } from "../../types/slideSceneText";
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { SlideSceneProperties, sceneField as field } from "./SlideSceneProperties";
+import { SlideSceneRichTextEditor } from "./SlideSceneRichTextEditor";
 import { useSlideSceneHistory } from "../../hooks/useSlideSceneHistory";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
@@ -13,7 +15,8 @@ import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
 type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string};
 export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF"}:Props){
   const editor=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null),timeline=useRef<HTMLDivElement>(null);
-  const [selectedIds,setSelectedIds]=useState<string[]>([]),[selected,setSelected]=useState<string|null>(null),[textEdit,setTextEdit]=useState<{id:string;original:string}|null>(null);
+  const [selectedIds,setSelectedIds]=useState<string[]>([]),[selected,setSelected]=useState<string|null>(null),[textEdit,setTextEdit]=useState<{id:string;signature:string}|null>(null);
+  const [richEdit,setRichEdit]=useState<{object:SlideSceneObject;signature:string}|null>(null);
   const [snap,setSnap]=useState(true),[imageUrl,setImageUrl]=useState(""),[uploading,setUploading]=useState(false),[message,setMessage]=useState("");
   const history=useSlideSceneHistory(scene,onChange,readOnly),{commit}=history;
   const item=scene.objects.find(o=>o.id===selected),locked=scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked);
@@ -29,12 +32,17 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
     setSelectedIds(current=>current.every(id=>existing.has(id))?current:current.filter(id=>existing.has(id)));
     if(selected&&!existing.has(selected))setSelected(null);
     if(textEdit&&(!existing.has(textEdit.id)||readOnly))setTextEdit(null);
-  },[scene.objects,selected,textEdit,readOnly]);
+    if(richEdit&&(!existing.has(richEdit.object.id)||readOnly||scene.objects.find(o=>o.id===richEdit.object.id)?.locked))setRichEdit(null);
+  },[scene.objects,selected,textEdit,richEdit,readOnly]);
   const patch=(values:Partial<SlideSceneObject>)=>{if(item&&!readOnly&&!item.locked)commit(scenePatchObject(scene,item.id,values));};
-  const beginText=(id:string)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object?.kind==="text"&&!object.locked)setTextEdit({id,original:object.text??""});};
+  const beginRichText=(id:string)=>{
+    const object=scene.objects.find(o=>o.id===id);
+    if(!readOnly&&object?.kind==="text"&&!object.locked){setTextEdit(null);setRichEdit({object:structuredClone(object),signature:sceneTextSignature(object)});}
+  };
+  const beginText=(id:string)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object?.kind==="text"&&!object.locked){if(object.richText)beginRichText(id);else setTextEdit({id,signature:sceneTextSignature(object)});}};
   const finishText=(id:string,text:string)=>{
     const object=scene.objects.find(o=>o.id===id);
-    if(object&&textEdit?.id===id&&(object.text??"")!==textEdit.original)setMessage("This text was changed elsewhere. Your draft was not applied over it.");
+    if(object&&textEdit?.id===id&&sceneTextSignature(object)!==textEdit.signature)setMessage("This text was changed elsewhere. Your draft was not applied over it.");
     else if(object&&!object.locked&&!readOnly)commit(scenePatchObject(scene,id,{text}));
     setTextEdit(null);
   };
@@ -67,7 +75,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
     if(modifier&&key==="z"){consume();e.shiftKey?history.redo():history.undo();return;}
     if(modifier&&key==="y"){consume();history.redo();return;}
     if(modifier&&key==="a"){consume();setSelectedIds(scene.objects.map(o=>o.id));setSelected(scene.objects[0]?.id??null);return;}
-    if(textEdit||!selected)return;
+    if(textEdit||richEdit||!selected)return;
     if(e.key==="F2"||e.key==="Enter"){consume();beginText(selected);return;}
     if(modifier&&key==="g"){consume();commit(e.shiftKey?ungroupSceneObjects(scene,ids):groupSceneObjects(scene,ids,()=>crypto.randomUUID()));return;}
     if(modifier&&key==="d"){consume();duplicate();return;}
@@ -90,7 +98,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
     </div>
     {message&&<p role="status" className="px-3 py-1 text-xs text-amber-900">{message}</p>}
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
-      <div className="flex min-h-24 min-w-0 flex-1 items-center justify-center overflow-auto p-3"><div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{aspectRatio:`${scene.width}/${scene.height}`,backgroundColor}} onPointerDown={e=>{if(textEdit)return;editor.current?.focus({preventScroll:true});if(!(e.target as Element).closest("[data-scene-object],[data-slide-selection-box]")){setSelected(null);setSelectedIds([]);}}}>
+      <div className="flex min-h-24 min-w-0 flex-1 items-center justify-center overflow-auto p-3"><div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{aspectRatio:`${scene.width}/${scene.height}`,backgroundColor}} onPointerDown={e=>{if(textEdit||richEdit)return;editor.current?.focus({preventScroll:true});if(!(e.target as Element).closest("[data-scene-object],[data-slide-selection-box]")){setSelected(null);setSelectedIds([]);}}}>
         <SlideSceneSurface scene={scene} selected={selected} selectedIds={selectedIds} editing={!readOnly} onSelect={select} editingTextId={textEdit?.id} onRequestTextEdit={beginText} onTextCancel={()=>setTextEdit(null)} onTextCommit={finishText}
           onMove={(id,x,y)=>{const original=scene.objects.find(o=>o.id===id);if(!original||readOnly||original.locked)return;const next=snapSceneRect({...original,x,y},snap);commit(translateSceneSelection(scene,selectedIds.includes(id)?selectedIds:[id],next.x-original.x,next.y-original.y));}}
           onResize={(id,rect)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object&&!object.locked)commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snap)));}} onTransformSelection={next=>commit(next)}/>
@@ -104,11 +112,18 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
           {[-15,15].map(degrees=><button type="button" key={degrees} className={field} disabled={locked} onClick={()=>commit(rotateSceneSelection(scene,ids,degrees))}>Rotate {degrees}°</button>)}{[0.9,1.1].map(scale=><button type="button" key={scale} className={field} disabled={locked} onClick={()=>scaleSelection(scale)}>Scale {scale<1?"-10%":"+10%"}</button>)}
         </div>}
         {item&&<div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button type="button" key={direction} className={field} disabled={readOnly||locked} onClick={()=>commit(alignSceneObjects(scene,ids,direction))}>{direction}</button>)}{ids.length>2&&(["x","y"] as const).map(axis=><button type="button" key={axis} className={field} disabled={readOnly||locked} onClick={()=>commit(distributeSceneObjects(scene,ids,axis))}>Distribute {axis==="x"?"H":"V"}</button>)}</div>}
-        {item&&<><hr/><SlideSceneProperties key={item.id} object={item} readOnly={readOnly} onPatch={patch} onLock={value=>{if(!readOnly)commit(scenePatchObject(scene,item.id,{locked:value}));}} onEditText={()=>beginText(item.id)} onTimeline={()=>{timeline.current?.scrollIntoView({block:"nearest"});timeline.current?.focus();}}/>
+        {item&&<><hr/><SlideSceneProperties key={item.id} object={item} readOnly={readOnly} onPatch={patch} onLock={value=>{if(!readOnly)commit(scenePatchObject(scene,item.id,{locked:value}));}} onEditText={()=>beginText(item.id)} onFormatText={()=>beginRichText(item.id)} onTimeline={()=>{timeline.current?.scrollIntoView({block:"nearest"});timeline.current?.focus();}}/>
           <div className="flex flex-wrap gap-1"><button type="button" className={field} disabled={readOnly||locked||scene.objects.length>=120} onClick={duplicate}>Duplicate</button><button type="button" className={field} disabled={readOnly||locked} onClick={()=>commit(moveSceneSelectionLayer(scene,ids,-1))}>Back</button><button type="button" className={field} disabled={readOnly||locked} onClick={()=>commit(moveSceneSelectionLayer(scene,ids,1))}>Front</button><button type="button" className={field} disabled={readOnly||locked} onClick={remove}>Delete</button></div>
         </>}
       </aside>
     </div>
     <div ref={timeline} tabIndex={-1}><SlideSceneTimeline scene={scene} selected={selected} onSelect={select} onChange={next=>commit(next)} readOnly={readOnly} backgroundColor={backgroundColor}/></div>
+    {richEdit&&!readOnly&&<SlideSceneRichTextEditor key={richEdit.object.id} object={richEdit.object} backgroundColor={backgroundColor} onCancel={()=>setRichEdit(null)} onApply={richText=>{
+      const current=scene.objects.find(o=>o.id===richEdit.object.id);
+      if(!current||current.locked||sceneTextSignature(current)!==richEdit.signature)return false;
+      const next=scenePatchObject(scene,current.id,{richText});
+      if(JSON.stringify(next)!==JSON.stringify(scene)&&!commit(next))return false;
+      setRichEdit(null);return true;
+    }}/>}
   </div>;
 }
