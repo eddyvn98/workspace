@@ -10,7 +10,7 @@ export type SlideScriptRect={x:number;y:number;w:number;h:number};
 export type SlideScriptTextStyle=Partial<Pick<SlideSceneObject,"fontSize"|"fontFamily"|"fontWeight"|"color"|"align"|"rotation"|"opacity"|"italic"|"underline"|"strike"|"verticalAlign">>;
 export type SlideScriptShapeStyle=Partial<Pick<SlideSceneObject,"stroke"|"radius"|"rotation"|"opacity"|"shapeKind"|"shapePath"|"strokeWidth"|"strokeDash">>;
 export type SlideScriptImageStyle=Partial<Pick<SlideSceneObject,"rotation"|"opacity"|"imageFit"|"imageFocusX"|"imageFocusY">>;
-export type SlideScriptTableStyle=SlideScriptTextStyle&Partial<Pick<SlideSceneObject,"fill"|"stroke">>;
+export type SlideScriptTableStyle=Partial<Pick<SlideSceneObject,"fontSize"|"fontFamily"|"fontWeight"|"color"|"align"|"rotation"|"opacity"|"fill"|"stroke">>;
 export type SlideScriptOutput={
   action:{type:"create_slide_deck";title:string;aspectRatio:"16:9"|"4:3";slides:Array<{name:string;html:string;scene:SlideScene;backgroundColor:string;presenterNotes:string;transition:"none"|"fade"|"slide"|"zoom"|"wipe"}>};
   warnings:Array<{slide:number;slideName:string}&SlideSceneWarning>;
