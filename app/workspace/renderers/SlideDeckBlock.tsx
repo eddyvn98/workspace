@@ -64,8 +64,8 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
     onSetNotes={actions.updateNotes} onSetHidden={actions.updateHidden} />;
   const editorContent = (
     <div className="slide-deck-studio" style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: studioOpen ? "0" : "6px", backgroundColor: "#ffffff",
-      border: `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#2563eb" : "#e2e8f0"}`,
-      boxShadow: isSelected ? "0 0 0 1px #2563eb, 0 4px 6px -1px rgba(0, 0, 0, 0.1)" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+      border: studioOpen ? "none" : `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#2563eb" : "#e2e8f0"}`,
+      boxShadow: studioOpen ? "none" : isSelected ? "0 0 0 1px #2563eb, 0 4px 6px -1px rgba(0, 0, 0, 0.1)" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
       overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <SlideDeckToolbar blockId={block.id} title={data.title} aspectRatio={data.aspectRatio ?? "16:9"}
         studioOpen={studioOpen} onToggleStudio={() => setStudioOpen(v => !v)}
@@ -89,19 +89,31 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
         {studioOpen && filmstrip}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {activeSlide && <>
-        <SlideMotionControls slide={activeSlide} onChange={(patch) => { if (!readOnly) onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, ...patch } } }); }} />
-        <div className="flex items-center gap-2 border-b px-2 py-1 text-xs">
-          <button type="button" disabled={readOnly || !!activeSlide.scene} className="rounded border px-2 py-1" onClick={() => {
-            if (readOnly || activeSlide.scene) return;
-            if (activeSlide.html.trim() && !window.confirm("Convert legacy content to editable V2 objects? Layout is approximate; the original HTML remains saved as backup.")) return;
-            onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene: legacyHtmlToScene(activeSlide.html, data.aspectRatio) } } });
-          }}>{activeSlide.scene ? "Scene V2" : "Enable Scene V2"}</button>
-          {activeSlide.scene && <button type="button" disabled={readOnly} className="rounded border px-2 py-1" onClick={() => {
-            if (readOnly || !window.confirm("Restore the original HTML slide view? The V2 scene on this slide will be removed.")) return;
-            const { scene: ignoredScene, ...rest } = activeSlide;
-            onChange({ slides: { ...data.slides, [activeSlide.id]: rest } });
-          }}>Restore HTML</button>}
-          {!activeSlide.scene && <SlideContentTools blockId={block.id} slideId={activeSlide.id} onEdit={startEditingBody} />}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-1 text-xs">
+          <SlideMotionControls slide={activeSlide} readOnly={readOnly} showContentAnimation={!activeSlide.scene}
+            onChange={patch=>{if(!readOnly)onChange({slides:{...data.slides,[activeSlide.id]:{...activeSlide,...patch}}});}}/>
+          <div className="flex items-center gap-2">
+            {activeSlide.scene ? <>
+              <span className="font-medium text-slate-500">Object editor</span>
+              {!readOnly && <details className="relative">
+                <summary className="cursor-pointer rounded px-2 py-1 text-slate-500 hover:bg-slate-100">Advanced</summary>
+                <div className="absolute right-0 z-30 w-52 rounded border border-slate-200 bg-white p-2 shadow-lg">
+                  <button type="button" className="w-full rounded px-2 py-2 text-left text-slate-700 hover:bg-slate-100" onClick={()=>{
+                    if(readOnly||!window.confirm("Restore the original HTML slide view? The editable object scene will be removed."))return;
+                    const {scene:ignoredScene,...rest}=activeSlide;
+                    onChange({slides:{...data.slides,[activeSlide.id]:rest}});
+                  }}>Restore original HTML</button>
+                </div>
+              </details>}
+            </> : <>
+              <SlideContentTools blockId={block.id} slideId={activeSlide.id} onEdit={startEditingBody}/>
+              <button type="button" disabled={readOnly} className="rounded border border-slate-200 px-2 py-1 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={()=>{
+                if(readOnly)return;
+                if(activeSlide.html.trim()&&!window.confirm("Convert legacy HTML to editable slide objects? Existing HTML will be kept as a backup; object positions are approximate."))return;
+                onChange({slides:{...data.slides,[activeSlide.id]:{...activeSlide,scene:legacyHtmlToScene(activeSlide.html,data.aspectRatio)}}});
+              }}>Convert to objects</button>
+            </>}
+          </div>
         </div>
       </>}
       <div className="slide-deck-themed slide-cq relative flex-1 overflow-hidden"
