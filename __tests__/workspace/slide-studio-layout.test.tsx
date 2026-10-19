@@ -43,7 +43,9 @@ describe("Slide Studio editor layout",()=>{
   });
   it("allows read-only inspection without showing a writable object insert action",()=>{
     render(<SlideSceneEditorCore scene={scene} onChange={vi.fn()} readOnly/>);
-    expect((screen.getByRole("combobox",{name:"Insert slide object"}) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("button",{name:"Text box"}) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button",{name:"Shape"}) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button",{name:"Image"}) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByLabelText("Slide inspector")).not.toBeNull();
   });
 });
