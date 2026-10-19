@@ -59,3 +59,5 @@ The first Studio pass hid Text box, Shape, Chart and Table under an Insert selec
 - Added `slide-scene-ribbon.test.tsx` covering one-click creation, in-place formatting, settings and read-only protection. `slide-studio-layout.test.tsx` was adapted to the new button surface.
 
 Browser QA should confirm the full insertion row is readable without horizontal scrolling at 1280px Studio, and wraps without truncation on narrower Canvas blocks. Follow-up functionality in an app should be discoverable first, not merely accessible through hidden menus.
+
+- Blank/new legacy-less slides now render an empty Scene editor immediately, with the visible ribbon ready for use; this does **not** persist a scene until the first user edit. Existing slides containing legacy HTML still show the original HTML editor and offer an explicit `Convert to objects` action, preserving legacy material.
