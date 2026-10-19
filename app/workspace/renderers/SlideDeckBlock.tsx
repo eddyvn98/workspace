@@ -1,6 +1,6 @@
 "use client";
 import { useSlidePresentationRequest } from "../utils/slidePresentationRequest";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { registerBlockRenderer, type BlockRendererProps } from "./registry";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
@@ -28,11 +28,16 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   useSlidePresentationRequest(block.id, actions.startPresenting);
   const [isEditingBody, setIsEditingBody] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
+  const studioRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!studioOpen) return;
     const prior = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prior; };
+  }, [studioOpen]);
+  useEffect(() => {
+    if (!studioOpen) return;
+    studioRef.current?.querySelector<HTMLButtonElement>('button[aria-label="Exit Slide Studio"]')?.focus({preventScroll:true});
   }, [studioOpen]);
   const boardId = useWorkspaceStore(state => state.boardId);
   const pendingEditBlockId = useWorkspaceStore((state) => state.pendingEditBlockId);
@@ -63,7 +68,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
     onSetStatus={actions.updateStatus} onSetBackground={actions.updateBackground}
     onSetNotes={actions.updateNotes} onSetHidden={actions.updateHidden} />;
   const editorContent = (
-    <div className="slide-deck-studio" style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: studioOpen ? "0" : "6px", backgroundColor: "#ffffff",
+    <div data-slide-deck-id={block.id} className="slide-deck-studio" style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: studioOpen ? "0" : "6px", backgroundColor: "#ffffff",
       border: studioOpen ? "none" : `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#2563eb" : "#e2e8f0"}`,
       boxShadow: studioOpen ? "none" : isSelected ? "0 0 0 1px #2563eb, 0 4px 6px -1px rgba(0, 0, 0, 0.1)" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
       overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -138,11 +143,18 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   );
   if (!studioOpen || typeof document === "undefined") return editorContent;
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="Slide Studio" data-slide-studio
+    <div ref={studioRef} role="dialog" aria-modal="true" aria-label="Slide Studio" data-slide-studio
       className="fixed inset-0 z-[1050] bg-slate-100 text-slate-900"
       onPointerDown={event => event.stopPropagation()}
       onClick={event => event.stopPropagation()}
       onKeyDown={event => {
+        if (event.key === "Tab" && studioRef.current?.contains(event.target as Node)) {
+          const nodes=Array.from(studioRef.current.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+            .filter(node=>node.getClientRects().length>0);
+          const first=nodes[0],last=nodes[nodes.length-1];
+          if(first&&last&&event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+          else if(first&&last&&!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+        }
         if (event.key === "Escape" && !event.defaultPrevented && !(event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) {
           event.stopPropagation(); setStudioOpen(false);
         }
