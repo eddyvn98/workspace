@@ -16,8 +16,15 @@ export function SlideSceneResizableInspector({children}:Props){
     const end=(event:PointerEvent)=>{
       if(event.pointerId!==start.current?.pointerId)return;start.current=null;setResizing(false);
     };
+    const cancel=()=>{start.current=null;setResizing(false);};
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key!=="Escape")return;
+      event.preventDefault();event.stopPropagation();cancel();
+    };
     window.addEventListener("pointermove",move);window.addEventListener("pointerup",end);window.addEventListener("pointercancel",end);
-    return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",end);window.removeEventListener("pointercancel",end);};
+    window.addEventListener("blur",cancel);window.addEventListener("keydown",escape,true);
+    return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",end);window.removeEventListener("pointercancel",end);
+      window.removeEventListener("blur",cancel);window.removeEventListener("keydown",escape,true);};
   },[resizing]);
   return <aside aria-label="Slide inspector"
     className="relative max-h-60 w-full shrink-0 overflow-auto border-t border-slate-200 bg-white p-3 text-xs lg:max-h-none lg:w-[var(--inspector-width)] lg:border-t-0 lg:border-l"
