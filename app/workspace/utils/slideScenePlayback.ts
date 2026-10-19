@@ -1,50 +1,59 @@
-import type { SlideSceneObject, SceneMotionKind } from "../types/slideScene";
-
-export type SceneCue = { id: string; kind: SceneMotionKind; step: number; startMs: number; durationMs: number; endMs: number };
-export type SceneTimeline = { cues: SceneCue[]; clickCount: number };
-const bounded = (n: number | undefined, fallback: number, low: number, high: number) =>
-  typeof n === "number" && Number.isFinite(n) ? Math.min(high, Math.max(low, n)) : fallback;
-
-/** One schedule is shared by the presenter and inspector; 'none' never consumes a click. */
-export function compileSceneTimeline(objects: Pick<SlideSceneObject, "id" | "motion">[]): SceneTimeline {
-  const cues: SceneCue[] = [];
-  let step = 0, previous: SceneCue | undefined;
-  for (const object of objects) {
-    const motion = object.motion;
-    if (!motion || motion.kind === "none") continue;
-    const delay = bounded(motion.delayMs, 0, 0, 10000);
-    const durationMs = bounded(motion.durationMs, 450, 100, 5000);
-    let startMs = delay;
-    if (motion.trigger === "on-click") step += 1;
-    else if (previous) startMs += motion.trigger === "after-previous" ? previous.endMs : previous.startMs;
-    const cue: SceneCue = { id: object.id, kind: motion.kind, step, startMs, durationMs, endMs: startMs + durationMs };
-    cues.push(cue); previous = cue;
-  }
-  return { cues, clickCount: step };
-}
-
-function entranceFrames(kind: SceneMotionKind): Keyframe[] {
-  const from = kind === "rise" ? "translateY(24px)" : kind === "slide" ? "translateX(50px)" : kind === "zoom" ? "scale(.8)" : "none";
-  return [
-    { opacity: 0, transform: from, clipPath: kind === "wipe" ? "inset(0 100% 0 0)" : "inset(0)" },
-    { opacity: 1, transform: "none", clipPath: "inset(0)" },
-  ];
-}
-
-/** Animate the INNER content only. Outer geometry, rotation and authored opacity are untouched. */
-export function playSceneBuild(surface: HTMLElement, timeline: SceneTimeline, step: number, reducedMotion = false): () => void {
-  const cues = new Map(timeline.cues.map(cue => [cue.id, cue]));
-  const animations: Animation[] = [], targets = Array.from(surface.querySelectorAll<HTMLElement>("[data-scene-motion]"));
+import { sceneBuildState, sceneBuildDuration, type SceneTimeline } from "./slideSceneSchedule";
+import { sceneInnerTrack, sceneTravelTrack } from "./slideSceneKeyframes";
+export { compileSceneTimeline, sceneBuildState, sceneBuildDuration } from "./slideSceneSchedule";
+export type { SceneCue, SceneTimeline } from "./slideSceneSchedule";
+export type ScenePlaybackController = { cancel():void; pause():void; play():void; seek(timeMs:number):void; durationMs:number };
+/** Only presentation effects are touched. Authored rotation/opacity and persistent scene data remain unchanged. */
+export function createScenePlayback(surface: HTMLElement, timeline: SceneTimeline, step: number, reducedMotion = false): ScenePlaybackController {
+  const animations: Animation[] = [], restore: Array<()=>void> = [];
+  const targets = Array.from(surface.querySelectorAll<HTMLElement>("[data-scene-motion]"));
+  const width = Number(surface.dataset.sceneWidth) || 1280;
+  const measured = surface.getBoundingClientRect().width;
+  const scale = measured > 0 ? measured/width : 1;
+  let cancelled = false;
   for (const element of targets) {
-    const cue = cues.get(element.dataset.sceneMotion || "");
-    element.style.opacity = cue && cue.step > step ? "0" : "1";
-    if (!cue || cue.step !== step || reducedMotion || typeof element.animate !== "function") continue;
-    animations.push(element.animate(entranceFrames(cue.kind), {
-      duration: cue.durationMs, delay: cue.startMs, fill: "both", easing: "ease-out",
-    }));
+    const id = element.dataset.sceneMotion || "";
+    const cues = timeline.cues.filter(cue=>cue.id===id && cue.step===step);
+    const initial = sceneBuildState(timeline,id,step), final = sceneBuildState(timeline,id,step,true);
+    const outer = element.closest<HTMLElement>("[data-scene-object]") ?? element;
+    const oldOpacity = element.style.opacity, oldTranslate = outer.style.translate, oldHidden = element.getAttribute("aria-hidden");
+    restore.push(()=>{
+      element.style.opacity = oldOpacity; outer.style.translate = oldTranslate;
+      if (oldHidden === null) element.removeAttribute("aria-hidden"); else element.setAttribute("aria-hidden",oldHidden);
+    });
+    element.style.opacity = final.visible ? "1" : "0";
+    element.setAttribute("aria-hidden",final.visible ? "false" : "true");
+    outer.style.translate = `${final.x*scale}px ${final.y*scale}px`;
+    if (!cues.length || reducedMotion || typeof element.animate !== "function") continue;
+    const inner = sceneInnerTrack(cues,initial,scale);
+    const animation = element.animate(inner.frames,{duration:inner.duration,delay:inner.delay,fill:"both",easing:"linear"});
+    animations.push(animation);
+    // CSS individual translate is additive to the object's static rotate() transform.
+    const travel = sceneTravelTrack(cues,initial,scale);
+    if (travel && typeof outer.animate === "function") {
+      animations.push(outer.animate(travel.frames,{duration:travel.duration,delay:travel.delay,fill:"both",easing:"linear"}));
+    }
   }
-  return () => {
-    for (const animation of animations) animation.cancel();
-    for (const element of targets) element.style.removeProperty("opacity");
+  const durationMs = sceneBuildDuration(timeline,step);
+  return {
+    durationMs,
+    pause() { if (!cancelled) for (const animation of animations) animation.pause(); },
+    play() { if (!cancelled) for (const animation of animations) animation.play(); },
+    seek(timeMs) {
+      if (cancelled || !Number.isFinite(timeMs)) return;
+      const time = Math.max(0,Math.min(durationMs,timeMs));
+      for (const animation of animations) {animation.pause(); animation.currentTime = time;}
+    },
+    cancel() {
+      if (cancelled) return;
+      cancelled = true;
+      for (const animation of animations) animation.cancel();
+      for (const cleanup of restore) cleanup();
+    },
   };
+}
+/** Compatibility entrypoint used by existing presenter tests and noninteractive previews. */
+export function playSceneBuild(surface: HTMLElement, timeline: SceneTimeline, step: number, reducedMotion = false): () => void {
+  const controller = createScenePlayback(surface,timeline,step,reducedMotion);
+  return () => controller.cancel();
 }
