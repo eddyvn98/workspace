@@ -14,6 +14,7 @@ export interface SlideThumbnailProps {
   aspectRatio?: SlideAspectRatio;
   index: number;
   vertical?: boolean;
+  readOnly?: boolean;
   isActive: boolean;
   canDelete: boolean;
   onSelect: () => void;
@@ -34,7 +35,7 @@ export interface SlideThumbnailProps {
  *  editor), a status dot, native HTML5 drag-and-drop for reordering, and a
  *  self-contained settings popover (rename/status/background/notes/duplicate/delete). */
 export function SlideThumbnail({
-  slide, theme, aspectRatio, index, vertical = false, isActive, canDelete, onSelect, onDragStart, onDragOver, onDrop,
+  slide, theme, aspectRatio, index, vertical = false, readOnly = false, isActive, canDelete, onSelect, onDragStart, onDragOver, onDrop,
   onRename, onDuplicate, onDelete, onSetStatus, onSetBackground, onSetNotes, onSetHidden,
 }: SlideThumbnailProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,7 +44,7 @@ export function SlideThumbnail({
     <div
       role="button" tabIndex={0} aria-label={`Select slide ${index + 1}: ${slide.name}`} aria-current={isActive ? "true" : undefined}
       onKeyDown={e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onSelect(); } }}
-      draggable
+      draggable={!readOnly}
       onPointerDown={(e) => e.stopPropagation()}
       onDragStart={() => onDragStart(index)}
       onDragOver={(e) => {
@@ -65,7 +66,7 @@ export function SlideThumbnail({
           {index + 1}
           {slide.hidden && <EyeOff className="h-2.5 w-2.5" aria-label="Hidden in presentation" />}
         </span>
-        <button
+        {!readOnly && <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
@@ -76,8 +77,8 @@ export function SlideThumbnail({
           aria-label="Slide settings"
         >
           <MoreHorizontal className="h-3 w-3" />
-        </button>
-        {menuOpen && (
+        </button>}
+        {menuOpen && !readOnly && (
           <SmartPopover defaultH="left" className="!z-50" onClose={() => setMenuOpen(false)}>
             <SlideSettingsMenu
               slide={slide}
