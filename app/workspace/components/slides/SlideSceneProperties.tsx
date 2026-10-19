@@ -6,6 +6,7 @@ import { SlideSceneTableControls } from "./SlideSceneTableEditor";
 import { SlideSceneShapeControls } from "./SlideSceneShapeControls";
 import { SlideScenePaintControls } from "./SlideScenePaintControls";
 import { SlideSceneChartControls } from "./SlideSceneChartEditor";
+import { SlideSceneCropControls } from "./SlideSceneCropControls";
 export const sceneField="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900 disabled:opacity-40";
 function ValueField({label,value,type="text",disabled,onSave}:{label:string;value:string|number;type?:"text"|"number";disabled:boolean;onSave:(value:string)=>void}){
   const [draft,setDraft]=useState(String(value));useEffect(()=>setDraft(String(value)),[value]);
@@ -14,7 +15,7 @@ function ValueField({label,value,type="text",disabled,onSave}:{label:string;valu
 }
 type Props={object:SlideSceneObject;readOnly:boolean;onPatch:(patch:Partial<SlideSceneObject>)=>void;onLock:(locked:boolean)=>void;onEditText:()=>void;onFormatText?:()=>void;onTimeline:()=>void};
 export function SlideSceneProperties({object:o,readOnly,onPatch,onLock,onEditText,onFormatText,onTimeline}:Props){
-  const disabled=readOnly||!!o.locked;
+  const disabled=readOnly||!!o.locked,exactCrop=o.imageCrop!==undefined||o.imageViewport!==undefined;
   return <div className="space-y-3" aria-label="Object properties">
     <strong className="block">Object properties</strong>
     {o.kind==="table"&&<SlideSceneTableControls object={o} readOnly={readOnly} onPatch={onPatch}/>}
@@ -33,9 +34,10 @@ export function SlideSceneProperties({object:o,readOnly,onPatch,onLock,onEditTex
     {(o.kind==="shape"||o.kind==="table")&&<ValueField label="Border color" value={o.stroke??"transparent"} disabled={disabled} onSave={stroke=>onPatch({stroke})}/>}
     {o.kind==="shape"&&(!o.shapeKind||["rect","roundRect"].includes(o.shapeKind))&&<ValueField label="Corner radius" type="number" value={o.radius??0} disabled={disabled} onSave={v=>onPatch({radius:Number(v),shapeKind:Number(v)>0?"roundRect":"rect"})}/>}
     {o.kind==="image"&&<>
-      <label className="block">Image fit<select aria-label="Image fit" className={sceneField+" w-full"} value={o.imageFit??"cover"} disabled={disabled} onChange={e=>onPatch({imageFit:e.target.value as SlideSceneObject["imageFit"]})}><option value="cover">Crop to fill</option><option value="contain">Fit entire image</option><option value="fill">Stretch to fill</option></select></label>
-      {(["imageFocusX","imageFocusY"] as const).map(axis=><label className="block" key={axis}>{axis==="imageFocusX"?"Horizontal focus":"Vertical focus"}: {Math.round((o[axis]??0.5)*100)}%<input aria-label={axis==="imageFocusX"?"Horizontal crop focus":"Vertical crop focus"} className="w-full" type="range" min={0} max={100} value={Math.round((o[axis]??0.5)*100)} disabled={disabled||o.imageFit==="fill"} onChange={e=>onPatch({[axis]:Number(e.target.value)/100})}/></label>)}
-      <button type="button" className={sceneField} disabled={disabled} onClick={()=>onPatch({imageFocusX:0.5,imageFocusY:0.5})}>Center image focus</button>
+      <label className="block">Image fit<select aria-label="Image fit" className={sceneField+" w-full"} value={o.imageFit??"cover"} disabled={disabled} onChange={e=>onPatch({imageFit:e.target.value as SlideSceneObject["imageFit"],imageCrop:undefined,imageViewport:undefined})}><option value="cover">Crop to fill</option><option value="contain">Fit entire image</option><option value="fill">Stretch to fill</option></select></label>
+      {(["imageFocusX","imageFocusY"] as const).map(axis=><label className="block" key={axis}>{axis==="imageFocusX"?"Horizontal focus":"Vertical focus"}: {Math.round((o[axis]??0.5)*100)}%<input aria-label={axis==="imageFocusX"?"Horizontal crop focus":"Vertical crop focus"} className="w-full" type="range" min={0} max={100} value={Math.round((o[axis]??0.5)*100)} disabled={disabled||o.imageFit==="fill"||exactCrop} onChange={e=>onPatch({[axis]:Number(e.target.value)/100})}/></label>)}
+      <button type="button" className={sceneField} disabled={disabled||exactCrop} onClick={()=>onPatch({imageFocusX:0.5,imageFocusY:0.5})}>Center image focus</button>
+      <SlideSceneCropControls key={o.id} object={o} disabled={disabled} onPatch={onPatch}/>
     </>}
     <SlideScenePaintControls key={o.id} object={o} disabled={disabled} onPatch={onPatch}/>
     <label className="flex justify-between">Locked<input aria-label="Lock object" type="checkbox" checked={!!o.locked} disabled={readOnly} onChange={e=>onLock(e.target.checked)}/></label>
