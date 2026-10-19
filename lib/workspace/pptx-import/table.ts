@@ -33,6 +33,7 @@ export function readNativeTable(node:Element,matrix:Matrix,groupId:string|undefi
         if(code==="text-style"&&signatures.size<=1&&!first(body,NS.a,"hlinkClick"))return;
         ctx.notice(code,message);
       });
+      if(signatures.size>1||text.richText?.paragraphs.some(p=>(p.align??"left")!==(text.align??"left")||p.lineHeight!==undefined&&Math.abs(p.lineHeight-1.12)>0.01||!!p.spaceBefore||!!p.spaceAfter))ctx.notice("table-rich-text","Mixed run or paragraph formatting inside a table cell was reduced to one cell style. Text and native table structure were retained.");
       result.text=text.text??"";result.fontSize=Math.min(120,text.fontSize??22);result.fontFamily=text.fontFamily??ctx.theme.minorFont;
       result.bold=text.fontWeight==="bold";result.italic=truth(run??defaults,"i");
       const underline=run?.getAttribute("u")??defaults?.getAttribute("u");result.underline=!!underline&&underline!=="none";
