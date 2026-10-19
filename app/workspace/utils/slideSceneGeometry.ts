@@ -42,7 +42,8 @@ export function duplicateSceneObjects(scene: SlideScene, ids: string[], idFactor
 }
 
 export function alignSceneObjects(scene: SlideScene, ids: string[], direction: SceneAlign): SlideScene {
-  const selected = scene.objects.filter(o => ids.includes(o.id) && !o.locked);
+  if (scene.objects.some(o=>ids.includes(o.id)&&o.locked)) return scene;
+  const selected = scene.objects.filter(o => ids.includes(o.id));
   if (!selected.length) return scene;
   const minX = Math.min(...selected.map(o => o.x));
   const minY = Math.min(...selected.map(o => o.y));
@@ -59,7 +60,8 @@ export function alignSceneObjects(scene: SlideScene, ids: string[], direction: S
 }
 
 export function distributeSceneObjects(scene: SlideScene, ids: string[], axis: "x" | "y"): SlideScene {
-  const selected = scene.objects.filter(o => ids.includes(o.id) && !o.locked)
+  if (scene.objects.some(o=>ids.includes(o.id)&&o.locked)) return scene;
+  const selected = scene.objects.filter(o => ids.includes(o.id))
     .sort((a, b) => a[axis] - b[axis]);
   if (selected.length < 3) return scene;
   const size = axis === "x" ? "w" : "h";
