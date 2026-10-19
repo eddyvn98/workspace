@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import type { SlideScene, SlideSceneObject } from "../../types/slideScene";
-import { normalizeSlideScene, sceneDeleteObject, sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slideScene";
+import { sceneDeleteObject, sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slideScene";
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { alignSceneObjects, duplicateSceneObjects, nudgeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { useEffect, useRef } from "react";
@@ -53,7 +53,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-3">
         <div className="relative w-full max-w-5xl overflow-hidden border bg-white shadow" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}
-          onPointerDown={e => { if (e.target === e.currentTarget) setSelected(null); }}>
+          onPointerDown={e => { if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
           <SlideSceneSurface scene={scene} selected={selected} editing={!readOnly} onSelect={select}
             onMove={(id, x, y) => { if (!readOnly) commit(setSceneObjectGeometry(scene, id, snapSceneRect({...scene.objects.find(o=>o.id===id)!,x,y}))); }}
             onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect))); }} />
@@ -78,10 +78,10 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
           <label className="block">Trigger<select className={field + " w-full"} value={item.motion?.trigger || "with-previous"} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:e.target.value as NonNullable<SlideSceneObject["motion"]>["trigger"],durationMs:item.motion?.durationMs||450,delayMs:item.motion?.delayMs||0}})}>
             {["with-previous","after-previous","on-click"].map(v => <option key={v}>{v}</option>)}</select></label>
           <label className="flex items-center justify-between">Duration ms<input className={field + " w-24"} type="number" value={item.motion?.durationMs || 450} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:item.motion?.trigger||"with-previous",durationMs:Number(e.target.value),delayMs:item.motion?.delayMs||0}})}/></label>
-          <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120} onClick={()=>{const next=duplicateSceneObjects(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());commit(next);setSelected(next.objects[next.objects.length-1].id);}}>Duplicate</button>
+          <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120} onClick={()=>{const next=duplicateSceneObjects(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());commit(next);select(next.objects[next.objects.length-1].id);}}>Duplicate</button>
             <button className={field} disabled={readOnly} onClick={() => commit(sceneMoveObject(scene,item.id,-1))}>Back</button>
             <button className={field} disabled={readOnly} onClick={() => commit(sceneMoveObject(scene,item.id,1))}>Front</button>
-            <button className={field} disabled={readOnly} onClick={() => {commit(sceneDeleteObject(scene,item.id));setSelected(null);}}>Delete</button>
+            <button className={field} disabled={readOnly} onClick={() => {commit(sceneDeleteObject(scene,item.id));setSelected(null);setSelectedIds([]);}}>Delete</button>
           </div>
         </>}
       </aside>
