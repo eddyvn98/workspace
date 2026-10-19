@@ -63,6 +63,6 @@ export async function exportBoardPptx(
     zip.file(`ppt/slides/_rels/slide${i + 1}.xml.rels`, rels(relationships));
     addPptxNotes(zip, i + 1, slide.presenterNotes ?? "");
   }
-  addPptxPackage(zip, slides.length, width, chartCount, board.title);
+  addPptxPackage(zip, slides.length, width, chartCount, board.title, width === 960 ? 720 : 720);
   return { buffer: await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }), slideCount: slides.length };
 }
