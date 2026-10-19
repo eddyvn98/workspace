@@ -62,7 +62,7 @@ export function normalizeSlideScene(input: unknown, ratio: "16:9" | "4:3" = "16:
   if (input === undefined || input === null) return undefined;
   const r = record(input);
   const size = slideSceneRatio(ratio);
-  if (!Array.isArray(r.objects) || r.objects.length > 120) return undefined;
+  if (r.version !== 2 || !Array.isArray(r.objects) || r.objects.length > 120) return undefined;
   const seen = new Set<string>();
   const objects: SlideSceneObject[] = [];
   for (const [index, value] of r.objects.entries()) {
