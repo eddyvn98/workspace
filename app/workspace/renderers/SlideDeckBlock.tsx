@@ -155,7 +155,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
           if(first&&last&&event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
           else if(first&&last&&!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
         }
-        if (event.key === "Escape" && !event.defaultPrevented && !(event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) {
+        if (event.key === "Escape" && !event.defaultPrevented && studioRef.current?.contains(event.target as Node) && !(event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) {
           event.stopPropagation(); setStudioOpen(false);
         }
       }}>
