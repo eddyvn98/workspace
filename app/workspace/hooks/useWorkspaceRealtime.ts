@@ -1,5 +1,6 @@
-import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 "use client";
+
+import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 import { getKnownRevision, rememberRealtimeRevision, rememberRevision } from "./workspaceBoardApi";
 import { useCollectionRevisionWatch } from "./useCollectionRevisionWatch";
 
