@@ -14,7 +14,7 @@ Updated 2026-10-19. Branch `feat/office-slide-scene-v2`, PR #56. **This is UI de
 - `Studio` / `Exit Studio` in deck header opens/closes a fullscreen React portal. This renders the **same Workspace editor and data**, not a second save system. Host selection/permissions and existing import/export/presenter actions remain intact.
 - Studio layout: vertical slide rail at desktop widths (horizontal scroll strip on narrow screens), central stage, Layers/Format inspector on the right.
 - Scene canvas fits by **both height and width** via CSS container units at actual 16:9 or 4:3 ratio. The slide remains the visual centre with a neutral grey work surface.
-- Core toolbar consolidates insertion under a dropdown; primary actions Undo/Redo, Upload image, Diagram, Snap, Inspector and Animation are visible. Image URL is a secondary control.
+- Core editor now has an **always-visible two-row ribbon**. One-click Text box, Shape, Image upload, Chart, Table, Diagram plus Undo/Redo are no longer hidden in an Insert dropdown. The contextual Format row offers text styling, alignment, shape type, color and selection actions. Image URL remains secondary.
 - Inspector can be hidden. Its **Layers** and **Format** tabs separate navigation/order from object properties. Selection via canvas opens Format; selection within Layers stays in Layers for multiple operations.
 - Animation timeline is collapsed by default and opened intentionally, including from an object's properties.
 - Group navigation appears only when a group exists or is being edited, and legacy HTML conversion is labelled `Convert to objects`. The destructive restore action is under Advanced.
@@ -46,3 +46,16 @@ pnpm build
 
 ## Remaining UX refinement
 Full object-selection toolbar conventions, drag guides, slide-level context menus, keyboard arrow navigation in the filmstrip, resizable inspector and explicit save/sync indicator should be assessed *after browser QA*. These are UX tasks, not an excuse to rewrite the host's persistence or agent architecture. No screenshot/video or local browser acceptance run was performed in this remote code-editing environment.
+
+## Follow-up: keep every common action discoverable
+
+The first Studio pass hid Text box, Shape, Chart and Table under an Insert select. This was a UX regression: the user could not find the actual creation toolbar. Fixed via `SlideSceneRibbon.tsx`:
+
+- Primary buttons are visible at all times with label + icon, not nested inside a selector: **Text box, Shape, Image, Chart, Table, Diagram**.
+- Undo/Redo remain on the first row. Inspector and Animation toggle panel visibility; their controls are never the only route to insert content.
+- The second row is selection-aware: text formatting (Bold/Italic/Underline, font size, alignment and color), shape type and fill, duplication, deletion and group actions. Heavy chart/table/shape properties remain in the Format inspector via a visible settings button.
+- The ribbon wraps to multiple lines for narrow embedded Workspace blocks; it does not hide the primary tools behind an overflow menu.
+- Images are inserted via Upload from the visible button; pasting a URL remains available as a secondary feature.
+- Added `slide-scene-ribbon.test.tsx` covering one-click creation, in-place formatting, settings and read-only protection. `slide-studio-layout.test.tsx` was adapted to the new button surface.
+
+Browser QA should confirm the full insertion row is readable without horizontal scrolling at 1280px Studio, and wraps without truncation on narrower Canvas blocks. Follow-up functionality in an app should be discoverable first, not merely accessible through hidden menus.
