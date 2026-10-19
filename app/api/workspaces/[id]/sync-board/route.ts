@@ -67,6 +67,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     connectors: board.connectors ?? {},
     camera: board.camera ?? {},
     revision: board.revision,
+    documentState: board.documentState,
     ...boardMetadata(board),
   });
 }
@@ -84,6 +85,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   }
 
   const { title, blocks, blockOrder, connectors, camera, baseRevision } = body;
+  if (body.documentState !== undefined && (typeof body.documentState !== "string"
+    || body.documentState.length > 32 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.documentState))) {
+    return NextResponse.json({ error: "Invalid document checkpoint" }, { status: 400 });
+  }
   const actorEmail = normalizeWorkspaceEmail(
     typeof body.actorEmail === "string" ? body.actorEmail : null,
   );
@@ -145,6 +150,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       blockOrder: blockOrder as Prisma.InputJsonValue,
       connectors: connectors as Prisma.InputJsonValue,
       camera: camera as Prisma.InputJsonValue,
+      ...(typeof body.documentState === "string" ? { documentState: body.documentState } : {}),
     },
     editEvents,
     baseRevision: baseRevision as number,

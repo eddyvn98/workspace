@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { toast } from 'sonner';
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import {
   type CanvasBlock,
@@ -9,6 +10,7 @@ import { drawExportConnector, exportConnectorSvg } from "../utils/workspaceExpor
 import { drawExportShape, exportShapeSvg } from "../utils/workspaceExportShapes";
 import { getRotatedRectBounds } from "../utils/workspaceExportGeometry";
 import { projectAttachedBlocks } from "../utils/tableAttachments";
+import { drawWorkspaceDocExport, workspaceDocCanvasMarkup, workspaceDocCanvasHiddenIds } from '../utils/workspaceDocCanvasExport';
 import {
   drawExportImage,
   drawExportTable,
@@ -100,9 +102,10 @@ export function useExport() {
     const visualBlocks = projectAttachedBlocks(blocks);
     const hasSelection = selectedBlockIds.length > 0;
     const isSelectionScope = onlySelected && hasSelection;
+    const hidden = workspaceDocCanvasHiddenIds(blocks, isSelectionScope ? selectedBlockIds : undefined);
 
     const orderedBlocks = getOrderedBlocks(visualBlocks, blockOrder).filter(
-      (b) => !isSelectionScope || selectedBlockIds.includes(b.id)
+      (b) => !hidden.has(b.id) && (!isSelectionScope || selectedBlockIds.includes(b.id))
     );
     const exportedConnectors = isSelectionScope
       ? Object.fromEntries(
@@ -127,6 +130,8 @@ export function useExport() {
     for (const block of orderedBlocks) {
       const b = getBlockRenderInfo(block, bbox);
       drawExportShape(ctx, b);
+      try { if (await drawWorkspaceDocExport(ctx, block, blocks, b)) continue; }
+      catch (error) { toast.error(error instanceof Error ? error.message : 'Document export failed.'); return; }
       await drawExportImage(ctx, b);
       drawExportTable(ctx, b);
       drawExportText(ctx, b);
@@ -136,23 +141,25 @@ export function useExport() {
 
     const safeTitle = (title || "workspace").replace(/[^a-z0-9-_]+/gi, "-");
     const filename = isSelectionScope ? `${safeTitle}-selection.png` : `${safeTitle}.png`;
-    triggerDownload(canvas.toDataURL("image/png"), filename);
+    try { triggerDownload(canvas.toDataURL("image/png"), filename); }
+    catch { toast.error('This browser cannot export the document canvas. Use the document Print / Save PDF action.'); }
   }, []);
 
   const exportSelectionPng = useCallback(() => {
     exportPng(true);
   }, [exportPng]);
 
-  const exportSvg = useCallback((onlySelected: boolean = false) => {
+  const exportSvg = useCallback(async (onlySelected: boolean = false) => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
     const { blocks, blockOrder, connectors, selectedBlockIds, title } = useWorkspaceStore.getState();
     const visualBlocks = projectAttachedBlocks(blocks);
     const hasSelection = selectedBlockIds.length > 0;
     const isSelectionScope = onlySelected && hasSelection;
+    const hidden = workspaceDocCanvasHiddenIds(blocks, isSelectionScope ? selectedBlockIds : undefined);
 
     const orderedBlocks = getOrderedBlocks(visualBlocks, blockOrder).filter(
-      (b) => !isSelectionScope || selectedBlockIds.includes(b.id)
+      (b) => !hidden.has(b.id) && (!isSelectionScope || selectedBlockIds.includes(b.id))
     );
     const exportedConnectors = isSelectionScope
       ? Object.fromEntries(
@@ -173,6 +180,10 @@ export function useExport() {
       const b = getBlockRenderInfo(block, bbox);
       const shapeMarkup = exportShapeSvg(b, escapeXml);
       if (shapeMarkup) svgElements.push(shapeMarkup);
+      try {
+        const docMarkup = await workspaceDocCanvasMarkup(block, blocks, b);
+        if (docMarkup) { svgElements.push(docMarkup); continue; }
+      } catch (error) { toast.error(error instanceof Error ? error.message : 'Document export failed.'); return; }
 
       const extraMarkup = exportBlockExtrasSvg(b, escapeXml);
       if (extraMarkup) svgElements.push(extraMarkup);

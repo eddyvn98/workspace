@@ -1,6 +1,6 @@
-"use client";
 import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
-import { getKnownRevision, rememberRevision } from "./workspaceBoardApi";
+"use client";
+import { getKnownRevision, rememberRealtimeRevision, rememberRevision } from "./workspaceBoardApi";
 import { useCollectionRevisionWatch } from "./useCollectionRevisionWatch";
 
 import { boardMetadata } from "@/lib/workspace/boardMetadata";
@@ -17,9 +17,12 @@ import {
   skipNextWorkspacePersistenceSnapshot,
   skipNextWorkspaceRealtimePublish,
   setWorkspaceRealtimeLive,
+  isWorkspaceRealtimeLive,
 } from "../utils/workspaceRealtimeProjection";
+import { flushWorkspacePendingSave, saveCurrentWorkspaceDraft } from "../utils/workspacePersistenceFlush";
 import { registerWorkspaceRealtimeFlush } from "../utils/workspaceRealtimeFlush";
 import { useWorkspaceRealtimePublisher } from "./useWorkspaceRealtimePublisher";
+import { requestWorkspaceRealtimeAccess } from "./workspaceRealtimeAccess";
 
 /**
  * Puts a board into a live session: everyone in it sees the same canvas as it
@@ -42,24 +45,6 @@ import { useWorkspaceRealtimePublisher } from "./useWorkspaceRealtimePublisher";
  * that draws them.
  */
 
-/** Fetches a token. Null means the person has no access, or the feature is
- *  not configured on this server — both of which mean "no live session", and
- *  neither of which is an error the user should see. */
-async function mintToken(boardId: string): Promise<{ token: string; wsUrl: string } | null> {
-  try {
-    const response = await fetch(`/api/workspaces/${encodeURIComponent(boardId)}/ws-token`, {
-      method: "POST",
-    });
-    if (!response.ok) return null;
-    const body = await response.json();
-    return typeof body?.token === "string" && typeof body?.wsUrl === "string"
-      ? { token: body.token, wsUrl: body.wsUrl }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 export interface WorkspaceRealtime {
   /** True once the socket is up. Until then every write goes to REST as
    *  before, so a caller does not have to wait for this. */
@@ -75,10 +60,13 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   // Collection records require REST CAS + per-record 3-way merge. The current
   // room protocol stores whole blocks and can lose concurrent record writes.
   const hasCollection = useWorkspaceStore((state) => Object.values(state.blocks).some((b) => b.type === "collection"));
+  const hasDocument = useWorkspaceStore((state) => Object.values(state.blocks).some((b) => b.type === "doc"));
   const hasSpreadsheet = useWorkspaceStore((state) => hasSpreadsheetBlock(state.blocks));
   useCollectionRevisionWatch(remoteBoardId ?? boardId, enabled && hasCollection, false);
   const [live, setLive] = useState(false);
   const [peers, setPeers] = useState<WorkspacePeer[]>([]);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
+  const retryBudgetRef = useRef({ boardId: "", count: 0 });
   const handleRef = useRef<WorkspaceLiveHandle | null>(null);
   const unregisterFlushRef = useRef<(() => void) | null>(null);
   const flushRealtimePendingSave = useWorkspaceRealtimePublisher(boardId, remoteBoardId, handleRef);
@@ -86,12 +74,46 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   useEffect(() => {
     if (!enabled || !remoteBoardId || hasCollection || hasSpreadsheet) return;
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const mintToken = async () => {
+      const result = await requestWorkspaceRealtimeAccess(remoteBoardId);
+      const state = useWorkspaceStore.getState();
+      if (cancelled || state.boardId !== boardId) return null;
+      if (result.status === "denied") {
+        state.setIsReadOnly(true);
+        handleRef.current?.disconnect();
+        return null;
+      }
+      if (result.status !== "ok") return null;
+      state.setIsReadOnly(!result.canWrite);
+      return result;
+    };
+    const handOffPendingDraft = () => {
+      const state = useWorkspaceStore.getState();
+      if (state.boardId !== boardId || state.isReadOnly) return;
+      // Drain throttled/microtask edits before checking the handle's pending vector.
+      void flushRealtimePendingSave(0);
+      if (handleRef.current?.hasPendingChanges()) saveCurrentWorkspaceDraft(boardId);
+    };
+    if (retryBudgetRef.current.boardId !== remoteBoardId) retryBudgetRef.current = { boardId: remoteBoardId, count: 0 };
+    const retryFreshConnection = (delay: number) => {
+      if (cancelled || retryBudgetRef.current.count >= 3 || retryTimer !== null) return;
+      retryBudgetRef.current.count++;
+      retryTimer = setTimeout(() => { retryTimer = null; if (!cancelled) setConnectionAttempt(value => value + 1); }, delay);
+    };
 
     void (async () => {
-      const minted = await mintToken(remoteBoardId);
+      const minted = await mintToken();
       // No token, no session, no complaint: REST autosave and presence
       // polling are already carrying this board.
       if (!minted || cancelled) return;
+
+      // A new Y.Doc has no relationship to an unsaved local HTML draft.
+      // Flush that draft before adopting the room; edits during the actual
+      // handshake are buffered by the handle and trigger this process again.
+      const flushed = await flushWorkspacePendingSave(remoteBoardId).catch(() => false);
+      if (cancelled) return;
+      if (!flushed) { retryFreshConnection(1000); return; }
 
       const initialState = useWorkspaceStore.getState();
       // Existing boards are seeded by the workspace room from its database
@@ -116,25 +138,28 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
         wsUrl: minted.wsUrl,
         userEmail: useWorkspaceStore.getState().currentUserEmail,
         initialBoard,
-        onRevision: (revision) => {
+        requireDocumentProtocol: hasDocument,
+        onRevision: revision => { if (!cancelled) rememberRealtimeRevision(remoteBoardId, revision); },
+        onPreSyncChanges: () => {
+          if (cancelled) return;
+          handleRef.current?.destroy();
+          handleRef.current = null;
+          void flushWorkspacePendingSave(remoteBoardId).catch(() => false).then(ok => retryFreshConnection(ok ? 0 : 1000));
+        },
+        onBoard: (board, source) => {
           if (cancelled) return;
           const current = useWorkspaceStore.getState();
-          rememberRevision({ id: remoteBoardId, revision, blocks: current.blocks, blockOrder: current.blockOrder, connectors: current.connectors });
-        },
-        onBoard: (board) => {
-          if (cancelled) return;
-          if (hasSpreadsheetBlock(board.blocks)) {
-            // A remote client introduced a workbook while this room was live.
-            // Leave the whole-block writer before accepting any new revision.
+          if (hasSpreadsheetBlock(board.blocks) || hasSpreadsheetBlock(current.blocks)) {
+            // A remote writer introduced a spreadsheet: the whole-block
+            // Yjs channel can no longer persist this board safely.
             cancelled = true;
             unregisterFlushRef.current?.(); unregisterFlushRef.current = null;
             handleRef.current?.destroy(); handleRef.current = null;
             setLive(false); setWorkspaceRealtimeLive(null); setPeers([]);
             return;
           }
-          const current = useWorkspaceStore.getState();
-          if (Object.values(current.blocks).some((b) => b.type === "collection") || hasSpreadsheetBlock(current.blocks) || hasSpreadsheetBlock(board.blocks)) return;
-          if (board.revision !== undefined && board.revision < (getKnownRevision(remoteBoardId) ?? -1)) return;
+          if (Object.values(current.blocks).some((b) => b.type === "collection")) return;
+          if (!source?.crdt && board.revision !== undefined && board.revision < (getKnownRevision(remoteBoardId) ?? -1)) return;
           // A newly-connected Yjs room can briefly announce its empty
           // initial document before REST hydration has finished. Do not let
           // that transient projection erase a board that is already loaded
@@ -157,9 +182,12 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
           // REST autosave — useWorkspacePersistence's cached baseRevision is
           // always one step behind what the room just wrote, which otherwise
           // made every incoming remote edit refused with a 409.
-          if (board.revision !== undefined) rememberRevision({ id: remoteBoardId, ...board });
+          if (board.revision !== undefined && !source?.local) {
+            if (source?.crdt) rememberRealtimeRevision(remoteBoardId, board.revision);
+            else rememberRevision({ id: remoteBoardId, ...board });
+          }
           skipNextWorkspaceHistorySnapshot();
-          skipNextWorkspacePersistenceSnapshot();
+          if (!source?.local || isWorkspaceRealtimeLive(remoteBoardId)) skipNextWorkspacePersistenceSnapshot();
           // This same store write is also what this hook's own local-edit
           // subscriber below listens on. The content it is about to set came
           // straight out of the Yjs doc (the initial post-sync projection, or
@@ -177,7 +205,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
             title: board.title,
             ...(board.frames !== undefined ? { frames: normalizeCameraFrames(board.frames) } : {}),
             ...(board.treeLayoutFamily !== undefined ? normalizeTreeLayoutFields(board) : {}),
-            blocks: board.blocks as never,
+            blocks: board.blocks as typeof current.blocks,
             connectors: board.connectors as never,
             blockOrder: board.blockOrder,
           });
@@ -199,7 +227,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
         // Re-minted on a timer and after every close, which is what makes a
         // session survive a network blip and what makes a revoked share take
         // effect instead of waiting for the tab to close.
-        refreshToken: () => mintToken(remoteBoardId),
+        refreshToken: mintToken,
         // A minted token only proves this client is authorized — it says
         // nothing about whether the collab server is actually reachable. If
         // "live" were flipped as soon as connectWorkspaceBoard() returns, a
@@ -212,9 +240,12 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
         // covering the board exactly while the session is not truly live.
         onSyncStateChange: (synced) => {
           if (cancelled) return;
+          const wasLive = isWorkspaceRealtimeLive(remoteBoardId);
           setLive(synced);
           setWorkspaceRealtimeLive(synced ? remoteBoardId : null);
+          if (!synced && wasLive) handOffPendingDraft();
           if (synced) {
+            retryBudgetRef.current.count = 0;
             unregisterFlushRef.current ??= registerWorkspaceRealtimeFlush(remoteBoardId, flushRealtimePendingSave);
           }
         },
@@ -228,7 +259,10 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
     })();
 
     return () => {
+      const wasLive = isWorkspaceRealtimeLive(remoteBoardId);
+      if (wasLive) { setWorkspaceRealtimeLive(null); handOffPendingDraft(); }
       cancelled = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
       unregisterFlushRef.current?.();
       unregisterFlushRef.current = null;
       handleRef.current?.destroy();
@@ -237,7 +271,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
       setWorkspaceRealtimeLive(null);
       setPeers([]);
     };
-  }, [enabled, hasCollection, hasSpreadsheet, remoteBoardId, flushRealtimePendingSave]);
+  }, [enabled, hasCollection, hasDocument, hasSpreadsheet, remoteBoardId, flushRealtimePendingSave, connectionAttempt]);
 
   // Broadcasts what this person is looking at. Subscribed rather than polled,
   // and de-duplicated inside the handle, so a selection that did not move

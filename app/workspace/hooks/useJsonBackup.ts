@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { DEFAULT_CAMERA } from "../types/camera";
 import { workspacePerfLog } from "../utils/workspacePerfDebug";
+import { includeWorkspaceDocTables } from '../utils/workspaceDocReferences';
 
 const BACKUP_VERSION = 1;
 
@@ -51,12 +52,13 @@ export function useJsonBackup() {
     const { selectedBlockIds, blocks, blockOrder, connectors, camera, title } = state;
     if (selectedBlockIds.length === 0) return;
 
-    const selectedSet = new Set(selectedBlockIds);
+    const selectedSet = new Set(includeWorkspaceDocTables(blocks, selectedBlockIds));
     const selectedBlocks: Record<string, typeof blocks[string]> = {};
-    for (const id of selectedBlockIds) {
-      if (blocks[id]) selectedBlocks[id] = blocks[id];
+    for (const id of selectedSet) {
+      if (blocks[id]) selectedBlocks[id] = blocks[id].embeddedInDocId && !selectedSet.has(blocks[id].embeddedInDocId!)
+        ? { ...blocks[id], embeddedInDocId: undefined } : blocks[id];
     }
-    const selectedBlockOrder = blockOrder.filter((id) => selectedSet.has(id));
+    const selectedBlockOrder = [...new Set([...blockOrder.filter((id) => selectedSet.has(id)), ...selectedSet])];
     const selectedConnectors: Record<string, typeof connectors[string]> = {};
     for (const [id, c] of Object.entries(connectors)) {
       if (selectedSet.has(c.fromBlockId) && selectedSet.has(c.toBlockId)) {
@@ -84,8 +86,13 @@ export function useJsonBackup() {
   }, []);
 
   const importJson = useCallback((file: File) => {
+    const initiatingState = useWorkspaceStore.getState();
+    if (initiatingState.isReadOnly) return;
+    const initiatingBoardId = initiatingState.boardId;
     const reader = new FileReader();
     reader.onload = (event) => {
+      const current = useWorkspaceStore.getState();
+      if (current.isReadOnly || current.boardId !== initiatingBoardId) return;
       const text = event.target?.result;
       if (typeof text !== "string") return;
 
@@ -118,6 +125,8 @@ export function useJsonBackup() {
           return;
         }
 
+        const latest = useWorkspaceStore.getState();
+        if (latest.isReadOnly || latest.boardId !== initiatingBoardId) return;
         useWorkspaceStore.setState({
           blocks: (parsed.blocks as ReturnType<typeof useWorkspaceStore.getState>["blocks"]) ?? {},
           blockOrder: parsed.blockOrder as string[],

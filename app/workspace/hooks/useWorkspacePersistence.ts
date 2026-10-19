@@ -88,8 +88,8 @@ export function useWorkspacePersistence(boardId: string): WorkspacePersistenceAp
   } = useWorkspacePersistenceSave(boardId, remoteLoadSettledRef, adopt);
   useEffect(() => {
     if (!boardId) return;
-    return registerWorkspacePersistenceFlush(boardId, flushPendingSave);
-  }, [boardId, flushPendingSave]);
+    return registerWorkspacePersistenceFlush(boardId, flushPendingSave, () => { setIsSavePending(true); save(); });
+  }, [boardId, flushPendingSave, save, setIsSavePending]);
   useEffect(() => {
     if (!boardId) {
       setIsLoadingBoard(false);

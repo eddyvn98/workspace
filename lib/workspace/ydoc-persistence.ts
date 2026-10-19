@@ -21,26 +21,53 @@ const DEFAULT_AWAIT_PERSIST_MS = 4500;
  *  and lets a caller wait for that confirmation. Split out from
  *  connectWorkspaceBoard so it can be exercised with a plain in-memory Y.Doc
  *  in a unit test, with no socket involved. */
-export function createPersistenceAwaiter(meta: Y.Map<unknown>) {
+export function createPersistenceAwaiter(meta: Y.Map<unknown>, doc?: Y.Doc) {
   let pendingSince: number | null = null;
+  let pendingVector: Map<number, number> | null = null;
+  let pendingRevision = -1;
   let confirmed = false;
   let disposed = false;
   const waiters = new Set<(ok: boolean) => void>();
   const onMetaChange = (event: Y.YMapEvent<unknown>) => {
-    if (!event.keysChanged.has("boardRevision") || pendingSince === null) return;
-    if (Date.now() - pendingSince < MIN_FLUSH_DELAY_MS) return;
+    if (pendingSince === null) return;
+    if (doc && meta.get("docProtocolVersion") === 1) {
+      // A deadline flush or repository rebase must not acknowledge a later edit.
+      // A state vector proves which Yjs structs the database actually contains.
+      if (!event.keysChanged.has("docPersistedVector") || !pendingVector) return;
+      try {
+        const encoded = meta.get("docPersistedVector");
+        if (typeof encoded !== "string") return;
+        const saved = Y.decodeStateVector(Uint8Array.from(atob(encoded), c => c.charCodeAt(0)));
+        if ([...pendingVector].some(([client, clock]) => (saved.get(client) ?? 0) < clock)) return;
+      } catch { return; }
+    } else {
+      if (!event.keysChanged.has("boardRevision") || Number(meta.get("boardRevision")) <= pendingRevision) return;
+      if (Date.now() - pendingSince < MIN_FLUSH_DELAY_MS) return;
+    }
     confirmed = true;
     for (const resolve of waiters) resolve(true);
     waiters.clear();
   };
   meta.observe(onMetaChange);
   return {
+    hasPendingChanges: () => !disposed && pendingSince !== null && !confirmed,
     markPending: () => {
+      if (doc && meta.get("docProtocolVersion") === 1) {
+        // Deleting Yjs content alone does not advance a struct clock. A marker
+        // in the same ordered update stream lets vectors acknowledge deletions too.
+        doc.transact(() => {
+          const edits = doc.getMap<number>("documentEdits");
+          const key = String(doc.clientID);
+          edits.set(key, (edits.get(key) ?? 0) + 1);
+        }, "persistence-marker");
+      }
       // Always the latest edit's timestamp, not the first unconfirmed one:
       // the server's own idle timer is re-armed on every edit, so the ack we
       // need to wait for is gated on the most recent one, exactly like the
       // room it mirrors.
       pendingSince = Date.now();
+      pendingRevision = Number(meta.get("boardRevision") ?? -1);
+      pendingVector = doc ? Y.decodeStateVector(Y.encodeStateVector(doc)) : null;
       confirmed = false;
     },
     awaitPersisted: (timeoutMs = DEFAULT_AWAIT_PERSIST_MS): Promise<boolean> => {

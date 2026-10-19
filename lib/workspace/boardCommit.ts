@@ -23,6 +23,8 @@ export interface BoardContent {
   blockOrder: Prisma.InputJsonValue;
   connectors: Prisma.InputJsonValue;
   camera: Prisma.InputJsonValue;
+  /** Only the authenticated realtime service writes the opaque CRDT checkpoint. */
+  documentState?: string;
   frames?: Prisma.InputJsonValue;
   treeLayoutDirection?: string;
   treeGrowthMode?: string;

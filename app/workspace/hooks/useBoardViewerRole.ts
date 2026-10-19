@@ -1,40 +1,44 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { fetchRemoteBoard } from "./workspaceBoardApi";
 import { useWorkspaceRemoteBoardId } from "./useWorkspaceRemoteBoardId";
 
 /**
  * Sets the store's `isReadOnly` flag from the caller's role on the open
- * board (see CONTRACTS.md §33). Fail-open on error/offline — a network
- * blip must not lock an owner or editor out of their own board; the server
- * is still the real authority (§21's 403 on every write), this is purely a
- * client-side UX improvement so a VIEWER doesn't fight with controls that
- * silently don't persist.
+ * board (see CONTRACTS.md §33). A validated viewer lock survives pending or
+ * failed refreshes. New/local boards remain editable until a role is known;
+ * the server remains authoritative for every write.
  */
-export function useBoardViewerRole(boardId: string): void {
+export function useBoardViewerRole(boardId: string, forceReadOnly = false): void {
   const remoteBoardId = useWorkspaceRemoteBoardId(boardId);
   const setIsReadOnly = useWorkspaceStore((state) => state.setIsReadOnly);
+  const resolved = useRef<{ boardId: string; viewer: boolean } | null>(null);
 
-  useEffect(() => {
-    // Route changes reuse the singleton store. Clear the previous board's
-    // viewer lock immediately, otherwise a freshly-created board can remain
-    // read-only before it has a remote snapshot (and its first map creation
-    // is silently rejected by createWorkspaceMap).
-    setIsReadOnly(false);
+  useLayoutEffect(() => {
+    // Clear a different board's lock before paint, but never briefly unlock
+    // a viewer whose access has already been validated for this board.
+    const locked = forceReadOnly || resolved.current?.boardId === boardId && resolved.current.viewer;
+    setIsReadOnly(Boolean(locked));
+    if (forceReadOnly) {
+      resolved.current = { boardId, viewer: true };
+      return;
+    }
     if (!remoteBoardId) return;
     let cancelled = false;
 
     void fetchRemoteBoard(remoteBoardId).then((board) => {
-      if (cancelled) return;
-      setIsReadOnly(board?.viewerRole === "VIEWER");
-    });
+      if (cancelled || !board?.viewerRole) return;
+      const viewer = board.viewerRole === "VIEWER";
+      resolved.current = { boardId, viewer };
+      setIsReadOnly(viewer);
+    }).catch(() => { /* Keep the last validated role while offline. */ });
 
     return () => {
       cancelled = true;
     };
-  }, [boardId, remoteBoardId, setIsReadOnly]);
+  }, [boardId, remoteBoardId, forceReadOnly, setIsReadOnly]);
 }
 
 export default useBoardViewerRole;

@@ -4,8 +4,10 @@
  * malformed response resolves cleanly without throwing, ensuring the workspace
  * engine can operate reliably.
  */
-import { clearBoardPendingCreate } from "../utils/selfCreatedBoards";
-import type { BoardContent } from "../utils/mergeBoardConflict";
+import { workspaceDocumentCheckpoint } from "../utils/workspaceDocumentCheckpoint";
+import type { PlainBoard } from "@/lib/workspace/ydoc-shapes";
+import { getKnownRevision, rememberRevision, forgetBoardRevision } from "./workspaceBoardRevision";
+export { getKnownRevision, getKnownContent, rememberRevision, rememberRealtimeRevision, forgetBoardRevision } from "./workspaceBoardRevision";
 
 export interface RemoteBoardSummary {
   id: string;
@@ -121,59 +123,13 @@ export type BoardAccessResult =
  * null (used when the caller needs to tell "a brand-new, never-saved board"
  * apart from "an id was given but the board can't be loaded / unauthorized").
  */
-/**
- * The revision each board was last seen at, so every save can say what it was
- * built on and the server can refuse a stale one.
- *
- * Kept here rather than threaded through the four call sites of
- * saveRemoteBoard: a signature they each have to remember to fill in is a
- * signature one of them eventually will not. Per-tab and deliberately not
- * persisted — after a reload the board is fetched before it can be saved, so
- * the revision is re-learned from the server rather than trusted from
- * localStorage, which is exactly the stale value that would defeat the check.
- */
-const knownRevisions = new Map<string, number>();
-export function getKnownRevision(id: string): number | undefined { return knownRevisions.get(id); }
-const knownContents = new Map<string, BoardContent>();
-
-/** Exported so a caller that fetches a board through its own request (e.g. a
- *  Dify-mutation refresh) can still tell this cache what revision it landed
- *  on — otherwise the very next autosave uses the old baseRevision and is
- *  refused with a 409 even though nothing is actually stale. */
-export function rememberRevision(board: Pick<RemoteBoard, "id" | "revision" | "blocks" | "blockOrder" | "connectors"> | undefined): void {
-  if (board?.id && typeof board.revision === "number") {
-    if (board.revision < (knownRevisions.get(board.id) ?? -1)) return;
-    clearBoardPendingCreate(board.id);
-    knownRevisions.set(board.id, board.revision);
-    knownContents.set(board.id, {
-      blocks: board.blocks as unknown as Record<string, unknown>,
-      blockOrder: board.blockOrder as unknown as string[],
-      connectors: board.connectors as unknown as Record<string, unknown>,
-    });
-  }
-}
-
-/** The content this tab last synced with the server for a board — the common
- *  ancestor a conflicting save is merged against (see mergeBoardConflict.ts).
- *  Unlike the revision it is NOT dropped on a conflict. */
-export function getKnownContent(id: string): BoardContent | undefined {
-  return knownContents.get(id);
-}
-
-/** Forgets a board's revision, so the next save has to relearn it by loading.
- *  Called on a conflict: continuing to save against a revision we know is
- *  superseded would just re-refuse. */
-export function forgetBoardRevision(id: string): void {
-  knownRevisions.delete(id);
-}
-
-export async function checkBoardAccess(id: string, options: { remember?: boolean } = {}): Promise<BoardAccessResult> {
+export async function checkBoardAccess(id: string, options?: { remember?: boolean }): Promise<BoardAccessResult> {
   try {
     const res = await fetch(`/api/workspaces/${id}`);
     if (res.status === 404 || res.status === 403) return { status: "not_found_or_denied" };
     if (!res.ok) return { status: "error" };
     const board = (await res.json()) as RemoteBoard;
-    if (options.remember !== false) rememberRevision(board);
+    if (options?.remember !== false) rememberRevision(board);
     return { status: "ok", board };
   } catch {
     return { status: "error" };
@@ -185,7 +141,8 @@ export async function saveRemoteBoard(
   payload: RemoteBoardPayload
 ): Promise<SaveBoardResult> {
   try {
-    const baseRevision = knownRevisions.get(id);
+    const baseRevision = getKnownRevision(id);
+    const documentState = workspaceDocumentCheckpoint(id, payload as PlainBoard);
     const res = await fetch(`/api/workspaces/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -193,7 +150,8 @@ export async function saveRemoteBoard(
       // as "cannot be ordered against a concurrent writer" and refuses. That
       // is the intended answer: a save that cannot name its base is the
       // blind overwrite this whole mechanism exists to stop.
-      body: JSON.stringify(baseRevision === undefined ? payload : { ...payload, baseRevision }),
+      body: JSON.stringify({ ...payload, ...(baseRevision === undefined ? {} : { baseRevision }),
+        ...(documentState ? { documentState } : {}) }),
     });
     if (!res.ok) {
       let errorMsg = "Failed to save workspace";

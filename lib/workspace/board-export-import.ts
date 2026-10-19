@@ -7,6 +7,8 @@ import { exportToOpml } from "@/app/workspace/utils/opml";
 import { createBlockId } from "@/app/workspace/types/block";
 import { createConnectorId } from "@/app/workspace/types/connector";
 import { commitContentAndNotify, type BoardAccessRole, type BoardFailure } from "./board-commit-notify";
+import { includeWorkspaceDocTables, remapWorkspaceDocReferences } from '@/app/workspace/utils/workspaceDocReferences';
+import { remapContainerReferences } from '@/app/workspace/utils/blockReferences';
 
 const MAX_EXPORT_CHARS = 200_000;
 const MAX_IMPORT_CHARS = 200_000;
@@ -33,10 +35,11 @@ export function exportBoardContent(board: WorkspaceBoard, format: unknown, block
     if (missing.length > 0) return { ok: false, status: 422, error: `Unknown block ids: ${missing.slice(0, 5).join(", ")}`, reason: "block_not_found" };
     ids = blockIds as string[];
   }
-  const selected = new Set(ids ?? fullOrder);
+  const selected = new Set(includeWorkspaceDocTables(allBlocks, ids ?? [...fullOrder, ...Object.keys(allBlocks)]));
   const blocks: Rec = {};
-  for (const id of selected) blocks[id] = allBlocks[id];
-  const order = fullOrder.filter((id) => selected.has(id));
+  for (const id of selected) blocks[id] = allBlocks[id]?.embeddedInDocId && !selected.has(allBlocks[id].embeddedInDocId)
+    ? { ...allBlocks[id], embeddedInDocId: undefined } : allBlocks[id];
+  const order = [...new Set([...fullOrder.filter((id) => selected.has(id)), ...selected])];
   const connectors: Rec = {};
   for (const [id, c] of Object.entries(allConnectors)) {
     if (selected.has(c?.fromBlockId) && selected.has(c?.toBlockId)) connectors[id] = c;
@@ -103,13 +106,14 @@ export async function importMarkdownIntoBoard(
   const added: Rec = {};
   for (const block of parsed.blocks as Rec[]) {
     const id = idMap.get(block.id)!;
-    added[id] = {
+    added[id] = remapWorkspaceDocReferences({
       ...block,
       id,
+      data: remapContainerReferences(block.data, idMap),
       parentId: block.parentId ? idMap.get(block.parentId) : undefined,
       mapId: block.mapId ? mapIdMap.get(block.mapId) : undefined,
       transform: { computed: shift(block.transform?.computed ?? null), override: shift(block.transform?.override ?? null) },
-    };
+    }, idMap);
   }
   const addedConnectors: Rec = {};
   for (const connector of parsed.connectors as Rec[]) {

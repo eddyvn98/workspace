@@ -28,8 +28,9 @@ export function useWorkspaceRealtimePublisher(
     if (publishTimerRef.current !== null) {
       clearTimeout(publishTimerRef.current);
       publishTimerRef.current = null;
-      flushPendingPublish();
     }
+    // Includes microtask batches, which have pending data without a timer.
+    flushPendingPublish();
     return (await handleRef.current?.awaitPersisted(timeoutMs)) ?? true;
   }, [flushPendingPublish, handleRef]);
 

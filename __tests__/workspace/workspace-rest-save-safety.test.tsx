@@ -4,11 +4,11 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  save: vi.fn(), access: vi.fn(), getKnown: vi.fn(), announce: vi.fn(), index: vi.fn(),
+  save: vi.fn(), access: vi.fn(), getKnown: vi.fn(), remember: vi.fn(), announce: vi.fn(), index: vi.fn(),
   notify: vi.fn(), realtime: vi.fn(() => false), consume: vi.fn(() => null),
 }));
 vi.mock("@/app/workspace/hooks/workspaceBoardApi", () => ({
-  saveRemoteBoard: mocks.save, checkBoardAccess: mocks.access, getKnownContent: mocks.getKnown, rememberRevision: vi.fn(),
+  saveRemoteBoard: mocks.save, checkBoardAccess: mocks.access, getKnownContent: mocks.getKnown, rememberRevision: mocks.remember,
 }));
 vi.mock("@/app/workspace/hooks/workspaceBoardIndex", () => ({
   boardKey: (id: string) => `board:${id}`, upsertIndexEntry: mocks.index,
@@ -26,6 +26,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.realtime.mockReturnValue(false);
   mocks.consume.mockReturnValue(null);
+  mocks.getKnown.mockReturnValue(undefined);
   mocks.access.mockResolvedValue({ status: "ok", board: { id: "board", blocks: {}, blockOrder: [], connectors: {} } });
   useWorkspaceStore.setState({ boardId: "board", isReadOnly: false, blocks: {}, blockOrder: [], connectors: {}, title: "Unsaved" });
 });
@@ -68,25 +69,16 @@ describe("Workspace REST save failure safety", () => {
     expect(useWorkspaceStore.getState().blocks).toBe(before);
     host.unmount();
   });
-
-  it("explicit Save retries one completed network failure without requiring another edit", async () => {
-    mocks.save.mockResolvedValueOnce({ ok: false, error: "503", conflict: false }).mockResolvedValue({ ok: true });
+  it("keeps an unsaved draft after a transient 503 even if GET would succeed", async () => {
+    mocks.save.mockResolvedValue({ ok: false, error: "Service unavailable", conflict: false });
     const host = mount();
+    const before = useWorkspaceStore.getState().blocks;
     act(() => host.api.save());
-    expect(await host.api.flushPendingSave()).toBe(false);
-    expect(mocks.save).toHaveBeenCalledTimes(1);
-    expect(await host.api.flushPendingSave(true)).toBe(true);
-    expect(mocks.save).toHaveBeenCalledTimes(2);
-    host.unmount();
-  });
-
-  it("explicit Save does not silently retry an unresolved workbook conflict", async () => {
-    mocks.save.mockResolvedValue({ ok: false, conflict: true });
-    mocks.getKnown.mockReturnValue(undefined);
-    const host = mount(); act(() => host.api.save());
-    expect(await host.api.flushPendingSave()).toBe(false);
-    expect(await host.api.flushPendingSave(true)).toBe(false);
-    expect(mocks.save).toHaveBeenCalledTimes(1);
+    const persisted = await host.api.flushPendingSave();
+    expect(persisted).toBe(false);
+    expect(host.adopted).not.toHaveBeenCalled();
+    expect(mocks.access).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().blocks).toBe(before);
     host.unmount();
   });
 
@@ -103,6 +95,58 @@ describe("Workspace REST save failure safety", () => {
     expect(await host.api.flushPendingSave()).toBe(true);
     expect(mocks.save).toHaveBeenCalledTimes(2);
     expect(mocks.save.mock.calls[1][1].title).toBe("Newer edit");
+    host.unmount();
+  });
+
+  it("retries a completed failed request once when Save is pressed again", async () => {
+    mocks.save.mockResolvedValueOnce({ ok: false, error: "Offline" }).mockResolvedValue({ ok: true });
+    const host = mount();
+    await act(async () => { host.api.save(); });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(host.api.saveError).toBe("Offline");
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(false); });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    await act(async () => { expect(await host.api.flushPendingSave(true)).toBe(true); });
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    expect(host.api.saveError).toBeNull();
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(true); });
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    host.unmount();
+  });
+
+  it("returns false after one failed manual retry without an endless retry loop", async () => {
+    mocks.save.mockResolvedValue({ ok: false, error: "Still offline" });
+    const host = mount();
+    await act(async () => { host.api.save(); });
+    await act(async () => { expect(await host.api.flushPendingSave(true)).toBe(false); });
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    expect(host.api.isSavePending).toBe(false);
+    host.unmount();
+  });
+
+  it("does not start a request for a clean flush or a failed draft that became read-only", async () => {
+    mocks.save.mockResolvedValue({ ok: false, error: "Offline" });
+    const host = mount();
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(true); });
+    expect(mocks.save).not.toHaveBeenCalled();
+    await act(async () => { host.api.save(); });
+    useWorkspaceStore.setState({ isReadOnly: true });
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(false); });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    host.unmount();
+  });
+
+  it("never remembers a newer conflict snapshot without a common ancestor", async () => {
+    mocks.save.mockResolvedValue({ ok: false, conflict: true });
+    const host = mount();
+    const draft = useWorkspaceStore.getState().blocks;
+    await act(async () => { host.api.save(); });
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(false); });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(mocks.access).toHaveBeenCalledWith("board", { remember: false });
+    expect(mocks.remember).not.toHaveBeenCalled();
+    expect(host.adopted).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().blocks).toBe(draft);
     host.unmount();
   });
 });

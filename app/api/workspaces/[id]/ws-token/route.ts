@@ -35,9 +35,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   const board = await prisma.workspaceBoard.findUnique({ where: { id: params.id } });
   if (!board) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (hasSpreadsheetBlock(board.blocks)) return NextResponse.json({ error: "Spreadsheet boards use revisioned REST saves", reason: "spreadsheet_requires_rest" }, { status: 409 });
   const role = await resolveAccessRole(board, email);
   if (!role) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (hasSpreadsheetBlock(board.blocks)) return NextResponse.json({ error: "Spreadsheet boards use revisioned REST saves", reason: "spreadsheet_requires_rest" }, { status: 409 });
 
   try {
     getWorkspaceWsSigningSecret();
@@ -67,6 +67,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     // under the mindmap name. Reuse it unless Workspace has an explicit URL.
     wsUrl: process.env.NEXT_PUBLIC_WORKSPACE_WS_URL
       || process.env.NEXT_PUBLIC_MINDMAP_WS_URL
-      || "ws://localhost:1234",
+      || "ws://localhost:3002",
   });
 }
