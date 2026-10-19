@@ -1,4 +1,6 @@
 import JSZip from "jszip";
+import { exportSceneShape } from "./pptx-scene";
+import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
 import { boardExportSlides } from "./slide-export-scene";
 import { chartShape, group, imageShape, NS, rels, tableShape, textShape, xml } from "./pptx-elements";
 import { addPptxChart } from "./pptx-chart";
@@ -18,10 +20,24 @@ export async function exportBoardPptx(
   let chartCount = 0;
   for (const [i, entry] of slides.entries()) {
     const { slide, theme, elements } = entry;
-    const { contentWidth, heights, scale } = slideExportLayout(elements, width, i);
+    const scene = normalizeSlideScene(slide.scene, width === 960 ? "4:3" : "16:9");
+    const { contentWidth, heights, scale } = scene ? { contentWidth: width - 112, heights: [] as number[], scale: 1 } : slideExportLayout(elements, width, i);
     const relationships = [{ id: "rId1", type: "slideLayout", target: "../slideLayouts/slideLayout1.xml" }, { id: "rId2", type: "notesSlide", target: `../notesSlides/notesSlide${i + 1}.xml` }];
     const { fill, accent, font, background } = await style(slide, theme);
     const shapes: string[] = []; let y = 48;
+    if (scene) {
+      const factor = width / scene.width;
+      for (const [j, obj] of scene.objects.entries()) {
+        const id = j + 2;
+        if (obj.kind === "image" && obj.src) {
+          const picture = await loadImage(obj.src);
+          zip.file(`ppt/media/image${picture.index}.png`, picture.buffer);
+          const relId = `rId${relationships.length + 1}`;
+          relationships.push({ id: relId, type: "image", target: `../media/image${picture.index}.png` });
+          shapes.push(imageShape(id,relId,obj.id,obj.x*factor,obj.y*factor,obj.w*factor,obj.h*factor));
+        } else shapes.push(exportSceneShape(obj,id,factor));
+      }
+    }
     for (const [j, element] of elements.entries()) {
       const height = heights[j] * scale, id = j + 2;
       if (element.kind === "text") shapes.push(textShape(id, element.text, 56, y, contentWidth, height, (element.heading ? 32 : 20) * scale, fill, font, element.heading));
