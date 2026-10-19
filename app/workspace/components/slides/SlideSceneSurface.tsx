@@ -39,16 +39,22 @@ export function SlideSceneSurface({scene,selected,selectedIds=[],editing=false,o
       if(box?.width&&box.height&&Math.hypot(e.clientX-drag.left,e.clientY-drag.top)>=3)onMove?.(drag.id,Math.round(drag.x+(e.clientX-drag.left)*scene.width/box.width),Math.round(drag.y+(e.clientY-drag.top)*scene.height/box.height));
       cancel();
     };
+    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();cancel();}};
     window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);window.addEventListener("pointercancel",cancel);
-    return ()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",cancel);};
+    window.addEventListener("keydown",escape,true);window.addEventListener("blur",cancel);
+    return ()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",cancel);
+      window.removeEventListener("keydown",escape,true);window.removeEventListener("blur",cancel);};
   },[drag,scene.width,scene.height,onMove]);
   useEffect(()=>{
     if(!resize)return;
     const dimensions=(e:PointerEvent)=>{const box=ref.current?.getBoundingClientRect();return box?.width&&box.height?{dx:(e.clientX-resize.startX)*scene.width/box.width,dy:(e.clientY-resize.startY)*scene.height/box.height}:{dx:0,dy:0};};
     const move=(e:PointerEvent)=>setResizeOffset(dimensions(e)),cancel=()=>{setResize(null);setResizeOffset({dx:0,dy:0});};
     const up=(e:PointerEvent)=>{if(Math.hypot(e.clientX-resize.startX,e.clientY-resize.startY)>=3){const delta=dimensions(e);onResize?.(resize.id,resizeSceneRect(resize,resize.handle,delta.dx,delta.dy,resize.ratio));}cancel();};
+    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.preventDefault();event.stopPropagation();cancel();}};
     window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);window.addEventListener("pointercancel",cancel);
-    return ()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",cancel);};
+    window.addEventListener("keydown",escape,true);window.addEventListener("blur",cancel);
+    return ()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",cancel);
+      window.removeEventListener("keydown",escape,true);window.removeEventListener("blur",cancel);};
   },[resize,scene.width,scene.height,onResize]);
   return <div ref={ref} data-scene-width={scene.width} data-scene-height={scene.height} className={editing?"absolute inset-0 overflow-visible":"absolute inset-0 overflow-hidden"} style={{containerType:"size"}}>
     {previewScene.objects.map(o=>{
