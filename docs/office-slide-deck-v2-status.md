@@ -144,3 +144,21 @@ pnpm build
 Manual acceptance: create a dark Scene V2 deck, edit on a 4:3 and 16:9 canvas, verify keyboard input in a second editor is unaffected, export PDF and PPTX, inspect generated pages visually and verify presenter click-step navigation on first/last slides.
 
 **Do not merge yet.** All changes are committed, but the repository is not available locally for automated build/browser execution in this tool environment. The Next.js scene editor and exporter remain unverified at runtime; advanced PPTX animation, import roundtrip and Code Execution Agent are explicitly deferred.
+
+## Verified baseline and application UI continuation — 2026-10-19
+
+- Local agent reported commit `e80ab905` built and tested locally. GitHub Actions on this SHA were independently verified: **Collection AI commands** and **Workspace universal quality gate** each concluded success (2/2). Exact local test logs were not attached.
+- Additional work after that green baseline: editable text directly on the positioned slide via double-click, sidebar action, F2 or Enter. Ctrl/Cmd+Enter commits and Escape cancels. Each accepted edit is one Scene V2 change so undo has an atomic boundary.
+- Added focus routing for clicked scene elements (arrow-key movement now stays scoped to the focused scene) and a jsdom UI test covering commit, cancel and keyboard submit.
+- No new code-execution runtime was introduced: prioritize the editor as a usable environment for a future agent.
+
+Local agent revalidation for the newer commits:
+```sh
+pnpm exec tsc --noEmit
+pnpm exec vitest run __tests__/workspace/slide-scene-inline-text.test.tsx
+pnpm test:workspace
+pnpm build
+```
+Manual browser check: double-click an unlocked text box, edit and blur to save; Escape leaves text intact, F2/Enter opens edit mode, Ctrl/Cmd+Enter saves; locked/read-only text cannot be edited. Verify shortcuts work after clicking an object and do not affect neighboring Canvas editor instances. Test 4:3 and 16:9 decks after reload.
+
+**Verification:** The CI successes apply to `e80ab905`. Subsequent commits need their own checks and manual QA before this PR is merged.
