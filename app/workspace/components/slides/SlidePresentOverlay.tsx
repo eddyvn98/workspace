@@ -61,6 +61,7 @@ export function SlidePresentOverlay({ data, index, showGrid, showNotes, onToggle
             <div
               key={slideId}
               ref={surfaceRef}
+              onClick={next}
               className="slide-cq relative w-full overflow-hidden rounded shadow-2xl"
               style={{
                 backgroundColor: slideBackground(slide.backgroundColor, data.theme),
