@@ -29,6 +29,8 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
   const imageFileInput = useRef<HTMLInputElement>(null);
   const [uploading,setUploading] = useState(false);
   const sceneFingerprint=useMemo(()=>JSON.stringify(scene),[scene]);
+  const currentSceneFingerprint=useRef(sceneFingerprint);
+  currentSceneFingerprint.current=sceneFingerprint;
   const history = useRef<{undo:SlideScene[];redo:SlideScene[];expected:string}>({undo:[],redo:[],expected:sceneFingerprint});
   const [historyVersion,setHistoryVersion] = useState(0);
   // An external Workspace sync may replace the scene. Never undo it with stale local snapshots.
@@ -61,9 +63,11 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
   };
   const uploadImage=async(file?:File)=>{
     if(!file||readOnly||uploading||scene.objects.length>=120)return;
+    const startedAt=sceneFingerprint;
     setUploading(true);
     try { const result=await uploadWorkspaceImageWithOriginal(file);
       if(!result?.url) throw new Error("Upload failed");
+      if(currentSceneFingerprint.current!==startedAt) throw new Error("Slide changed during upload. Retry inserting the image to avoid overwriting other edits.");
       const next=sceneObject("image",100,100);next.src=result.url;
       commit({...scene,objects:[...scene.objects,next]});select(next.id);
     } catch(error){window.alert(error instanceof Error?error.message:"Image upload failed");}
