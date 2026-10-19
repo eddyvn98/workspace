@@ -1,10 +1,15 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeSlideScene, type SlideScene } from "../types/slideScene";
-type History={undo:SlideScene[];redo:SlideScene[];expected:string};
-export function useSlideSceneHistory(scene:SlideScene,onChange:(scene:SlideScene)=>void,readOnly:boolean){
+export type SlideSceneHistoryState={undo:SlideScene[];redo:SlideScene[];expected:string};
+export type SlideSceneHistorySlot={current:SlideSceneHistoryState};
+type History=SlideSceneHistoryState;
+export function useSlideSceneHistory(scene:SlideScene,onChange:(scene:SlideScene)=>void,readOnly:boolean,historySlot?:SlideSceneHistorySlot){
   const signature=useMemo(()=>JSON.stringify(scene),[scene]);
-  const history=useRef<History>({undo:[],redo:[],expected:signature});
+  const localHistory=useRef<History>({undo:[],redo:[],expected:signature});
+  // The host may change the editor DOM root when entering fullscreen Studio.
+  // A host-owned slot preserves Undo/Redo across that view-only remount.
+  const history=historySlot??localHistory;
   const latest=useRef({scene,onChange,readOnly,signature});
   latest.current={scene,onChange,readOnly,signature};
   const mounted=useRef(true);
