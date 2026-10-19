@@ -96,7 +96,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
           backgroundColor={slideBackground(activeSlide.backgroundColor, data.theme)} readOnly={readOnly}
           onChange={scene => { if (!readOnly) onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene } } }); }} />
           : activeSlide && <WorkspaceDocRichEditor key={activeSlide.id} blockId={block.id} html={activeSlide.html}
-            isEditing={isEditingBody && !readOnly} onChange={(next) => actions.updateHtml(activeSlide.id, next)} onStopEditing={stopEditingBody} />}
+            isEditing={isEditingBody && !readOnly} readOnly={readOnly} onChange={(next) => actions.updateHtml(activeSlide.id, next)} onStopEditing={stopEditingBody} />}
       </div>
       <SlideFilmstrip data={data} onSelect={actions.selectSlide} onAdd={actions.addSlide} onReorder={actions.reorderSlide}
         onRename={actions.renameSlide} onDuplicate={actions.duplicateSlide} onDelete={actions.deleteSlide}

@@ -1,7 +1,7 @@
 // Minimal HTML parser for the doc editor's own output (and the sanitized HTML
 // the agent writes). It keeps character offsets so edits can splice the stored
 // string and leave every untouched byte (lineIds, embedded tables) intact.
-export const VOID_TAGS = new Set(["br", "img", "hr"]);
+export const VOID_TAGS = new Set(["br", "img", "hr", "col", "input"]);
 const TAG_RE = /<(?:"[^"]*"|'[^']*'|[^'">])*>/g;
 
 export interface HtmlNode {
@@ -18,7 +18,10 @@ export interface HtmlNode {
 export function decodeText(value: string): string {
   return value
     .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#(?:x([\da-f]+)|(\d+));/gi, (_, hex, decimal) => {
+      const code = Number.parseInt(hex ?? decimal, hex ? 16 : 10);
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '\ufffd';
+    })
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 }
 

@@ -1,27 +1,15 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { useWorkspaceViewportControls } from "../hooks/useWorkspaceViewportControls";
 import { WorkspaceDocLineMenu } from "./WorkspaceDocLineMenu";
+import { docLineAtPosition, docLineElement, findDocLine } from "../utils/docLineTargets";
 
 interface HoverLine {
   lineId: string;
   top: number;
-}
-
-function findLinePos(editor: Editor, lineId: string): { pos: number } | null {
-  let found: { pos: number } | null = null;
-  editor.state.doc.descendants((node, pos) => {
-    if (found) return false;
-    if (node.attrs.lineId === lineId) {
-      found = { pos };
-      return false;
-    }
-    return true;
-  });
-  return found;
 }
 
 /** `editor.view.nodeDOM(pos)` is the "correct" way to resolve a line's DOM
@@ -31,7 +19,7 @@ function findLinePos(editor: Editor, lineId: string): { pos: number } | null {
  *  every line, querying for it directly is both simpler and immune to that
  *  edge case. */
 function lineDom(container: HTMLElement, lineId: string): HTMLElement | null {
-  return container.querySelector(`[data-line-id="${lineId}"]`);
+  return docLineElement(container, lineId);
 }
 
 /** offsetTop is relative to the element's OWN offsetParent, not necessarily
@@ -53,22 +41,13 @@ function offsetTopWithin(el: HTMLElement, container: HTMLElement): number {
 }
 
 function lineAtClientPoint(editor: Editor, container: HTMLElement, clientX: number, clientY: number): HoverLine | null {
+  if (editor.isDestroyed) return null;
   const result = editor.view.posAtCoords({ left: clientX, top: clientY });
   if (!result) return null;
-  const $pos = editor.state.doc.resolve(result.pos);
-  for (let depth = $pos.depth; depth > 0; depth--) {
-    const lineId = $pos.node(depth).attrs?.lineId as string | undefined;
-    if (!lineId) continue;
-    const dom = lineDom(container, lineId);
-    if (!dom) continue;
-    // offsetTopWithin (local, untransformed) rather than getBoundingClientRect
-    // (post-zoom screen pixels) — the canvas renders at an arbitrary zoom via
-    // a CSS transform on an ancestor, and this button is positioned INSIDE
-    // that same transformed subtree. A screen-pixel delta used as a CSS `top`
-    // there gets scaled by the zoom a second time.
-    return { lineId, top: offsetTopWithin(dom, container) };
-  }
-  return null;
+  const target = docLineAtPosition(editor.state.doc, result.pos);
+  const lineId = target?.node.attrs.lineId as string | undefined;
+  const dom = lineId ? lineDom(container, lineId) : null;
+  return lineId && dom ? { lineId, top: offsetTopWithin(dom, container) } : null;
 }
 
 /** Hover-tracks the doc/slideDeck line under the pointer (while editing) and
@@ -96,13 +75,16 @@ export function WorkspaceDocLineOverlay({
   // (without this, the menu closed itself the moment you moved toward it,
   // before any item could be clicked).
   const [openLineId, setOpenLineId] = useState<string | null>(null);
+  const highlight = useRef<Animation | null>(null);
   const pendingFocusLineId = useWorkspaceStore((state) => state.pendingFocusLineId);
+  const selectedBlockId = useWorkspaceStore((state) => state.selectedBlockIds[0]);
   const setPendingFocusLineId = useWorkspaceStore((state) => state.setPendingFocusLineId);
   const { centerOnBlock } = useWorkspaceViewportControls();
 
   useEffect(() => {
     if (!editor || !isEditing) {
       setHover(null);
+      setOpenLineId(null);
       return;
     }
     const container = containerRef.current;
@@ -115,31 +97,43 @@ export function WorkspaceDocLineOverlay({
     const handleLeave = () => {
       if (!openLineId) setHover(null);
     };
+    const handleSelection = () => {
+      if (openLineId || editor.isDestroyed) return;
+      const target = docLineAtPosition(editor.state.doc, editor.state.selection.head);
+      const id = target?.node.attrs.lineId as string | undefined;
+      const dom = id ? lineDom(container, id) : null;
+      if (id && dom) setHover({ lineId: id, top: offsetTopWithin(dom, container) });
+    };
 
     container.addEventListener("mousemove", handleMove);
     container.addEventListener("mouseleave", handleLeave);
+    editor.on("selectionUpdate", handleSelection);
     return () => {
       container.removeEventListener("mousemove", handleMove);
       container.removeEventListener("mouseleave", handleLeave);
+      editor.off("selectionUpdate", handleSelection);
     };
   }, [editor, isEditing, containerRef, openLineId]);
 
   useEffect(() => {
-    if (!editor || !pendingFocusLineId || !containerRef.current) return;
-    const target = findLinePos(editor, pendingFocusLineId);
-    if (!target) return;
-
-    centerOnBlock(blockId);
-    const dom = lineDom(containerRef.current, pendingFocusLineId);
-    if (dom) {
+    if (!editor || !pendingFocusLineId || selectedBlockId !== blockId) return;
+    const focus = () => {
+      if (editor.isDestroyed || !containerRef.current) return;
+      const target = findDocLine(editor.state.doc, pendingFocusLineId);
+      if (!target) return;
+      const dom = lineDom(containerRef.current, target.node.attrs.lineId || pendingFocusLineId);
+      if (!dom) return;
+      centerOnBlock(blockId);
       dom.scrollIntoView({ block: "center", behavior: "smooth" });
-      dom.style.transition = "background-color 0.3s";
-      dom.style.backgroundColor = "#fef08a";
-      setTimeout(() => { dom.style.backgroundColor = "transparent"; }, 1200);
-      setTimeout(() => { dom.style.transition = ""; }, 1600);
-    }
-    setPendingFocusLineId(null);
-  }, [editor, pendingFocusLineId, blockId, centerOnBlock, setPendingFocusLineId, containerRef]);
+      highlight.current?.cancel();
+      highlight.current = dom.animate?.([{ backgroundColor: "#fef08a" }, { backgroundColor: "transparent" }], { duration: 1600 }) ?? null;
+      setPendingFocusLineId(null);
+    };
+    focus();
+    editor.on("transaction", focus);
+    return () => { editor.off("transaction", focus); };
+  }, [editor, pendingFocusLineId, blockId, selectedBlockId, centerOnBlock, setPendingFocusLineId, containerRef]);
+  useEffect(() => () => { highlight.current?.cancel(); }, []);
 
   if (!editor || !isEditing || !hover) return null;
 

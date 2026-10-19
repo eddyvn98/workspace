@@ -24,6 +24,8 @@
 
 import * as Y from "yjs";
 import { BOARD_METADATA_KEYS, boardMetadata, type BoardMetadata } from "./boardMetadata";
+import { projectDocumentBlock, synchronizeDocumentFragments, type DocumentCodec } from "./ydoc-documents";
+import { normalizeWorkspaceDocOwnership } from '@/app/workspace/utils/workspaceDocReferences';
 
 export interface PlainBoard extends BoardMetadata {
   revision?: number;
@@ -56,7 +58,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 /** The board as the rest of the app expects it. Read-only projection: the doc
  *  is the source of truth while a session is live. */
-export function deriveBoardFromDoc(doc: Y.Doc): PlainBoard {
+export function deriveBoardFromDoc(doc: Y.Doc, codec?: DocumentCodec): PlainBoard {
   const { blocks, connectors, meta } = workspaceDocMaps(doc);
   const storedOrder = meta.get("blockOrder");
   const order = Array.isArray(storedOrder) ? storedOrder.filter((id): id is string => typeof id === "string") : [];
@@ -72,7 +74,7 @@ export function deriveBoardFromDoc(doc: Y.Doc): PlainBoard {
     ...boardMetadata(Object.fromEntries(BOARD_METADATA_KEYS.map((key) => [key, meta.get(key)]))),
     ...(Number.isInteger(meta.get("boardRevision")) ? { revision: Number(meta.get("boardRevision")) } : {}),
     title: typeof meta.get("title") === "string" ? (meta.get("title") as string) : "",
-    blocks: Object.fromEntries([...blocks.entries()]),
+    blocks: normalizeWorkspaceDocOwnership(Object.fromEntries([...blocks.entries()].map(([id, block]) => [id, projectDocumentBlock(doc, id, block, codec)]))),
     blockOrder: [...ordered, ...missing],
     connectors: Object.fromEntries([...connectors.entries()]),
   };
@@ -114,10 +116,11 @@ export function seedDocFromBoard(doc: Y.Doc, board: PlainBoard): void {
  * or a field reprocessed into an equal-but-not-identical value upstream),
  * which would arm a wait for an ack a no-op write never produces.
  */
-export function applyBoardDiffToDoc(doc: Y.Doc, previous: PlainBoard, next: PlainBoard, origin?: unknown): boolean {
+export function applyBoardDiffToDoc(doc: Y.Doc, previous: PlainBoard, next: PlainBoard, origin?: unknown, codec?: DocumentCodec): boolean {
   const { blocks, connectors, meta } = workspaceDocMaps(doc);
   let mutated = false;
   doc.transact(() => {
+    if (codec && synchronizeDocumentFragments(doc, asRecord(previous.blocks), asRecord(next.blocks), codec)) mutated = true;
     if (syncMap(blocks, asRecord(previous.blocks), asRecord(next.blocks))) mutated = true;
     if (syncMap(connectors, asRecord(previous.connectors), asRecord(next.connectors))) mutated = true;
     if (previous.title !== next.title) {

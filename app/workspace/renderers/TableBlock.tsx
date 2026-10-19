@@ -20,11 +20,14 @@ import { fitTableContent } from "../utils/tableAutoFit";
 export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: boolean; onSelectEmbedded?: () => void }> = ({
   block,
   isSelected,
+  readOnly = false,
   onChange,
   isEmbedded = false,
   onSelectEmbedded,
 }) => {
   const setSelection = useWorkspaceStore((state) => state.setSelection);
+  const storeReadOnly = useWorkspaceStore((state) => state.isReadOnly);
+  const isReadOnly = readOnly || storeReadOnly;
   const updateBlockTransform = useWorkspaceStore((state) => state.updateBlockTransform);
   const cellFontSizes = block.data?.cellFontSizes;
   const cellAlign = block.data?.cellAlign;
@@ -37,6 +40,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
   const headerCol = Boolean(block.data?.headerCol);
   const passThroughEmptyCellClicks = Boolean(block.data?.passThroughEmptyCellClicks);
   const handleTableChange = React.useCallback((patch: Parameters<typeof onChange>[0]) => {
+    if (isReadOnly || useWorkspaceStore.getState().isReadOnly) return;
     const needsFit = block.data?.autoFitContent !== false
       && !block.data?.merges?.length
       && ["cells", "rows", "cols", "formulas"].some((key) => key in patch);
@@ -47,7 +51,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
     const fit = fitTableContent((patch as { cells?: unknown }).cells ?? block.data.cells);
     onChange({ ...patch, autoFitContent: true, rowWeights: fit.rowWeights, colWeights: fit.colWeights });
     updateBlockTransform(block.id, { w: fit.width, h: fit.height }, "override");
-  }, [block.data, block.id, onChange, updateBlockTransform]);
+  }, [block.data, block.id, isReadOnly, onChange, updateBlockTransform]);
   const {
     mode, rows, cols, rowWeights, colWeights, rowSum, colSum, grid, displayGrid,
     contentGrid, formulaGrid, formulaErrors, rowOrder, sortCol, filterCol,
@@ -140,6 +144,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      if (isReadOnly) return;
                       onSelectEmbedded?.();
                       if (!isEmbedded) setSelection([block.id]);
                       selectCell({ row: rowIdx, col: colIdx });
@@ -161,7 +166,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
                       showEditorToolbar={false}
                       isSelected={selectedCell?.row === rowIdx && selectedCell?.col === colIdx}
                       isRangeSelected={isCellInRange(selectedRange, { row: rowIdx, col: colIdx })}
-                      isEditing={editingCell?.row === rowIdx && editingCell?.col === colIdx}
+                      isEditing={!isReadOnly && editingCell?.row === rowIdx && editingCell?.col === colIdx}
                       onSelect={() => {
                         // TableCell stops pointerdown/click propagation so drag/pan
                         // handlers don't fire while editing text — but that also
@@ -174,6 +179,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
                         selectCell({ row: rowIdx, col: colIdx });
                       }}
                       onEnterEdit={() => {
+                        if (isReadOnly) return;
                         onSelectEmbedded?.();
                         if (!isEmbedded) setSelection([block.id]);
                         selectCell({ row: rowIdx, col: colIdx });
@@ -199,7 +205,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
       {/* Row divider/insert positions assume physical row order, which a
           sort or filter view no longer matches visually - hidden together
           rather than left silently misaligned. */}
-      {isSelected && !sortCol && !filterCol && (
+      {isSelected && !isReadOnly && !sortCol && !filterCol && (
         <TableResizeHandles
           rowWeights={rowWeights}
           colWeights={colWeights}
@@ -209,7 +215,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
         />
       )}
 
-      {isSelected && !sortCol && !filterCol && (
+      {isSelected && !isReadOnly && !sortCol && !filterCol && (
         <TableInsertHandles
           rowWeights={rowWeights}
           colWeights={colWeights}
@@ -226,7 +232,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
           disableCellAttachment is the same flag the swimlane already uses to
           mark "structural grid, not a content table" (see BlockDataMap.table
           in types/table.ts), reused here for the identical reason. */}
-      {isSelected && headerRow && !block.data?.disableCellAttachment && (
+      {isSelected && !isReadOnly && headerRow && !block.data?.disableCellAttachment && (
         <TableColumnHeaderControls
           colWeights={colWeights}
           cols={cols}
@@ -242,7 +248,7 @@ export const TableBlock: React.FC<BlockRendererProps<"table"> & { isEmbedded?: b
         />
       )}
 
-      {contextMenu && (
+      {contextMenu && !isReadOnly && (
         <TableCellContextMenu
           position={contextMenu.position}
           rowIndex={contextMenu.row}

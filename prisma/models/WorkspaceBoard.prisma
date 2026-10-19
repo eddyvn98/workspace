@@ -25,6 +25,8 @@ model WorkspaceBoard {
   blockOrder Json
   connectors Json
   camera     Json
+  /// Service-only Yjs checkpoint. Never expose CRDT tombstones through public/browser REST payloads.
+  documentState String? @db.Text
   /// Ordered list of saved camera bookmarks (CameraFrame[] — see
   /// app/workspace/types/camera.ts), each pointing at any region of the
   /// board regardless of what block types live there. Drives the

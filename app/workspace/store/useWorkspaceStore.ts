@@ -15,6 +15,7 @@ import { removeAttachmentFromTables } from "../utils/tableAttachments";
 import { appendCollectionAudit } from "../collections/collectionAudit";
 import { deletedCollectionIds, pruneDeletedCollectionLinks, unbindDeletedCollection } from "../collections/collectionBoardIntegrity";
 import { isCollectionBlockPayload } from "../collections/model";
+import { reconcileWorkspaceDocTables, removeWorkspaceDocReferences } from '../utils/workspaceDocReferences';
 import type { WorkspaceStore } from "./workspaceStoreTypes";
 export type { WorkspaceInlineRichEditorActiveMarks, WorkspaceInlineRichEditorCommands, WorkspaceStore } from "./workspaceStoreTypes";
 
@@ -52,7 +53,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
           state.currentUserEmail ?? "Editor") : undefined;
       const updated = { ...existing, ...patch, ...(data ? { data } : {}),
         updatedAt: Date.now(), lastEditedBy: state.currentUserEmail ?? existing.lastEditedBy } as CanvasBlock;
-      const next = { ...state.blocks, [id]: updated };
+      const next = reconcileWorkspaceDocTables({ ...state.blocks, [id]: updated }, id);
       const removed = existing.type === "collection" && updated.type === "collection"
         ? deletedCollectionIds(existing.data, updated.data) : new Set<string>();
       return { blocks: pruneDeletedCollectionLinks(next, id, removed, state.currentUserEmail ?? "Editor").blocks };
@@ -64,7 +65,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       markWorkspaceMutation("node.restore");
       const current = state.blocks[id];
       return {
-        blocks: {
+        blocks: reconcileWorkspaceDocTables({
           ...state.blocks,
           [id]: {
             ...version,
@@ -73,7 +74,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
             updatedAt: Date.now(),
             lastEditedBy: state.currentUserEmail ?? current.lastEditedBy,
           },
-        },
+        }, id),
       };
     }),
 
@@ -104,8 +105,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   removeBlock: (id) =>
     set((state) => {
       if (state.isReadOnly) return state;
-      const rest = { ...state.blocks };
+      let rest = { ...state.blocks };
       delete rest[id];
+      rest = removeWorkspaceDocReferences(rest, id);
       if (state.blocks[id]?.type === "collection") Object.assign(rest, unbindDeletedCollection(rest, id, state.currentUserEmail ?? "Editor"));
       const attachmentChanges = removeAttachmentFromTables(state.blocks, id);
       for (const [tableId, cellItems] of Object.entries(attachmentChanges)) {

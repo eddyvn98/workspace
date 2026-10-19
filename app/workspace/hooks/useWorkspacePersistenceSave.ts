@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
-import { checkBoardAccess, getKnownContent, saveRemoteBoard } from "./workspaceBoardApi";
+import { checkBoardAccess, getKnownContent, rememberRevision, saveRemoteBoard } from "./workspaceBoardApi";
 import { mergeBoardContent } from "../utils/mergeBoardConflict";
 import { notifyMergeConflicts } from "../utils/restoreMergeConflicts";
 import { boardKey, upsertIndexEntry, type BoardSnapshot } from "./workspaceBoardIndex";
@@ -69,6 +69,7 @@ export function useWorkspacePersistenceSave(
       return;
     }
     isSaveInFlightRef.current = true;
+    setIsSavePending(true);
     setSaveError(null);
     const editOperation = consumeWorkspaceMutation();
     const executeRemoteSave = async () => {
@@ -100,9 +101,10 @@ export function useWorkspacePersistenceSave(
             setSaveError(result.error ?? "Failed to save workspace; changes remain on this device");
             return;
           }
-          // Taken before checkBoardAccess below replaces it with the server's.
+          // A conflict lookup must not authorize retrying an unmerged draft
+          // against the server's newer revision.
           const base = getKnownContent(id);
-          const authoritative = await checkBoardAccess(id);
+          const authoritative = await checkBoardAccess(id, { remember: false });
           if (boardIdRef.current !== id) return;
           if (authoritative.status === "ok" && base) {
             // Another writer moved the board on: fold this tab's edits into
@@ -120,6 +122,7 @@ export function useWorkspacePersistenceSave(
             );
             ignoreNextStoreChangeRef.current = true;
             adopt({ ...authoritative.board, blocks: merged.blocks, blockOrder: merged.blockOrder, connectors: merged.connectors } as never, id);
+            rememberRevision(authoritative.board);
             lastSaveOkRef.current = merged.conflicts === 0;
             setSaveError(merged.conflicts === 0 ? null : "Some of your changes conflicted with another editor's and were not applied.");
             notifyMergeConflicts(merged.items);
@@ -151,6 +154,10 @@ export function useWorkspacePersistenceSave(
 
   const flushPendingSave = useCallback(async (): Promise<boolean> => {
     if (typeof window === "undefined") return true;
+    // One explicit flush can retry a preceding failed request. Do this only
+    // at entry: a failing retry must resolve false, not start an endless loop.
+    if (!lastSaveOkRef.current && !isSaveInFlightRef.current
+      && !hasPendingSaveRef.current && debounceRef.current === null) save();
     // An edit may schedule another debounce *while* a preceding request is
     // in flight. Re-check the timer after every await so AI never reads a
     // "successfully flushed" board that still has local queued changes.

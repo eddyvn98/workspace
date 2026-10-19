@@ -1,7 +1,9 @@
 import { Extension, type Editor, type Range } from "@tiptap/react";
-import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
+import Suggestion, { exitSuggestion, type SuggestionOptions } from "@tiptap/suggestion";
+import { PluginKey } from "@tiptap/pm/state";
 import {
   Calculator,
+  Code2,
   Heading1,
   Heading2,
   Heading3,
@@ -9,6 +11,7 @@ import {
   List,
   ListChecks,
   ListOrdered,
+  Minus,
   Pilcrow,
   Quote as QuoteIcon,
   Table as TableIcon,
@@ -37,6 +40,8 @@ export interface SlashCommandItem {
 export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { label: "Paragraph", description: "Plain text line", icon: Pilcrow, group: "Basic", command: (editor, range) => editor.chain().focus().deleteRange(range).clearNodes().setParagraph().run() },
   { label: "Quote", description: "Capture a quote", icon: QuoteIcon, group: "Basic", command: (editor, range) => editor.chain().focus().deleteRange(range).clearNodes().toggleBlockquote().run() },
+  { label: "Code block", description: "Write a block of code", icon: Code2, group: "Basic", command: (editor, range) => editor.chain().focus().deleteRange(range).clearNodes().setCodeBlock().run() },
+  { label: "Divider", description: "Separate sections with a line", icon: Minus, group: "Basic", command: (editor, range) => editor.chain().focus().deleteRange(range).setHorizontalRule().run() },
   { label: "Heading 1", description: "Big section heading", icon: Heading1, group: "Headings", command: (editor, range) => editor.chain().focus().deleteRange(range).clearNodes().setHeading({ level: 1 }).run() },
   { label: "Heading 2", description: "Medium section heading", icon: Heading2, group: "Headings", command: (editor, range) => editor.chain().focus().deleteRange(range).clearNodes().setHeading({ level: 2 }).run() },
   { label: "Heading 3", description: "Small section heading", icon: Heading3, group: "Headings", command: (editor, range) => editor.chain().focus().deleteRange(range).clearNodes().setHeading({ level: 3 }).run() },
@@ -53,6 +58,16 @@ export interface SlashMenuState {
   range: Range;
   clientRect: () => DOMRect | null;
   selectedIndex: number;
+  menuId: string;
+  onHighlight: (index: number) => void;
+}
+
+export const DocSlashPluginKey = new PluginKey("docSlashCommand");
+
+export function closeDocSlashMenu(editor: Editor): boolean {
+  if (!DocSlashPluginKey.getState(editor.state)?.active) return false;
+  exitSuggestion(editor.view, DocSlashPluginKey);
+  return true;
 }
 
 /**
@@ -68,13 +83,15 @@ export function createDocSlashCommand(
   onSelectItem: (editor: Editor, item: SlashCommandItem, range: Range) => void,
   getItems: () => SlashCommandItem[] = () => SLASH_COMMAND_ITEMS,
 ) {
+  const menuId = `doc-slash-${Math.random().toString(36).slice(2)}`;
   return Extension.create({
     name: "docSlashCommand",
     addProseMirrorPlugins() {
       const options: Omit<SuggestionOptions, "editor"> = {
+        pluginKey: DocSlashPluginKey,
         char: "/",
         startOfLine: false,
-        items: ({ query }) => getItems().filter((item) => item.label.toLowerCase().includes(query.toLowerCase())),
+        items: ({ query }) => getItems().filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(query.toLowerCase())),
         render: () => {
           let selectedIndex = 0;
           let current: { items: SlashCommandItem[]; range: Range; clientRect: () => DOMRect | null } | null = null;
@@ -82,7 +99,20 @@ export function createDocSlashCommand(
 
           const push = () => {
             if (!current) return;
-            onStateChange({ ...current, selectedIndex });
+            const dom = activeEditor?.view.dom;
+            dom?.setAttribute("aria-expanded", "true");
+            dom?.setAttribute("aria-haspopup", "listbox");
+            dom?.setAttribute("aria-controls", menuId);
+            if (current.items[selectedIndex]) dom?.setAttribute("aria-activedescendant", `${menuId}-option-${selectedIndex}`);
+            else dom?.removeAttribute("aria-activedescendant");
+            onStateChange({ ...current, selectedIndex, menuId, onHighlight: (index) => {
+              if (current?.items[index]) { selectedIndex = index; push(); }
+            } });
+          };
+          const clear = () => {
+            for (const attribute of ["aria-expanded", "aria-haspopup", "aria-controls", "aria-activedescendant"]) activeEditor?.view.dom.removeAttribute(attribute);
+            current = null;
+            onStateChange(null);
           };
 
           return {
@@ -101,8 +131,8 @@ export function createDocSlashCommand(
             onKeyDown: (props) => {
               if (!current) return false;
               if (props.event.key === "Escape") {
-                current = null;
-                onStateChange(null);
+                if (activeEditor) exitSuggestion(activeEditor.view, DocSlashPluginKey);
+                clear();
                 return true;
               }
               if (props.event.key === "ArrowDown") {
@@ -115,20 +145,22 @@ export function createDocSlashCommand(
                 push();
                 return true;
               }
+              if (props.event.key === "Home" || props.event.key === "End") {
+                selectedIndex = props.event.key === "Home" ? 0 : Math.max(0, current.items.length - 1);
+                push();
+                return true;
+              }
               if (props.event.key === "Enter") {
                 const item = current.items[selectedIndex];
                 const range = current.range;
-                current = null;
-                onStateChange(null);
-                if (item && activeEditor) onSelectItem(activeEditor, item, range);
+                if (!item || !activeEditor) return false;
+                clear();
+                onSelectItem(activeEditor, item, range);
                 return true;
               }
               return false;
             },
-            onExit: () => {
-              current = null;
-              onStateChange(null);
-            },
+            onExit: clear,
           };
         },
       };

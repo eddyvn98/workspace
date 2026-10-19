@@ -11,8 +11,9 @@ async function compressImageBlob(file: File): Promise<Blob> {
   if (file.size < SKIP_COMPRESSION_SIZE || file.type === "image/svg+xml" || file.type === "image/gif") {
     return file;
   }
+  let bitmap: ImageBitmap | undefined;
   try {
-    const bitmap = await createImageBitmap(file);
+    bitmap = await createImageBitmap(file);
     const maxSide = Math.max(bitmap.width, bitmap.height);
     if (maxSide <= MAX_DIMENSION && file.size < 500 * 1024) {
       return file;
@@ -33,6 +34,8 @@ async function compressImageBlob(file: File): Promise<Blob> {
   } catch (err) {
     console.warn("Client-side image compression fallback to original:", err);
     return file;
+  } finally {
+    bitmap?.close();
   }
 }
 
@@ -48,10 +51,10 @@ export function readFileAsDataUrl(file: File | Blob): Promise<string> {
   });
 }
 
-async function uploadRaw(blob: Blob, filename: string): Promise<string | null> {
+async function uploadRaw(blob: Blob, filename: string, signal?: AbortSignal): Promise<string | null> {
   const formData = new FormData();
   formData.append("file", blob, filename);
-  const res = await fetch("/api/workspace-images", { method: "POST", body: formData });
+  const res = await fetch("/api/workspace-images", { method: "POST", body: formData, signal });
   if (!res.ok) return null;
   const data = await res.json();
   return typeof data?.url === "string" && data.url ? data.url : null;
@@ -78,22 +81,25 @@ export async function uploadOrReadWorkspaceImage(file: File): Promise<string | n
  * here to skip the second upload and point both URLs at one blob.
  */
 export async function uploadWorkspaceImageWithOriginal(
-  file: File
+  file: File,
+  options: { signal?: AbortSignal } = {},
 ): Promise<{ url: string; downloadUrl: string } | null> {
-  if (!file || !file.type.startsWith("image/")) return null;
+  if (!file || !file.type.startsWith("image/") || options.signal?.aborted) return null;
   try {
     const compressedBlob = await compressImageBlob(file);
+    if (options.signal?.aborted) return null;
     if (compressedBlob === file) {
-      const url = await uploadRaw(file, file.name);
+      const url = await uploadRaw(file, file.name, options.signal);
       return url ? { url, downloadUrl: url } : null;
     }
     const [downloadUrl, url] = await Promise.all([
-      uploadRaw(file, file.name),
-      uploadRaw(compressedBlob, file.name),
+      uploadRaw(file, file.name, options.signal),
+      uploadRaw(compressedBlob, file.name, options.signal),
     ]);
     if (!downloadUrl || !url) return null;
     return { url, downloadUrl };
   } catch (err) {
+    if (options.signal?.aborted) return null;
     console.error("Upload to /api/workspace-images failed:", err);
     return null;
   }

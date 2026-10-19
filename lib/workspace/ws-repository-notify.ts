@@ -35,6 +35,12 @@ export interface WorkspaceAgentPatch {
   previousMetadata?: BoardMetadata;
 }
 
+export function workspaceRealtimeDeliveryConfigured(): boolean {
+  return Boolean(process.env.WORKSPACE_WS_INTERNAL_URL
+    ? process.env.WORKSPACE_WS_TOKEN_SECRET
+    : process.env.MINDMAP_WS_INTERNAL_URL && process.env.MINDMAP_WS_TOKEN_SECRET);
+}
+
 export async function notifyWorkspaceAgentMutation(
   boardId: string,
   patch: WorkspaceAgentPatch,
@@ -52,8 +58,8 @@ export async function postWorkspaceAgentPatch(
   patch: WorkspaceAgentPatch,
   revision: number,
 ): Promise<void> {
-  const internalUrl = process.env.MINDMAP_WS_INTERNAL_URL;
-  const secret = process.env.MINDMAP_WS_TOKEN_SECRET;
+  const internalUrl = process.env.WORKSPACE_WS_INTERNAL_URL || process.env.MINDMAP_WS_INTERNAL_URL;
+  const secret = process.env.WORKSPACE_WS_INTERNAL_URL ? process.env.WORKSPACE_WS_TOKEN_SECRET : process.env.MINDMAP_WS_TOKEN_SECRET;
   if (!internalUrl || !secret) throw new Error("Workspace realtime delivery is not configured");
 
   const url = new URL("/internal/workspace-agent-patch", internalUrl);

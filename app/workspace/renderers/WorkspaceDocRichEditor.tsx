@@ -2,25 +2,26 @@
 
 import { EditorContent, Extension, useEditor } from "@tiptap/react";
 import { liftListItem, sinkListItem } from "@tiptap/pm/schema-list";
-import StarterKit from "@tiptap/starter-kit";
+import Collaboration from "@tiptap/extension-collaboration";
+import { documentBaseExtensions } from "@/lib/workspace/document-schema";
 import Placeholder from "@tiptap/extension-placeholder";
-import TaskList from "@tiptap/extension-task-list";
-import TaskItem from "@tiptap/extension-task-item";
-import TextAlign from "@tiptap/extension-text-align";
-import { TableKit } from "@tiptap/extension-table";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { useWorkspaceStore, type WorkspaceInlineRichEditorCommands } from "../store/useWorkspaceStore";
+import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import type { BlockId } from "../types/block";
 import { DocLineId } from "../extensions/docLineId";
 import { DocImage } from "../extensions/docImage";
 import { SlideChart } from "../extensions/slideChart";
 import { DocWorkspaceTable } from "../extensions/docWorkspaceTable";
-import { createDocSlashCommand, type SlashMenuState } from "../extensions/docSlashCommand";
+import { createDocSlashCommand, closeDocSlashMenu, type SlashMenuState } from "../extensions/docSlashCommand";
 import { WorkspaceDocLineOverlay } from "../components/WorkspaceDocLineOverlay";
 import { WorkspaceDocSlashMenu } from "../components/WorkspaceDocSlashMenu";
 import { WorkspaceDocTableControls } from "../components/WorkspaceDocTableControls";
 import { WorkspaceDocRichEditorStyles } from "../components/WorkspaceDocRichEditorStyles";
-import { uploadWorkspaceImageWithOriginal } from "../utils/imageUpload";
+import { createDocImageUpload, uploadDocImage } from "../extensions/docImageUpload";
+import { DocTableClipboard } from "../extensions/docTableClipboard";
+import { workspaceDocCommands } from "../utils/workspaceDocCommands";
+import { WorkspaceDocTools } from "../components/WorkspaceDocTools";
+import { useDocumentCollaboration } from "../hooks/useDocumentCollaboration";
 import { getWorkspaceDocSlashItems } from "../utils/workspaceDocSlashItems";
 import { computeActiveMarks, handleDocSlashSelect, type WorkspaceDocTableEmbedHandler, type WorkspaceDocTableInsertHandler } from "../utils/workspaceDocEditorHelpers";
 import { useDocEditorSynchronization } from "../hooks/useDocEditorSynchronization";
@@ -45,10 +46,9 @@ const AlignCenterShortcut = Extension.create({
  * section headings, and checklists — so this is its own TipTap config
  * rather than a growing set of flags on the label editor.
  *
- * Formatting controls (Bold/Heading/List/Checklist/Quote/Link) live in the
- * floating WorkspaceSelectionToolbar, not inline here — see
- * useWorkspaceStore.ts's activeRichTextEditor doc comment. This component
- * only publishes editor state; it renders no toolbar of its own.
+ * Formatting controls use the shared activeRichTextEditor channel in the
+ * canvas and Office toolbar. Find, replace, outline and counts live beside
+ * the document content.
  */
 export function WorkspaceDocRichEditor({
   blockId,
@@ -58,6 +58,8 @@ export function WorkspaceDocRichEditor({
   onStopEditing,
   onInsertTable,
   onEmbedTable,
+  readOnly = false,
+  showDocumentTools = false,
 }: {
   blockId: BlockId;
   html: string;
@@ -66,6 +68,8 @@ export function WorkspaceDocRichEditor({
   onStopEditing: () => void;
   onInsertTable?: WorkspaceDocTableInsertHandler;
   onEmbedTable?: WorkspaceDocTableEmbedHandler;
+  readOnly?: boolean;
+  showDocumentTools?: boolean;
 }) {
   // Tracks the HTML this editor instance itself last produced, so the resync
   // effect below can tell "the store caught up with my own last keystroke"
@@ -78,62 +82,25 @@ export function WorkspaceDocRichEditor({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [slashState, setSlashState] = useState<SlashMenuState | null>(null);
 
-  const handleSlashImageFile = async (event: ChangeEvent<HTMLInputElement>) => {
+  const fragment = useDocumentCollaboration(blockId);
+  const isReadOnly = useWorkspaceStore(state => state.isReadOnly);
+  const editable = isEditing && !isReadOnly && !readOnly;
+  const handleSlashImageFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || !file.type.startsWith("image/") || !editor) return;
-
-    // Compression + upload takes a few hundred ms (longer for a large
-    // photo) with nothing else on screen to show for it — insert a visible
-    // placeholder immediately so picking a file doesn't look like it did
-    // nothing, then swap it for the real image once the upload resolves.
-    const placeholderText = "Uploading image…";
-    const from = editor.state.selection.from;
-    const to = from + placeholderText.length;
-    editor.chain().focus().insertContentAt(from, placeholderText).setTextSelection({ from, to }).setItalic().run();
-
-    const uploaded = await uploadWorkspaceImageWithOriginal(file);
-    if (editor.isDestroyed) return;
-    if (!uploaded) {
-      editor.chain().focus().deleteRange({ from, to }).run();
-      return;
-    }
-    editor.chain().focus().deleteRange({ from, to }).setImage({ src: uploaded.url, alt: file.name }).run();
+    if (file && editor) uploadDocImage(editor, file);
   };
-
-  const publishState = useCallback((editor: NonNullable<ReturnType<typeof useEditor>>) => {
-    const commands: WorkspaceInlineRichEditorCommands = {
-      toggleBold: () => editor.chain().focus().toggleBold().run(),
-      toggleItalic: () => editor.chain().focus().toggleItalic().run(),
-      toggleUnderline: () => editor.chain().focus().toggleUnderline().run(),
-      toggleStrike: () => editor.chain().focus().toggleStrike().run(),
-      toggleBulletList: () => editor.chain().focus().toggleBulletList().run(),
-      toggleOrderedList: () => editor.chain().focus().toggleOrderedList().run(),
-      toggleBlockquote: () => editor.chain().focus().toggleBlockquote().run(),
-      setTextAlign: (align) => editor.chain().focus().setTextAlign(align).run(),
-      toggleCode: () => editor.chain().focus().toggleCode().run(),
-      toggleHeading1: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-      toggleHeading2: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-      toggleHeading3: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-      toggleTaskList: () => editor.chain().focus().toggleTaskList().run(),
-      setLink: (url) => { if (url) editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run(); },
-      unsetLink: () => editor.chain().focus().extendMarkRange("link").unsetLink().run(),
-      insertImage: (src, alt) => editor.chain().focus().setImage({ src, alt }).run(),
-    };
-    useWorkspaceStore.getState().setActiveRichTextEditor({ blockId, commands, activeMarks: computeActiveMarks(editor) });
-  }, [blockId]);
+  const publishState = useCallback((instance: NonNullable<ReturnType<typeof useEditor>>) => {
+    if (!editable) return;
+    useWorkspaceStore.getState().setActiveRichTextEditor({ blockId, commands: workspaceDocCommands(instance), activeMarks: computeActiveMarks(instance) });
+  }, [blockId, editable]);
 
   const editor = useEditor({
     extensions: [
-      // StarterKit (v3) already bundles Link internally — same trap as
-      // Underline in WorkspaceShapeRichEditor.tsx (see its own doc comment):
-      // a separate @tiptap/extension-link import here registered it twice
-      // ("Duplicate extension names found: ['link']"). Configure it via
-      // StarterKit's own `link` option instead.
-      StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: { openOnClick: false, autolink: true } }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      TextAlign.configure({ types: ["paragraph", "heading", "listItem", "blockquote"] }),
+      ...documentBaseExtensions(Boolean(fragment)),
+      ...(fragment ? [Collaboration.configure({ fragment })] : []),
+      createDocImageUpload(),
+      DocTableClipboard.configure({ blockId }),
       Placeholder.configure({
         showOnlyCurrent: false,
         emptyNodeClass: ({ hasAnchor }) => (hasAnchor ? "is-empty is-empty-current" : "is-empty"),
@@ -155,11 +122,10 @@ export function WorkspaceDocRichEditor({
           return "Press '/' for options or start writing";
         },
       }),
-      TableKit.configure({ table: { resizable: true } }),
       AlignCenterShortcut,
-      DocLineId,
+      DocLineId.configure({ canWrite: () => !readOnly && !useWorkspaceStore.getState().isReadOnly }),
       DocImage,
-      DocWorkspaceTable,
+      DocWorkspaceTable.configure({ readOnly }),
       SlideChart,
       createDocSlashCommand(
         setSlashState,
@@ -167,10 +133,10 @@ export function WorkspaceDocRichEditor({
         () => [...getWorkspaceDocSlashItems(blockId)],
       ),
     ],
-    content: html,
+    content: fragment ? undefined : html,
     // Always constructed editable — TableKit's columnResizing plugin is only
     // ever added if `this.editor.isEditable` reads true at THIS ONE-TIME
-    // construction (extensions are frozen by the `[]` dep array below), so
+    // construction, so
     // gating this on the current `isEditing` would permanently disable
     // column resize whenever a block happens to mount not-yet-editing. The
     // effect below (`editor.setEditable(isEditing)`) is what actually
@@ -181,15 +147,21 @@ export function WorkspaceDocRichEditor({
     onUpdate: ({ editor: instance }) => {
       const nextHtml = instance.getHTML();
       lastEmittedHtmlRef.current = nextHtml;
-      onChange(nextHtml);
+      // The Yjs projection publishes merged HTML to the store for a bound document.
+      if (!fragment) onChange(nextHtml);
       publishState(instance);
     },
     onSelectionUpdate: ({ editor: instance }) => publishState(instance),
+    onTransaction: ({ editor: instance }) => publishState(instance),
     editorProps: {
-      attributes: { style: "outline:none;" },
+      attributes: { style: "outline:none;", role: "textbox", "aria-label": "Document content", "aria-multiline": "true" },
       handleKeyDown: (view, event) => {
         event.stopPropagation();
-        if (event.key === "Escape") { event.preventDefault(); onStopEditing(); return true; }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          if (!editor || !closeDocSlashMenu(editor)) onStopEditing();
+          return true;
+        }
         // Sink/lift the current list item a level, same as most editors.
         // Without this, Tab does nothing here (TipTap's ListItem doesn't
         // bind Tab/Shift-Tab itself) and — since stopPropagation above only
@@ -212,9 +184,9 @@ export function WorkspaceDocRichEditor({
         return false;
       },
     },
-  }, []);
+  }, [blockId, fragment, readOnly]);
 
-  useDocEditorSynchronization(editor, html, isEditing, lastEmittedHtmlRef, publishState);
+  useDocEditorSynchronization(editor, html, editable, lastEmittedHtmlRef, publishState, Boolean(fragment));
 
   useEffect(() => () => {
     if (useWorkspaceStore.getState().activeRichTextEditor?.blockId === blockId) {
@@ -226,6 +198,7 @@ export function WorkspaceDocRichEditor({
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+      {(isEditing || showDocumentTools) && <WorkspaceDocTools editor={editor} readOnly={!editable} />}
       <div
         ref={containerRef}
         className="workspace-doc-rich-editor"
@@ -241,14 +214,16 @@ export function WorkspaceDocRichEditor({
         // overflows the frame.
         style={{ position: "relative", flex: 1, minHeight: 0, overflow: "auto", padding: "24px 28px", pointerEvents: "auto" }}
       >
-        <WorkspaceDocLineOverlay editor={editor} blockId={blockId} containerRef={containerRef} isEditing={isEditing} />
-        {isEditing && <WorkspaceDocTableControls editor={editor} />}
+        <WorkspaceDocLineOverlay editor={editor} blockId={blockId} containerRef={containerRef} isEditing={editable} />
+        {editable && <WorkspaceDocTableControls editor={editor} />}
         {slashState && (
           <WorkspaceDocSlashMenu
+            menuId={slashState.menuId}
+            onHighlight={slashState.onHighlight}
             items={slashState.items}
             clientRect={slashState.clientRect}
             selectedIndex={slashState.selectedIndex}
-            onSelect={(item) => { handleDocSlashSelect(editor, item, slashState.range, imageInputRef, onInsertTable, onEmbedTable); setSlashState(null); }}
+            onSelect={(item) => { handleDocSlashSelect(editor, item, slashState.range, imageInputRef, onInsertTable, onEmbedTable); closeDocSlashMenu(editor); setSlashState(null); }}
           />
         )}
         <input ref={imageInputRef} type="file" accept="image/*" onChange={handleSlashImageFile} style={{ display: "none" }} />

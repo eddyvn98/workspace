@@ -1,3 +1,5 @@
+import type { WorkspaceInlineRichEditorActiveMarks, WorkspaceInlineRichEditorCommands } from "./workspaceRichEditorTypes";
+export type { WorkspaceInlineRichEditorActiveMarks, WorkspaceInlineRichEditorCommands } from "./workspaceRichEditorTypes";
 import type { BlockId, BlockStyle, CanvasBlock, FreehandToolType, ShapeKind, Transform } from "../types/block";
 import type { AnchorSide, CanvasConnector, ConnectorId } from "../types/connector";
 import type { CameraFrame, CameraState } from "../types/camera";
@@ -233,56 +235,4 @@ export interface WorkspaceStore {
    *  core store file stays independent of any specific editor library. */
   activeRichTextEditor: { blockId: BlockId; commands: WorkspaceInlineRichEditorCommands; activeMarks: WorkspaceInlineRichEditorActiveMarks } | null;
   setActiveRichTextEditor: (value: WorkspaceStore["activeRichTextEditor"]) => void;
-}
-
-export interface WorkspaceInlineRichEditorCommands {
-  toggleBold: () => void;
-  toggleItalic: () => void;
-  toggleUnderline: () => void;
-  toggleStrike: () => void;
-  toggleBulletList: () => void;
-  toggleOrderedList: () => void;
-  toggleBlockquote: () => void;
-  setTextAlign: (align: "left" | "center" | "right" | "justify") => void;
-  /** Doc-block-only commands (WorkspaceDocRichEditor.tsx) — a shape's label
-   *  editor has no heading/checklist/link/code concept (see its own doc
-   *  comment), so these stay optional rather than forcing every editor to
-   *  implement no-ops. */
-  toggleCode?: () => void;
-  toggleHeading1?: () => void;
-  toggleHeading2?: () => void;
-  toggleHeading3?: () => void;
-  toggleTaskList?: () => void;
-  /** Applies/replaces the link on the current selection (or the link the
-   *  caret sits inside). window.prompt() isn't usable here — it throws in
-   *  this app's runtime — so the URL comes from WorkspaceDocFormatToolbar's
-   *  own popover input instead of a native prompt. */
-  setLink?: (url: string) => void;
-  unsetLink?: () => void;
-  insertImage?: (src: string, alt?: string) => void;
-}
-
-/** A live snapshot of the current selection's formatting, refreshed on
- *  every selection/content change (WorkspaceShapeRichEditor.tsx's
- *  onSelectionUpdate/onTransaction) — lets WorkspaceSelectionToolbar.tsx's
- *  Bold/Italic/.../list buttons show whether the selected text ALREADY has
- *  that mark, the same way they already do for a TextBlock's whole-block
- *  style flags. */
-export interface WorkspaceInlineRichEditorActiveMarks {
-  bold: boolean;
-  italic: boolean;
-  underline: boolean;
-  strike: boolean;
-  bulletList: boolean;
-  orderedList: boolean;
-  blockquote: boolean;
-  align: "left" | "center" | "right" | "justify";
-  /** Doc-block-only marks — see WorkspaceInlineRichEditorCommands. */
-  code?: boolean;
-  heading1?: boolean;
-  heading2?: boolean;
-  heading3?: boolean;
-  taskList?: boolean;
-  link?: boolean;
-  linkHref?: string;
 }

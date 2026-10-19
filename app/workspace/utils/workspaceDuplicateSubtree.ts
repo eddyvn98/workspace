@@ -10,8 +10,8 @@ import {
   type Transform,
 } from "../types/block";
 import { createConnectorId, type CanvasConnector } from "../types/connector";
-import { collectSubtreeBlockIds } from "./treeSubtree";
-import { withoutTableAttachments } from "./tableAttachments";
+import { remapWorkspaceDocReferences } from './workspaceDocReferences';
+import { collectReferencedBlockIds, remapContainerReferences } from './blockReferences';
 
 const DEFAULT_TRANSFORM: Transform = { x: 0, y: 0, w: 160, h: 80, rotation: 0, zIndex: 0 };
 const DEFAULT_OFFSET = { x: 24, y: 24 };
@@ -40,6 +40,7 @@ export interface DuplicateSubtreeOptions {
   offsetX?: number;
   offsetY?: number;
   asNewMap?: boolean;
+  select?: boolean;
 }
 
 export function duplicateWorkspaceSubtree(
@@ -52,7 +53,7 @@ export function duplicateWorkspaceSubtree(
   const targetBlock = state.blocks[targetId];
   if (!targetBlock) return [];
 
-  const subtreeIds = collectSubtreeBlockIds(targetId, state.blocks);
+  const subtreeIds = new Set(collectReferencedBlockIds(state.blocks, [targetId]));
   if (subtreeIds.size === 0) return [];
 
   const offsetX = options.offsetX ?? DEFAULT_OFFSET.x;
@@ -126,11 +127,12 @@ export function duplicateWorkspaceSubtree(
             },
           };
 
-    const clonedBlock: CanvasBlock = {
+    const clonedBlock: CanvasBlock = remapWorkspaceDocReferences({
       id: newId,
       type: origBlock.type,
       transform: clonedTransform,
-      data: cloneValue(withoutTableAttachments(origBlock)),
+      data: remapContainerReferences(cloneValue(origBlock.data), idMap),
+      ...(origBlock.embeddedInDocId ? { embeddedInDocId: origBlock.embeddedInDocId } : {}),
       ...(clonedParentId ? { parentId: clonedParentId } : {}),
       ...(origBlock.style ? { style: cloneValue(origBlock.style) } : {}),
       ...(origBlock.description ? { description: origBlock.description } : {}),
@@ -139,7 +141,7 @@ export function duplicateWorkspaceSubtree(
       ...(origBlock.attachedImages ? { attachedImages: cloneValue(origBlock.attachedImages) } : {}),
       createdAt: now,
       updatedAt: now,
-    } as CanvasBlock;
+    } as CanvasBlock, idMap);
 
     createdBlocks.push(clonedBlock);
   }
@@ -201,7 +203,7 @@ export function duplicateWorkspaceSubtree(
     }
   }
 
-  const createdIds = createdBlocks.map((b) => b.id);
+  const createdIds = [newTargetId, ...createdBlocks.map((b) => b.id).filter((id) => id !== newTargetId)];
   if (createdIds.length > 0) {
     const subtreeOrderIndexes = orderedOriginalIds
       .map((id) => originalOrder.indexOf(id))
@@ -212,7 +214,7 @@ export function duplicateWorkspaceSubtree(
     const nextOrder = originalOrder.slice();
     nextOrder.splice(insertAt, 0, ...createdIds);
     state.setBlockOrder(nextOrder);
-    state.setSelection(createdIds);
+    if (options.select !== false) state.setSelection(createdIds);
   }
 
   return createdIds;

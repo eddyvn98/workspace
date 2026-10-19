@@ -28,8 +28,8 @@ export async function notifyWorkspaceAccessChanged(
   boardId: string,
   userEmail: string,
 ): Promise<void> {
-  const internalUrl = process.env.MINDMAP_WS_INTERNAL_URL;
-  const secret = process.env.MINDMAP_WS_TOKEN_SECRET;
+  const internalUrl = process.env.WORKSPACE_WS_INTERNAL_URL || process.env.MINDMAP_WS_INTERNAL_URL;
+  const secret = process.env.WORKSPACE_WS_INTERNAL_URL ? process.env.WORKSPACE_WS_TOKEN_SECRET : process.env.MINDMAP_WS_TOKEN_SECRET;
   if (!internalUrl || !secret) return;
 
   try {

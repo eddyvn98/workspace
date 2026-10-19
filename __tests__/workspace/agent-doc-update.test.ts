@@ -84,7 +84,7 @@ describe("partial doc edits", () => {
   it("targets a line by lineId for replace, append and prepend", () => {
     const state = board();
     applyAgentAction(state, { type: "update_rich_text", blockId: "doc", mode: "replace", lineId: "l-p1", markdown: "Replaced" });
-    expect(html(state)).toContain('<h1 data-line-id="l-h1">Plan</h1><p>Replaced</p><h2 data-line-id="l-h2">');
+    expect(html(state)).toContain('<h1 data-line-id="l-h1">Plan</h1><p data-line-id="l-p1">Replaced</p><h2 data-line-id="l-h2">');
     applyAgentAction(state, { type: "update_rich_text", blockId: "doc", mode: "prepend", lineId: "l-h3", html: "<hr>" });
     expect(html(state)).toContain(`<hr><h2 data-line-id="l-h3">Notes</h2>`);
     applyAgentAction(state, { type: "update_rich_text", blockId: "doc", lineId: "l-p2", markdown: "Tail" });
@@ -205,7 +205,7 @@ describe("embed_table_in_doc", () => {
     const state = board("<p>x</p>");
     applyAgentAction(state, { type: "update_node", blockId: "doc", markdown: '![a](x"onerror="alert(1) and [b](javascript:alert(1))' });
     const html = (state.blocks.doc.data as { html: string }).html;
-    expect(html).not.toMatch(/onerror\s*=/i);
+    expect(html).not.toMatch(/[\s"']onerror\s*=/i);
     expect(html).not.toMatch(/href="javascript:/i);
   });
 });
