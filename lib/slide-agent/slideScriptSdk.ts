@@ -10,7 +10,7 @@ import { inspectSlideScene, type SlideSceneWarning } from "@/app/workspace/utils
 export type SlideScriptRect = { x: number; y: number; w: number; h: number };
 export type SlideScriptTextStyle = Partial<Pick<SlideSceneObject, "fontSize" | "fontFamily" | "fontWeight" | "color" | "align" | "rotation" | "opacity">>;
 export type SlideScriptShapeStyle = Partial<Pick<SlideSceneObject, "stroke" | "radius" | "rotation" | "opacity">>;
-export type SlideScriptImageStyle = Partial<Pick<SlideSceneObject, "rotation" | "opacity" | "imageFit">>;
+export type SlideScriptImageStyle = Partial<Pick<SlideSceneObject, "rotation" | "opacity" | "imageFit" | "imageFocusX" | "imageFocusY">>;
 export type SlideScriptOutput = {
   action: {
     type: "create_slide_deck";
