@@ -19,5 +19,9 @@ export const DEFAULT_THEME: Theme = {
 /** Refuse data loss instead of silently truncating a large imported slide. */
 export function appendObjects(target: SlideSceneObject[], items: SlideSceneObject[]): void {
   if (target.length + items.length > 120) throw new Error("Imported slide exceeds 120 editable objects. Split it in PowerPoint first.");
+  for (const item of items) {
+    if ((item.text?.length ?? 0) > 10000) throw new Error("Imported text or cached chart data exceeds 10,000 characters. Split it before importing.");
+    if (item.series?.some(point => point.label.length > 80)) throw new Error("An imported chart label exceeds 80 characters. Shorten it before importing.");
+  }
   target.push(...items);
 }
