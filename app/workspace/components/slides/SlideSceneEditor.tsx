@@ -6,6 +6,7 @@ import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { alignSceneObjects, duplicateSceneObjects, nudgeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { useEffect, useRef } from "react";
+import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
 
 type Props = { scene: SlideScene; onChange: (next: SlideScene) => void; readOnly?: boolean };
 const field = "rounded border border-slate-300 bg-white px-2 py-1 text-slate-900";
@@ -17,6 +18,8 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
     setSelectedIds(current => additive ? (current.includes(id)?current.filter(x=>x!==id):[...current,id]) : [id]);
   };
   const [imageUrl, setImageUrl] = useState("");
+  const imageFileInput = useRef<HTMLInputElement>(null);
+  const [uploading,setUploading] = useState(false);
   const history = useRef<{undo:SlideScene[];redo:SlideScene[]}>({undo:[],redo:[]});
   const [historyVersion,setHistoryVersion] = useState(0);
   const commit = (next:SlideScene) => { if(readOnly || next===scene || JSON.stringify(next)===JSON.stringify(scene)) return; history.current.undo.push(scene); if(history.current.undo.length>60) history.current.undo.shift(); history.current.redo=[]; setHistoryVersion(v=>v+1);onChange(next); };
@@ -33,6 +36,16 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
     commit({ ...scene, objects: [...scene.objects, next] });
     select(next.id);
   };
+  const uploadImage=async(file?:File)=>{
+    if(!file||readOnly||uploading||scene.objects.length>=120)return;
+    setUploading(true);
+    try { const result=await uploadWorkspaceImageWithOriginal(file);
+      if(!result?.url) throw new Error("Upload failed");
+      const next=sceneObject("image",100,100);next.src=result.url;
+      commit({...scene,objects:[...scene.objects,next]});select(next.id);
+    } catch(error){window.alert(error instanceof Error?error.message:"Image upload failed");}
+    finally {setUploading(false);}
+  };
   useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(readOnly)return;const target=e.target as HTMLElement;if(target?.closest("input,textarea,select,[contenteditable=true]"))return;
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return;}
@@ -48,7 +61,9 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
       <button className={field} disabled={readOnly} onClick={() => add("text")}>+ Text</button>
       <button className={field} disabled={readOnly} onClick={() => add("shape")}>+ Shape</button>
       <input className={field + " w-40"} aria-label="Image URL" value={imageUrl} placeholder="Image URL" onChange={e => setImageUrl(e.target.value)} />
-      <button className={field} disabled={readOnly || !imageUrl} onClick={() => add("image")}>+ Image</button>
+      <button className={field} disabled={readOnly || !imageUrl} onClick={() => add("image")}>+ Image URL</button>
+      <button className={field} disabled={readOnly||uploading} onClick={()=>imageFileInput.current?.click()}>{uploading?"Uploading…":"Upload image"}</button>
+      <input ref={imageFileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void uploadImage(file);}}/>
       <span className="ml-auto text-slate-500">{scene.objects.length} objects</span>
     </div>
     <div className="flex min-h-0 flex-1 overflow-hidden">
