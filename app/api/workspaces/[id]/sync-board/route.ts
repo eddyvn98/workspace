@@ -1,3 +1,4 @@
+import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 import { normalizeTreeLayoutFields } from "@/app/workspace/utils/normalizeTreeLayoutFields";
 import { boardMetadata } from "@/lib/workspace/boardMetadata";
 import { hasCollectionBlock } from "@/lib/workspace/collectionGuard";
@@ -118,6 +119,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   // Refuse whole-block Yjs flushes rather than risk dropping parallel record edits.
   if (hasCollectionBlock(existing.blocks) || hasCollectionBlock(blocks)) {
     return NextResponse.json({ error: "Collection boards require revisioned REST writes", reason: "collection_requires_rest" }, { status: 409 });
+  }
+
+  if (hasSpreadsheetBlock(existing.blocks) || hasSpreadsheetBlock(blocks)) {
+    return NextResponse.json({ error: "Spreadsheet boards require revisioned REST writes", reason: "spreadsheet_requires_rest" }, { status: 409 });
   }
 
   // The secret got the request in; it does not decide whose board this is.

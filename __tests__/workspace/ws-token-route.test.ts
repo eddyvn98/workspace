@@ -49,7 +49,13 @@ describe("POST /api/workspaces/[id]/ws-token", () => {
 		await expect(response.json()).resolves.toMatchObject({ wsUrl: "wss://collab.example/ws" });
 	});
 
-	it("prefers an explicit Workspace collaboration URL", async () => {
+	it("does not mint whole-block realtime tokens for spreadsheets", async () => {
+    mocks.findUnique.mockResolvedValue({ id: "board-123", blocks: { s: { type: "table", data: { mode: "spreadsheet" } } } });
+    const response = await getResponse();
+    expect(response.status).toBe(409); expect(mocks.signWorkspaceWsToken).not.toHaveBeenCalled();
+  });
+
+  it("prefers an explicit Workspace collaboration URL", async () => {
 		vi.stubEnv("NEXT_PUBLIC_WORKSPACE_WS_URL", "wss://workspace-collab.example/ws");
 		vi.stubEnv("NEXT_PUBLIC_MINDMAP_WS_URL", "wss://collab.example/ws");
 

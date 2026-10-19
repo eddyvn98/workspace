@@ -1,4 +1,6 @@
 "use client";
+
+import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 import { getKnownRevision, rememberRealtimeRevision, rememberRevision } from "./workspaceBoardApi";
 import { useCollectionRevisionWatch } from "./useCollectionRevisionWatch";
 
@@ -60,6 +62,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   // room protocol stores whole blocks and can lose concurrent record writes.
   const hasCollection = useWorkspaceStore((state) => Object.values(state.blocks).some((b) => b.type === "collection"));
   const hasDocument = useWorkspaceStore((state) => Object.values(state.blocks).some((b) => b.type === "doc"));
+  const hasSpreadsheet = useWorkspaceStore((state) => hasSpreadsheetBlock(state.blocks));
   useCollectionRevisionWatch(remoteBoardId ?? boardId, enabled && hasCollection, false);
   const [live, setLive] = useState(false);
   const [peers, setPeers] = useState<WorkspacePeer[]>([]);
@@ -70,7 +73,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
   const flushRealtimePendingSave = useWorkspaceRealtimePublisher(boardId, remoteBoardId, handleRef);
 
   useEffect(() => {
-    if (!enabled || !remoteBoardId || hasCollection) return;
+    if (!enabled || !remoteBoardId || hasCollection || hasSpreadsheet) return;
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const mintToken = async () => {
@@ -147,6 +150,15 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
         onBoard: (board, source) => {
           if (cancelled) return;
           const current = useWorkspaceStore.getState();
+          if (hasSpreadsheetBlock(board.blocks) || hasSpreadsheetBlock(current.blocks)) {
+            // A remote writer introduced a spreadsheet: the whole-block
+            // Yjs channel can no longer persist this board safely.
+            cancelled = true;
+            unregisterFlushRef.current?.(); unregisterFlushRef.current = null;
+            handleRef.current?.destroy(); handleRef.current = null;
+            setLive(false); setWorkspaceRealtimeLive(null); setPeers([]);
+            return;
+          }
           if (Object.values(current.blocks).some((b) => b.type === "collection")) return;
           if (!source?.crdt && board.revision !== undefined && board.revision < (getKnownRevision(remoteBoardId) ?? -1)) return;
           // A newly-connected Yjs room can briefly announce its empty
@@ -260,7 +272,7 @@ export function useWorkspaceRealtime(boardId: string, enabled = true): Workspace
       setWorkspaceRealtimeLive(null);
       setPeers([]);
     };
-  }, [enabled, hasCollection, hasDocument, remoteBoardId, flushRealtimePendingSave, connectionAttempt]);
+  }, [enabled, hasCollection, hasDocument, hasSpreadsheet, remoteBoardId, flushRealtimePendingSave, connectionAttempt]);
 
   // Broadcasts what this person is looking at. Subscribed rather than polled,
   // and de-duplicated inside the handle, so a selection that did not move

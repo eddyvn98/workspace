@@ -1,9 +1,10 @@
+import { flushWorkspaceEditors } from "./workspaceEditorFlush";
 import { isWorkspaceRealtimeLive } from "./workspaceRealtimeProjection";
 import { flushWorkspaceRealtimePendingSave } from "./workspaceRealtimeFlush";
 
 /** Resolves to whether the flush is known to have reached the database —
  *  `false` means the caller must not treat the board as freshly persisted. */
-type FlushFn = () => Promise<boolean>;
+type FlushFn = (retryFailed?: boolean) => Promise<boolean>;
 
 let activeFlush: { boardId: string; flush: FlushFn; saveCurrent?: () => void } | null = null;
 
@@ -13,9 +14,10 @@ let activeFlush: { boardId: string; flush: FlushFn; saveCurrent?: () => void } |
  *  before the AI reads the board over REST. Returns an unregister function to
  *  call on unmount/board change so a stale flush is never invoked. */
 export function registerWorkspacePersistenceFlush(boardId: string, flush: FlushFn, saveCurrent?: () => void): () => void {
-  activeFlush = { boardId, flush, saveCurrent };
+  const lease = { boardId, flush, saveCurrent };
+  activeFlush = lease;
   return () => {
-    if (activeFlush?.boardId === boardId) activeFlush = null;
+    if (activeFlush === lease) activeFlush = null;
   };
 }
 
@@ -38,8 +40,9 @@ export function hasWorkspacePersistenceFlush(boardId: string): boolean {
  *  could not confirm persistence (a failed REST save, or the realtime room's
  *  ack not landing within its wait window) — callers must not silently treat
  *  that as a successful flush. */
-export async function flushWorkspacePendingSave(boardId: string): Promise<boolean> {
+export async function flushWorkspacePendingSave(boardId: string, retryFailed = false): Promise<boolean> {
+  if (!await flushWorkspaceEditors(boardId)) return false;
   if (isWorkspaceRealtimeLive(boardId)) return flushWorkspaceRealtimePendingSave(boardId);
-  if (activeFlush?.boardId === boardId) return activeFlush.flush();
+  if (activeFlush?.boardId === boardId) return activeFlush.flush(retryFailed);
   return true;
 }

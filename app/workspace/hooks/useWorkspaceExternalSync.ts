@@ -5,7 +5,7 @@ import { normalizeCameraFrames } from "../utils/cameraFrameOps";
 import { useEffect, useRef } from "react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { useWorkspaceRemoteBoardId } from "./useWorkspaceRemoteBoardId";
-import { checkBoardAccess, getKnownRevision } from "./workspaceBoardApi";
+import { checkBoardAccess, getKnownRevision, rememberRevision } from "./workspaceBoardApi";
 import { skipNextWorkspaceHistorySnapshot } from "../utils/workspaceHistoryBridge";
 import { skipNextWorkspacePersistenceSnapshot, skipNextWorkspaceRealtimePublish } from "../utils/workspaceRealtimeProjection";
 
@@ -72,12 +72,15 @@ export function useWorkspaceExternalSync(
 
     const tick = async () => {
       if (cancelled || liveRef.current || unsavedRef.current) return;
-      const result = await checkBoardAccess(remoteBoardId);
+      const before = useWorkspaceStore.getState();
+      // A speculative poll must not advance the CAS base before adoption.
+      const result = await checkBoardAccess(remoteBoardId, { remember: false });
       if (cancelled || liveRef.current || unsavedRef.current || result.status !== "ok") return;
       const remoteRevision = result.board.revision;
       if (typeof remoteRevision !== "number") return;
       const state = useWorkspaceStore.getState();
-      if (state.boardId !== remoteBoardId) return;
+      if (state.boardId !== remoteBoardId || state.blocks !== before.blocks || state.connectors !== before.connectors
+        || state.blockOrder !== before.blockOrder || remoteRevision < (getKnownRevision(remoteBoardId) ?? -1)) return;
 
       const known = knownRevisionRef.current;
       knownRevisionRef.current = Math.max(known ?? -1, remoteRevision);
@@ -87,6 +90,7 @@ export function useWorkspaceExternalSync(
 
       // What was just pulled came from the server: it must not become an undo
       // step, be saved straight back, or be re-published to a live room.
+      rememberRevision(result.board);
       skipNextWorkspaceHistorySnapshot();
       skipNextWorkspacePersistenceSnapshot();
       skipNextWorkspaceRealtimePublish();

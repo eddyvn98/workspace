@@ -1,5 +1,6 @@
 "use client";
 
+import { hasSpreadsheetBlock } from "@/lib/workspace/spreadsheetGuard";
 import { useCallback, useRef, useState } from "react";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { checkBoardAccess, getKnownContent, rememberRevision, saveRemoteBoard } from "./workspaceBoardApi";
@@ -23,6 +24,7 @@ export function useWorkspacePersistenceSave(
   const hasPendingSaveRef = useRef(false);
   const saveInFlightPromiseRef = useRef<Promise<void> | null>(null);
   const lastSaveOkRef = useRef(true);
+  const lastSaveConflictRef = useRef(false);
   const [isSavePending, setIsSavePending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -93,6 +95,7 @@ export function useWorkspacePersistenceSave(
         // the newly opened board with this response or its conflict state.
         if (boardIdRef.current !== id) return;
         lastSaveOkRef.current = result.ok;
+        lastSaveConflictRef.current = Boolean(result.conflict);
         if (!result.ok) {
           // Network errors and 5xx are not revision conflicts. A healthy GET
           // after a failed PUT does NOT prove this draft was saved; replacing
@@ -120,6 +123,13 @@ export function useWorkspacePersistenceSave(
                 connectors: authoritative.board.connectors as never,
               },
             );
+            if (merged.conflicts && hasSpreadsheetBlock(mine.blocks)) {
+              // Preserve a conflicting workbook in this tab instead of
+              // adopting another writer's version and losing the draft.
+              hasPendingSaveRef.current = false;
+              setSaveError("Spreadsheet conflict: your draft is kept on this device. Export a Native backup before reloading the server version.");
+              return;
+            }
             ignoreNextStoreChangeRef.current = true;
             adopt({ ...authoritative.board, blocks: merged.blocks, blockOrder: merged.blockOrder, connectors: merged.connectors } as never, id);
             rememberRevision(authoritative.board);
@@ -139,6 +149,7 @@ export function useWorkspacePersistenceSave(
         // masquerade as persisted state during an AI preflight flush.
         if (boardIdRef.current === id) {
           lastSaveOkRef.current = false;
+          lastSaveConflictRef.current = false;
           setSaveError(error instanceof Error ? error.message : "Failed to save workspace");
         }
       } finally {
@@ -152,12 +163,15 @@ export function useWorkspacePersistenceSave(
     saveInFlightPromiseRef.current = executeRemoteSave();
   }, [adopt, remoteLoadSettledRef]);
 
-  const flushPendingSave = useCallback(async (): Promise<boolean> => {
+  const flushPendingSave = useCallback(async (retryFailed = false): Promise<boolean> => {
     if (typeof window === "undefined") return true;
-    // One explicit flush can retry a preceding failed request. Do this only
-    // at entry: a failing retry must resolve false, not start an endless loop.
-    if (!lastSaveOkRef.current && !isSaveInFlightRef.current
-      && !hasPendingSaveRef.current && debounceRef.current === null) save();
+    // Only explicit user Save retries a completed network failure. AI
+    // preflight must not silently retry a draft that already failed to save.
+    if (retryFailed && !lastSaveOkRef.current && !lastSaveConflictRef.current
+      && !isSaveInFlightRef.current && !hasPendingSaveRef.current && debounceRef.current === null) {
+      setIsSavePending(true);
+      save();
+    }
     // An edit may schedule another debounce *while* a preceding request is
     // in flight. Re-check the timer after every await so AI never reads a
     // "successfully flushed" board that still has local queued changes.

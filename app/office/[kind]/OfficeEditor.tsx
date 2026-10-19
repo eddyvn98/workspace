@@ -34,9 +34,18 @@ function Content({ kind, viewer }: { kind: OfficeKind; viewer: boolean }) {
   const router = useRouter();
   const boardId = params.get("boardId") ?? "";
   const blockId = params.get("blockId") ?? "";
+  const [hasEditorDraft, setHasEditorDraft] = useState(false);
   const { isBoardReady, isLoadingBoard, loadError, isSavePending, saveError } = useWorkspacePersistence(boardId);
   const realtime = useWorkspaceRealtime(boardId, isBoardReady && !loadError);
-  useWorkspaceExternalSync(boardId, { live: realtime.live, hasUnsavedLocalChanges: isSavePending });
+  useEffect(() => {
+    if (kind !== "spreadsheet") return;
+    const warn = (event: BeforeUnloadEvent) => {
+      if (hasEditorDraft || isSavePending || saveError) { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [kind, hasEditorDraft, isSavePending, saveError]);
+  useWorkspaceExternalSync(boardId, { live: realtime.live, hasUnsavedLocalChanges: isSavePending || Boolean(saveError) || hasEditorDraft });
   useBoardViewerRole(boardId, viewer);
   const storeBoardId = useWorkspaceStore(s => s.boardId);
   const block = useWorkspaceStore(s => s.blocks[blockId]);
@@ -94,7 +103,7 @@ function Content({ kind, viewer }: { kind: OfficeKind; viewer: boolean }) {
   if (!block || officeKindOfBlock(block) !== kind) return <Status text="This file no longer exists in Workspace." />;
 
   const changeData = (data: CanvasBlock["data"]) => {
-    if (!readOnly) updateBlock(blockId, { data });
+    if (!readOnly && useWorkspaceStore.getState().boardId === boardId) updateBlock(blockId, { data });
   };
   return <main className="flex h-dvh flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
     <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-white px-4 py-2 dark:bg-slate-900">
@@ -104,18 +113,18 @@ function Content({ kind, viewer }: { kind: OfficeKind; viewer: boolean }) {
           onBlur={renameFile} onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
           readOnly={readOnly} maxLength={120}
           className="w-36 max-w-[35vw] rounded border border-transparent bg-transparent px-2 py-1 text-sm font-semibold outline-none focus:border-indigo-500 sm:w-72" />
-        <span role="status" aria-live="polite" className="text-xs text-slate-500 dark:text-slate-300">{readOnly ? "View only" : saveError ? "Save failed" : isSavePending ? "Saving..." : "Autosave"}</span>
+        <span role="status" aria-live="polite" className="text-xs text-slate-500 dark:text-slate-300">{readOnly ? "View only" : saveError ? "Save failed" : hasEditorDraft ? "Editing cell..." : isSavePending ? "Saving..." : "Autosave"}</span>
       </div>
       <div className="flex items-center gap-3 text-xs">
         {readOnly && kind === "document" && <>
           <button type="button" onClick={() => void downloadWorkspaceDocHtml(blockId).catch(error => toast.error(error instanceof Error ? error.message : "Document export failed."))} className="rounded border px-3 py-1.5">Download HTML</button>
           <button type="button" onClick={() => void printWorkspaceDoc(blockId).catch(error => toast.error(error instanceof Error ? error.message : "Document print failed."))} className="rounded border px-3 py-1.5">Print / Save PDF</button>
         </>}
-        <button type="button" disabled={readOnly} onClick={() => void flushWorkspacePendingSave(boardId).then(ok => ok ? toast.success("Saved") : toast.error("Save not confirmed")).catch(() => toast.error("Save failed. Please retry."))} className="rounded border px-3 py-1.5 disabled:opacity-50">Save</button>
+        <button type="button" disabled={readOnly} onClick={() => void flushWorkspacePendingSave(boardId, kind === "spreadsheet").then(ok => ok ? toast.success("Saved") : toast.error("Save not confirmed")).catch(() => toast.error("Save failed. Please retry."))} className="rounded border px-3 py-1.5 disabled:opacity-50">Save</button>
         <button type="button" onClick={() => void saveAndLeave(`/workspace?id=${encodeURIComponent(boardId)}`)} className="text-indigo-600 hover:underline">Open on canvas</button>
       </div>
     </header>
-    {!readOnly && saveError && <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">Changes could not be saved. Keep this tab open and use Save to retry.</div>}
+    {!readOnly && saveError && <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">{kind === "spreadsheet" ? `${saveError} Keep this tab open and retry Save, or export a Native backup.` : "Changes could not be saved. Keep this tab open and use Save to retry."}</div>}
     {kind === "document" && block.type === "doc" && <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-1 border-b bg-white px-4 py-1 dark:bg-slate-900">
         {!readOnly && editor?.blockId === blockId && <WorkspaceDocFormatToolbar blockId={blockId} boardId={boardId} commands={editor.commands} marks={editor.activeMarks} hideExpand />}
@@ -130,7 +139,7 @@ function Content({ kind, viewer }: { kind: OfficeKind; viewer: boolean }) {
       </div>
     </div>}
     {kind === "spreadsheet" && block.type === "table" && <div className="min-h-0 flex-1">
-      <Spreadsheet block={block as CanvasBlock<"table">} standalone fillParent hideHeader allowEdit={!readOnly} boardTitle={title}
+      <Spreadsheet block={block as CanvasBlock<"table">} standalone fillParent hideHeader allowEdit={!readOnly} boardTitle={title} boardId={boardId} onDirtyChange={setHasEditorDraft}
         onClose={() => void saveAndLeave()}
         onChange={(patch: Partial<TableBlockPayload>) => {
           const latest = useWorkspaceStore.getState().blocks[blockId];

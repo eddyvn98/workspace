@@ -1,37 +1,11 @@
 import type { Range } from "@fortune-sheet/core";
 import type { TableBlockPayload } from "../../types/table";
 
+/** Every persisted field matters: notes, borders, validation, freeze and strike
+ * changes must not disappear simply because the visible cell text is unchanged. */
 export function tableDataSignature(data: Partial<TableBlockPayload>): string {
-  const rows = Math.max(0, data.rows ?? data.cells?.length ?? 0);
-  const cols = Math.max(0, data.cols ?? data.cells?.[0]?.length ?? 0);
-  const cellMarks = Array.from({ length: rows }, (_, row) => Array.from({ length: cols }, (_, col) => {
-    const runs = data.cellContents?.[row]?.[col]?.blocks.flatMap((block) => block.runs) ?? [];
-    const marks = {
-      bold: runs.some((run) => run.marks?.bold),
-      italic: runs.some((run) => run.marks?.italic),
-      underline: runs.some((run) => run.marks?.underline),
-    };
-    return Object.values(marks).some(Boolean) ? marks : undefined;
-  }));
-  return JSON.stringify({
-    sheets: data.sheets,
-    activeSheetId: data.activeSheetId,
-    rows: data.rows,
-    cols: data.cols,
-    cells: data.cells,
-    formulas: data.formulas,
-    cellBgColor: data.cellBgColor,
-    cellTextColor: data.cellTextColor,
-    cellFontSizes: data.cellFontSizes,
-    cellAlign: data.cellAlign,
-    cellValues: data.cellValues,
-    cellFormats: data.cellFormats,
-    columnFormats: data.columnFormats,
-    merges: data.merges,
-    rowHeights: data.rowHeights,
-    columnWidths: data.columnWidths,
-    cellMarks,
-  });
+  return JSON.stringify(data, (_key, value) => value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value);
 }
 
 export function isSpreadsheetControl(target: EventTarget | null): boolean {

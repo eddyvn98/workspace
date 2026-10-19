@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { SpreadsheetFileToolbar } from "./SpreadsheetFileToolbar";
+import { useSpreadsheetFlush } from "./useSpreadsheetFlush";
 import { createPortal } from "react-dom";
 import { ArrowLeft, X } from "lucide-react";
 import { Workbook } from "@fortune-sheet/react";
@@ -20,6 +22,8 @@ export interface WorkspaceSpreadsheetEditorProps {
   fillParent?: boolean;
   hideHeader?: boolean;
   boardTitle?: string;
+  boardId?: string;
+  onDirtyChange?: (dirty: boolean) => void;
   allowEdit?: boolean;
   assistant?: React.ReactNode;
 }
@@ -32,17 +36,29 @@ export function WorkspaceSpreadsheetEditor({
   fillParent = false,
   hideHeader = false,
   boardTitle,
+  boardId,
+  onDirtyChange,
   allowEdit = true,
   assistant,
 }: WorkspaceSpreadsheetEditorProps) {
   const [mounted, setMounted] = React.useState(false);
-  const sheets = React.useMemo(() => tableBlockToFortuneWorkbook(block, { expandEmptyGrid: true }), [block]);
+  const sheets = React.useMemo(() => tableBlockToFortuneWorkbook(block, { expandEmptyGrid: true }), [block.id, block.data]);
   const sheet = sheets.find((candidate) => candidate.status === 1) ?? sheets[0];
+  const rootRef = React.useRef<HTMLElement>(null);
+  const closeRef = React.useRef(onClose); closeRef.current = onClose;
+  const allowEditRef = React.useRef(allowEdit); allowEditRef.current = allowEdit;
   const workbookRef = React.useRef<WorkbookInstance>(null);
   const blockRef = React.useRef(block);
   blockRef.current = block;
   const onChangeRef = React.useRef(onChange);
   onChangeRef.current = onChange;
+  const notifyChange = React.useCallback((patch: Partial<TableBlockPayload>) => {
+    // A flush can synchronously emit a patch before React renders new props.
+    // File export/backup must read that committed draft, never the old block.
+    const current = blockRef.current;
+    blockRef.current = { ...current, data: { ...current.data, ...patch } };
+    onChangeRef.current(patch);
+  }, []);
   const selectionRef = React.useRef<Range>([]);
   const activeSheetRef = React.useRef(sheet.id);
   React.useEffect(() => { activeSheetRef.current = sheet.id; }, [sheet.id]);
@@ -55,6 +71,16 @@ export function WorkspaceSpreadsheetEditor({
   const calculatedSignatureRef = React.useRef<string | null>(null);
   const pendingPatchRef = React.useRef<{ signature: string; data: Partial<TableBlockPayload> } | null>(null);
   const emitTimerRef = React.useRef<number | null>(null);
+  const emitNow = React.useCallback(() => {
+    if (emitTimerRef.current !== null) window.clearTimeout(emitTimerRef.current);
+    emitTimerRef.current = null;
+    const pending = pendingPatchRef.current; pendingPatchRef.current = null;
+    if (!pending || !allowEditRef.current) return;
+    lastEmittedRef.current = pending.signature;
+    notifyChange(pending.data);
+  }, [notifyChange]);
+  const editing = useSpreadsheetFlush({ boardId, root: rootRef, emitNow, onDirtyChange });
+  const getBlock = React.useCallback(() => blockRef.current, []);
   const formulaRefreshSignature = React.useMemo(() => JSON.stringify({ activeId: sheet.id, sheets: sheets.map((item) => ({
     id: item.id, cells: item.celldata?.map(({ r, c, v }) => [r, c, v?.v, v?.f]),
   })) }), [sheet.id, sheets]);
@@ -74,7 +100,8 @@ export function WorkspaceSpreadsheetEditor({
   React.useEffect(() => {
     setMounted(true);
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      // Escape cancels an active cell/menu, not the entire Office page.
+      if (event.key === "Escape" && !standalone && !(event.target instanceof Element && event.target.closest("input, textarea, [contenteditable], [role='dialog'], .fortune-container"))) closeRef.current();
     };
     const handleTabWhileEditing = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !allowEdit) return;
@@ -120,9 +147,8 @@ export function WorkspaceSpreadsheetEditor({
       document.removeEventListener("click", restoreAfterToolbarAction, true);
       document.removeEventListener("keydown", handleTabWhileEditing, true);
       window.removeEventListener("keydown", handleKeyDown);
-      if (emitTimerRef.current !== null) window.clearTimeout(emitTimerRef.current);
     };
-  }, [allowEdit, onClose, restoreSelection, saveSelection, sheet.column]);
+  }, [allowEdit, standalone, restoreSelection, saveSelection, sheet.column]);
 
   React.useEffect(() => {
     if (!mounted || !sheet.id || formulaRefreshSignature === calculatedSignatureRef.current) return;
@@ -136,6 +162,7 @@ export function WorkspaceSpreadsheetEditor({
   }, [formulaRefreshSignature, mounted, sheet.id, sheets]);
 
   const handleChange = React.useCallback((nextSheets: typeof sheet[]) => {
+    if (!allowEditRef.current) return;
     const currentBlock = blockRef.current;
     const nextData = fortuneWorkbookToTablePatch(nextSheets, currentBlock, activeSheetRef.current);
     if (!nextData) return;
@@ -144,14 +171,10 @@ export function WorkspaceSpreadsheetEditor({
     pendingPatchRef.current = { signature, data: nextData };
     if (emitTimerRef.current !== null) return;
     emitTimerRef.current = window.setTimeout(() => {
-      emitTimerRef.current = null;
-      const pending = pendingPatchRef.current;
-      pendingPatchRef.current = null;
-      if (!pending) return;
-      lastEmittedRef.current = pending.signature;
-      onChangeRef.current(pending.data);
+      emitNow();
+      editing.markClean();
     }, 0);
-  }, []);
+  }, [editing.markClean, emitNow]);
 
   const workbookHooks = React.useMemo(() => ({
     afterSelectionChange: (id: string) => {
@@ -165,7 +188,12 @@ export function WorkspaceSpreadsheetEditor({
 
   if (!mounted) return null;
   const editor = (
-    <section
+    <section ref={rootRef}
+      onInputCapture={(event) => {
+        if (!allowEdit || !(event.target instanceof Element)) return;
+        const input = event.target.closest<HTMLElement>(".luckysheet-cell-input, .fortune-fx-input");
+        if (input) editing.markDirty(input);
+      }}
       className={standalone
         ? (fillParent ? "flex h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-900" : "flex h-screen w-screen min-w-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-900")
         : "flex h-[min(820px,calc(100vh-32px))] w-[min(1280px,calc(100vw-32px))] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"}
@@ -188,6 +216,7 @@ export function WorkspaceSpreadsheetEditor({
           </button>
         )}
       </header>}
+      <SpreadsheetFileToolbar getBlock={getBlock} flush={editing.flush} onChange={notifyChange} allowEdit={allowEdit} title={boardTitle || "Spreadsheet"} />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className={standalone ? "min-h-0 min-w-0 flex-1 p-3" : "min-h-0 min-w-0 flex-1 p-2"}>
           <div className="h-full w-full overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">

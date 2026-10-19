@@ -3,6 +3,8 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
+import { flushWorkspacePendingSave } from "@/app/workspace/utils/workspacePersistenceFlush";
+import { toast } from "sonner";
 import ProtectedRoute from "@/components/features/auth/protected-route";
 import { useWorkspaceStore } from "@/app/workspace/store/useWorkspaceStore";
 import { useWorkspacePersistence } from "@/app/workspace/hooks/useWorkspacePersistence";
@@ -36,9 +38,10 @@ function TableEditorPageContent() {
   const searchParams = useSearchParams();
   const boardId = searchParams.get("boardId") ?? "";
   const tableId = searchParams.get("tableId") ?? "";
-  const { isLoadingBoard, loadError, isBoardReady, isSavePending } = useWorkspacePersistence(boardId);
+  const [draft, setDraft] = React.useState(false);
+  const { isLoadingBoard, loadError, isBoardReady, isSavePending, saveError } = useWorkspacePersistence(boardId);
   const realtime = useWorkspaceRealtime(boardId, isBoardReady && !loadError);
-  useWorkspaceExternalSync(boardId, { live: realtime.live, hasUnsavedLocalChanges: isSavePending });
+  useWorkspaceExternalSync(boardId, { live: realtime.live, hasUnsavedLocalChanges: isSavePending || Boolean(saveError) || draft });
   useBoardViewerRole(boardId);
   const block = useWorkspaceStore((state) => {
     const candidate = state.blocks[tableId];
@@ -47,13 +50,15 @@ function TableEditorPageContent() {
   const title = useWorkspaceStore((state) => state.title);
   const isReadOnly = useWorkspaceStore((state) => state.isReadOnly);
   const updateBlock = useWorkspaceStore((state) => state.updateBlock);
-  const goBack = React.useCallback(() => {
+  const goBack = React.useCallback(async () => {
+    if (!await flushWorkspacePendingSave(boardId)) { toast.error("Save not confirmed. Export a native backup before leaving."); return; }
     router.push(boardId ? `/workspace?id=${encodeURIComponent(boardId)}` : "/workspace");
   }, [boardId, router]);
   const handleChange = React.useCallback((patch: Partial<TableBlockPayload>) => {
-    if (!block || isReadOnly) return;
-    updateBlock(tableId, { data: { ...block.data, ...patch } });
-  }, [block, isReadOnly, tableId, updateBlock]);
+    const state = useWorkspaceStore.getState(), latest = state.blocks[tableId];
+    if (!latest || latest.type !== "table" || state.boardId !== boardId || isReadOnly) return;
+    updateBlock(tableId, { data: { ...latest.data, ...patch } });
+  }, [boardId, isReadOnly, tableId, updateBlock]);
 
   if (!boardId || !tableId) return <EditorStatus message="This spreadsheet link is incomplete." onBack={goBack} />;
   if (loadError && !block) return <EditorStatus message="This workspace could not be loaded." onBack={goBack} />;
@@ -62,6 +67,8 @@ function TableEditorPageContent() {
   return (
     <WorkspaceSpreadsheetEditor
       block={block}
+      boardId={boardId}
+      onDirtyChange={setDraft}
       onChange={handleChange}
       onClose={goBack}
       standalone
