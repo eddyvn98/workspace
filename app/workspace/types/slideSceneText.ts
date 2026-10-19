@@ -36,7 +36,7 @@ export function normalizeSceneTextStyle(input: unknown): SceneTextStyle | undefi
     if (typeof raw[key] !== "boolean") return undefined;
     output[key] = raw[key];
   }
-  if (raw.color != null) { const value = sceneTextColor(raw.color); if (!value) return undefined; output.color = value; }
+  if (raw.color != null) { const value = raw.color === "transparent" ? "#000000" : sceneTextColor(raw.color); if (!value) return undefined; output.color = value; }
   if (raw.fontFamily != null) {
     if (typeof raw.fontFamily !== "string" || !/^[\w\s,'"-]{1,100}$/.test(raw.fontFamily)) return undefined;
     output.fontFamily = raw.fontFamily;
@@ -46,6 +46,7 @@ export function normalizeSceneTextStyle(input: unknown): SceneTextStyle | undefi
     if (!finite(raw[key]) || raw[key] < min || raw[key] > max) return undefined;
     output[key] = raw[key];
   }
+  if (raw.color === "transparent") output.opacity = 0;
   return output;
 }
 export function normalizeSceneRichText(input: unknown): SceneRichText | undefined {
@@ -97,10 +98,11 @@ export function richTextFromObject(object: SceneTextDefaults): SceneRichText {
   return object.richText ?? { version: 1, paragraphs: (object.text ?? "").split("\n").map(text => ({ runs: [{ text }] })) };
 }
 export function resolvedSceneTextStyle(object: SceneTextDefaults, run: SceneTextStyle = {}): Required<SceneTextStyle> {
+  const color = run.color ?? object.color ?? "#0F172A";
   return { bold: run.bold ?? object.fontWeight === "bold", italic: run.italic ?? object.italic ?? false,
     underline: run.underline ?? object.underline ?? false, strike: run.strike ?? object.strike ?? false,
     fontSize: run.fontSize ?? object.fontSize ?? 44, fontFamily: run.fontFamily ?? object.fontFamily ?? "Arial",
-    color: run.color ?? object.color ?? "#0F172A", opacity: run.opacity ?? 1 };
+    color: color === "transparent" ? "#000000" : color, opacity: color === "transparent" ? 0 : run.opacity ?? 1 };
 }
 /** Explicit whole-box formatting changes override the matching run/paragraph overrides, not the text. */
 export function inheritSceneTextStyle(rich: SceneRichText, patch: Partial<SceneTextDefaults>): SceneRichText {
