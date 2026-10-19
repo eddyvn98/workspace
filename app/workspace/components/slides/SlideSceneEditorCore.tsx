@@ -23,7 +23,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
   const [richEdit,setRichEdit]=useState<{object:SlideSceneObject;signature:string}|null>(null);
   const [snap,setSnap]=useState(true),[imageUrl,setImageUrl]=useState(""),[uploading,setUploading]=useState(false),[message,setMessage]=useState("");
   const [showInspector,setShowInspector]=useState(true),[inspectorTab,setInspectorTab]=useState<"layers"|"properties">("layers");
-  const [showTimeline,setShowTimeline]=useState(false);
+  const [showTimeline,setShowTimeline]=useState(false),[inspectorWidth,setInspectorWidth]=useState(288);
   const history=useSlideSceneHistory(scene,onChange,readOnly,historySlot),{commit}=history;
   const item=scene.objects.find(o=>o.id===selected),locked=scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked);
   const warnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]),ids=selectedIds.length?selectedIds:selected?[selected]:[];
@@ -95,7 +95,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
           onResize={(id,rect)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object&&!object.locked)commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snap)));}} onTransformSelection={next=>commit(next)}/>
         {slideNumber !== undefined && <span className="pointer-events-none absolute bottom-[2%] right-[2%] z-10 text-[1.2cqw] text-white mix-blend-difference" aria-label={`Slide number ${slideNumber}`}>{slideNumber}</span>}
       </SlideSceneViewport>
-      {showInspector && <SlideSceneResizableInspector><div className="space-y-3">
+      {showInspector && <SlideSceneResizableInspector width={inspectorWidth} onWidthChange={setInspectorWidth}><div className="space-y-3">
         <div className="sticky top-0 z-10 -mx-3 -mt-3 flex gap-1 border-b border-slate-200 bg-white p-2">
           <button type="button" aria-pressed={inspectorTab==="layers"} onClick={()=>setInspectorTab("layers")}
             className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-2 text-sm ${inspectorTab==="layers"?"bg-indigo-50 font-semibold text-indigo-700":"text-slate-600 hover:bg-slate-100"}`}>
