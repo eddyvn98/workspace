@@ -1,12 +1,14 @@
 import { emptySlideScene, normalizeSlideScene, type SceneMotion, type SlideScene, type SlideSceneObject } from "@/app/workspace/types/slideScene";
 import { MAX_OBJECT_EFFECTS, MAX_SCENE_EFFECTS, normalizeSceneMotion, objectMotions } from "@/app/workspace/types/slideSceneMotion";
 import { normalizeSceneTable, type SceneTableData, type SceneTableCell } from "@/app/workspace/types/slideSceneTable";
+import { normalizeSceneRichText, sceneRichTextPlainText, type SceneRichText } from "@/app/workspace/types/slideSceneText";
+import { normalizeSceneVectorPath, type SceneVectorPath } from "@/app/workspace/types/slideSceneShape";
 import { listSceneEffects } from "@/app/workspace/utils/slideSceneEffects";
 import { inspectSlideScene, type SlideSceneWarning } from "@/app/workspace/utils/slideSceneInspect";
 /** Pure authoring API shared by app tooling and future agents. This module never executes generated code. */
 export type SlideScriptRect={x:number;y:number;w:number;h:number};
-export type SlideScriptTextStyle=Partial<Pick<SlideSceneObject,"fontSize"|"fontFamily"|"fontWeight"|"color"|"align"|"rotation"|"opacity">>;
-export type SlideScriptShapeStyle=Partial<Pick<SlideSceneObject,"stroke"|"radius"|"rotation"|"opacity">>;
+export type SlideScriptTextStyle=Partial<Pick<SlideSceneObject,"fontSize"|"fontFamily"|"fontWeight"|"color"|"align"|"rotation"|"opacity"|"italic"|"underline"|"strike"|"verticalAlign">>;
+export type SlideScriptShapeStyle=Partial<Pick<SlideSceneObject,"stroke"|"radius"|"rotation"|"opacity"|"shapeKind"|"shapePath"|"strokeWidth"|"strokeDash">>;
 export type SlideScriptImageStyle=Partial<Pick<SlideSceneObject,"rotation"|"opacity"|"imageFit"|"imageFocusX"|"imageFocusY">>;
 export type SlideScriptTableStyle=SlideScriptTextStyle&Partial<Pick<SlideSceneObject,"fill"|"stroke">>;
 export type SlideScriptOutput={
@@ -20,8 +22,19 @@ export class SlideScriptSlide{
   text(value:string,box:SlideScriptRect,style:SlideScriptTextStyle={}):string{
     const key=id(),{rotation=0,...rest}=style;this.draft.objects.push({id:key,kind:"text",...rect(box),rotation,text:value,...rest});return key;
   }
+  richText(value:SceneRichText,box:SlideScriptRect,style:SlideScriptTextStyle={}):string{
+    const richText=normalizeSceneRichText(value);
+    if(!richText)throw new Error("Invalid rich text: use version 1, at most 200 paragraphs, 1024 runs and 10,000 characters with supported styles.");
+    const key=id(),{rotation=0,...rest}=style;
+    this.draft.objects.push({id:key,kind:"text",...rect(box),rotation,text:sceneRichTextPlainText(richText),richText,...rest});return key;
+  }
   shape(fill:string,box:SlideScriptRect,style:SlideScriptShapeStyle={}):string{
     const key=id(),{rotation=0,...rest}=style;this.draft.objects.push({id:key,kind:"shape",...rect(box),rotation,fill,...rest});return key;
+  }
+  vector(value:SceneVectorPath,box:SlideScriptRect,fill="#4f46e5",style:Omit<SlideScriptShapeStyle,"shapeKind"|"shapePath">={}):string{
+    const shapePath=normalizeSceneVectorPath(value);
+    if(!shapePath)throw new Error("Invalid vector path: supply a viewBox and 2-256 numeric M/L/C/Q/Z commands.");
+    return this.shape(fill,box,{...style,shapeKind:"custom",shapePath});
   }
   image(src:string,box:SlideScriptRect,style:SlideScriptImageStyle={}):string{
     const key=id(),{rotation=0,...rest}=style;this.draft.objects.push({id:key,kind:"image",...rect(box),rotation,src,...rest});return key;
@@ -71,7 +84,7 @@ export class SlideScriptDeck{
     const warnings:SlideScriptOutput["warnings"]=[];
     const slides=this.slides.map((draft,index)=>{
       const scene=normalizeSlideScene({...emptySlideScene(this.aspectRatio),objects:draft.objects},this.aspectRatio);
-      if(!scene)throw new Error(`Slide ${index+1} contains invalid scene objects, tables or animations.`);
+      if(!scene)throw new Error(`Slide ${index+1} contains invalid scene objects, text, vector paths, tables or animations.`);
       warnings.push(...inspectSlideScene(scene,draft.backgroundColor).map(warning=>({...warning,slide:index+1,slideName:draft.name})));
       return {name:draft.name,html:"",scene,backgroundColor:draft.backgroundColor,presenterNotes:draft.presenterNotes,transition:draft.transition};
     });
