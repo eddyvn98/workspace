@@ -30,20 +30,17 @@ function seriesXml(data:SceneChartData):string{
 }
 function labels(data:SceneChartData):string{
   const pie=data.type==="pie"||data.type==="doughnut",position=pie?"bestFit":data.type==="line"||data.type==="scatter"?"t":data.type==="area"?"ctr":data.grouping==="none"?"outEnd":"ctr";
-  return `<c:dLbls><c:dLblPos val="${position}"/><c:numFmt formatCode="${xml(formatCode(data))}" sourceLinked="0"/><c:showLegendKey val="0"/><c:showVal val="${data.showValues?1:0}"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
+  return `<c:dLbls><c:numFmt formatCode="${xml(formatCode(data))}" sourceLinked="0"/><c:dLblPos val="${position}"/><c:showLegendKey val="0"/><c:showVal val="${data.showValues?1:0}"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
 }
 function valueRange(data:SceneChartData):{min:number;max:number}{
   if(data.grouping==="percent")return {min:0,max:1};
   if(data.grouping==="stacked"){
-    const sums=data.categories.flatMap((_,i)=>{
-      let positive=0,negative=0;data.series.forEach(s=>{const v=s.values[i]??0;if(v>=0)positive+=v;else negative+=v;});return [positive,negative];
-    });return chartDomain(sums,true);
+    const sums=data.categories.flatMap((_,i)=>{let positive=0,negative=0;data.series.forEach(s=>{const v=s.values[i]??0;if(v>=0)positive+=v;else negative+=v;});return [positive,negative];});return chartDomain(sums,true);
   }
   return chartDomain(data.series.flatMap(s=>s.values.filter((v):v is number=>v!==null)),data.includeZero||["column","bar","area"].includes(data.type));
 }
 function axis(data:SceneChartData,id:number,cross:number,value:boolean,x=false):string{
-  const bar=data.type==="bar",scatter=data.type==="scatter",tag=value?"valAx":"catAx";
-  const position=value?(x||bar?"b":"l"):(bar?"l":"b");
+  const bar=data.type==="bar",scatter=data.type==="scatter",tag=value?"valAx":"catAx",position=value?(x||bar?"b":"l"):(bar?"l":"b");
   const domain=value?(x?chartDomain(data.series.flatMap(s=>(s.xValues??[]).filter((v):v is number=>v!==null)),false):valueRange(data)):undefined;
   const scaling=`<c:scaling><c:orientation val="${!value&&bar?"maxMin":"minMax"}"/>${domain?`<c:max val="${domain.max}"/><c:min val="${domain.min}"/>`:""}</c:scaling>`;
   const grid=value&&!x?`<c:majorGridlines><c:spPr><a:ln>${fill("#CBD5E1")}</a:ln></c:spPr></c:majorGridlines>`:"";
@@ -57,8 +54,7 @@ export function sceneChartXml(input:SceneChartData):string{
   else if(data.type==="line"||data.type==="area")plot=`<c:${data.type}Chart><c:grouping val="standard"/><c:varyColors val="0"/>${series}${dataLabels}${ids}</c:${data.type}Chart>`;
   else if(data.type==="scatter")plot=`<c:scatterChart><c:scatterStyle val="marker"/><c:varyColors val="0"/>${series}${dataLabels}${ids}</c:scatterChart>`;
   else plot=`<c:${data.type}Chart><c:varyColors val="1"/>${series}${dataLabels}<c:firstSliceAng val="0"/>${data.type==="doughnut"?'<c:holeSize val="55"/>':""}</c:${data.type}Chart>`;
-  const axes=pie?"":axis(data,100,200,data.type==="scatter",data.type==="scatter")+axis(data,200,100,true);
-  const legend=data.legend?'<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>':"";
+  const axes=pie?"":axis(data,100,200,data.type==="scatter",data.type==="scatter")+axis(data,200,100,true),legend=data.legend?'<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>':"";
   const background=data.background==="transparent"?"<a:noFill/>":fill(data.background);
   return `<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:lang val="vi-VN"/><c:chart>${title(data.title)}<c:plotArea><c:layout/>${plot}${axes}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart><c:spPr>${background}<a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400"/></a:pPr><a:endParaRPr lang="vi-VN"/></a:p></c:txPr><c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>`;
 }
@@ -67,7 +63,6 @@ export async function addPptxSceneChart(zip:JSZip,index:number,input:SceneChartD
   const workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet("Data"),scatter=data.type==="scatter";
   sheet.addRow(["Category",...data.series.flatMap(s=>scatter?[`${s.name} X`,s.name]:[s.name])]);
   data.categories.forEach((label,i)=>sheet.addRow([label,...data.series.flatMap(s=>scatter?[s.xValues![i],s.values[i]]:[s.values[i]])]));
-  zip.file(`ppt/embeddings/chart${index}.xlsx`,await workbook.xlsx.writeBuffer());
-  zip.file(`ppt/charts/chart${index}.xml`,sceneChartXml(data));
+  zip.file(`ppt/embeddings/chart${index}.xlsx`,await workbook.xlsx.writeBuffer());zip.file(`ppt/charts/chart${index}.xml`,sceneChartXml(data));
   zip.file(`ppt/charts/_rels/chart${index}.xml.rels`,rels([{id:"rId1",type:"package",target:`../embeddings/chart${index}.xlsx`}]));
 }
