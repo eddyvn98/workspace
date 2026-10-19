@@ -30,7 +30,12 @@ export async function exportBoardPptx(
       const factor = width / scene.width;
       for (const [j, obj] of scene.objects.entries()) {
         const id = j + 2;
-        if (obj.kind === "image" && obj.src) {
+        if (obj.kind === "chart" && obj.series) {
+          const index = ++chartCount, relId = `rId${relationships.length + 1}`;
+          await addPptxChart(zip,index,obj.series,accent);
+          relationships.push({id:relId,type:"chart",target:`../charts/chart${index}.xml`});
+          shapes.push(chartShape(id,relId,obj.x*factor,obj.y*factor,obj.w*factor,obj.h*factor));
+        } else if (obj.kind === "image" && obj.src) {
           const picture = await loadImage(obj.src);
           zip.file(`ppt/media/image${picture.index}.png`, picture.buffer);
           const relId = `rId${relationships.length + 1}`;
