@@ -38,8 +38,37 @@ function readValue(cell: Cell, data: TableBlockPayload, r: number, c: number, wa
   const note = cell.note;
   if (note) (data.cellNotes ??= {})[key] = { value: typeof note === "string" ? note : (note.texts ?? []).map((x) => x.text).join(""), isShow: false };
 }
+function sheetDimensions(ws: Worksheet): { rows: number; cols: number } {
+  let rows = Math.max(1, ws.rowCount);
+  let cols = Math.max(1, ws.columnCount);
+  ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    if (rowNumber > rows) rows = rowNumber;
+    if (row.cellCount > cols) cols = row.cellCount;
+  });
+  if (ws.columns) {
+    for (const col of ws.columns) {
+      if (typeof col.number === "number" && col.number > cols) cols = col.number;
+    }
+  }
+  for (const merge of ws.model.merges ?? []) {
+    try {
+      const range = parseRange(merge);
+      if (range.row[1] + 1 > rows) rows = range.row[1] + 1;
+      if (range.column[1] + 1 > cols) cols = range.column[1] + 1;
+    } catch {}
+  }
+  const validations = (ws as unknown as { dataValidations?: { model?: Record<string, unknown> } }).dataValidations?.model ?? {};
+  for (const key of Object.keys(validations)) {
+    try {
+      const range = parseRange(key);
+      if (range.row[1] + 1 > rows) rows = range.row[1] + 1;
+      if (range.column[1] + 1 > cols) cols = range.column[1] + 1;
+    } catch {}
+  }
+  return { rows, cols };
+}
 function readSheet(ws: Worksheet, warnings: Warnings): TableWorkbookSheet {
-  const rows = Math.max(1, ws.rowCount), cols = Math.max(1, ws.columnCount);
+  const { rows, cols } = sheetDimensions(ws);
   assertDimensions(rows, cols);
   const data: TableBlockPayload = { rows, cols, cells: Array.from({ length: rows }, () => Array(cols).fill("")), mode: "spreadsheet" };
   // Excel templates regularly style empty cells. eachRow/eachCell without
@@ -77,7 +106,8 @@ export async function importXlsx(bytes: Uint8Array): Promise<WorkbookImport> {
   if (workbook.worksheets.length > SHEET_LIMITS.sheets) throw new Error("More than 20 worksheets.");
   let total = 0;
   for (const ws of workbook.worksheets) {
-    total += assertDimensions(Math.max(1, ws.rowCount), Math.max(1, ws.columnCount));
+    const { rows, cols } = sheetDimensions(ws);
+    total += assertDimensions(rows, cols);
     if (total > SHEET_LIMITS.cells) throw new Error("Workbook exceeds 50,000 allocated cells.");
   }
   if (workbook.definedNames.model.length) warnings.add("Named ranges are not preserved; formulas using them need review.");
