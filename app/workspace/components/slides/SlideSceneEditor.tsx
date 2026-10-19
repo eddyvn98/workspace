@@ -57,7 +57,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     const direction:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(nudgeSceneObjects(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
   };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,readOnly,historyVersion]);
-  return <div ref={editorRef} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
+  return <div ref={editorRef} tabIndex={0} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-white p-2 text-xs">
       <strong>Scene editor</strong>
       <button className={field} disabled={readOnly || !history.current.undo.length} onClick={undo}>Undo</button><button className={field} disabled={readOnly || !history.current.redo.length} onClick={redo}>Redo</button>
@@ -72,7 +72,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-3">
         <div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{ aspectRatio: `${scene.width} / ${scene.height}`,backgroundColor }}
-          onPointerDown={e => { if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
+          onPointerDown={e => { editorRef.current?.focus({preventScroll:true});if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
           <SlideSceneSurface scene={scene} selected={selected} editing={!readOnly} onSelect={select}
             onMove={(id, x, y) => { if (!readOnly) commit(setSceneObjectGeometry(scene, id, snapSceneRect({...scene.objects.find(o=>o.id===id)!,x,y}))); }}
             onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect))); }} />
