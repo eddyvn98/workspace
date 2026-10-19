@@ -1,11 +1,13 @@
 "use client";
 import { useEffect } from "react";
 import type { Editor } from "@tiptap/react";
+import { cancelDocImageUploads } from "../extensions/docImageUpload";
 
 /** React node views may call flushSync: dispatch editor changes after the React effect has returned. */
 export function useDocEditorSynchronization(
   editor: Editor | null, html: string, isEditing: boolean,
   lastEmitted: { current: string }, publish: (editor: Editor) => void,
+  collaborative = false,
 ) {
   useEffect(() => {
     let cancelled = false;
@@ -20,10 +22,13 @@ export function useDocEditorSynchronization(
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
-      if (cancelled || !editor || editor.isDestroyed || html === lastEmitted.current) return;
-      if (editor.getHTML() !== html) editor.commands.setContent(html || "", { emitUpdate: false });
+      if (cancelled || !editor || editor.isDestroyed || collaborative || html === lastEmitted.current) return;
+      if (editor.getHTML() !== html) {
+        cancelDocImageUploads(editor);
+        editor.commands.setContent(html || "", { emitUpdate: false });
+      }
       lastEmitted.current = html;
     });
     return () => { cancelled = true; };
-  }, [editor, html, lastEmitted]);
+  }, [editor, html, lastEmitted, collaborative]);
 }

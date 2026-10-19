@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { toast } from 'sonner';
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 import { type CanvasBlock, type Transform, resolveTransform } from "../types/block";
 import { drawExportConnector } from "../utils/workspaceExportConnectors";
@@ -6,6 +7,7 @@ import { drawExportShape } from "../utils/workspaceExportShapes";
 import { projectAttachedBlocks } from "../utils/tableAttachments";
 import { getRotatedRectBounds } from "../utils/workspaceExportGeometry";
 import { drawExportImage, drawExportTable, drawExportText, getBlockRenderInfo } from "../utils/workspaceExportBlocks";
+import { drawWorkspaceDocExport, workspaceDocCanvasHiddenIds } from '../utils/workspaceDocCanvasExport';
 
 const DEFAULT_TRANSFORM: Transform = { x: 0, y: 0, w: 160, h: 80, rotation: 0, zIndex: 0 };
 const PADDING = 40;
@@ -125,8 +127,9 @@ export function useExportPdf() {
     const { blocks, blockOrder, connectors, selectedBlockIds } = useWorkspaceStore.getState();
     const visualBlocks = projectAttachedBlocks(blocks);
     const hasSelection = selectedBlockIds.length > 0;
+    const hidden = workspaceDocCanvasHiddenIds(blocks, hasSelection ? selectedBlockIds : undefined);
     const orderedBlocks = getOrderedBlocks(visualBlocks, blockOrder).filter(
-      (b) => !hasSelection || selectedBlockIds.includes(b.id)
+      (b) => !hidden.has(b.id) && (!hasSelection || selectedBlockIds.includes(b.id))
     );
     const exportedConnectors = hasSelection
       ? Object.fromEntries(
@@ -155,6 +158,8 @@ export function useExportPdf() {
     for (const block of orderedBlocks) {
       const b = getBlockRenderInfo(block, bbox);
       drawExportShape(ctx, b);
+      try { if (await drawWorkspaceDocExport(ctx, block, blocks, b)) continue; }
+      catch (error) { toast.error(error instanceof Error ? error.message : 'Document export failed.'); return; }
       await drawExportImage(ctx, b);
       drawExportTable(ctx, b);
       drawExportText(ctx, b);
@@ -162,7 +167,9 @@ export function useExportPdf() {
 
     for (const connector of Object.values(exportedConnectors)) drawExportConnector(ctx, connector, visualBlocks, bbox);
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    let dataUrl: string;
+    try { dataUrl = canvas.toDataURL("image/jpeg", 0.95); }
+    catch { toast.error('This browser cannot export the document canvas. Use the document Print / Save PDF action.'); return; }
     const base64 = dataUrl.split(",")[1];
     const binaryStr = atob(base64);
     const jpegBytes = new Uint8Array(binaryStr.length);

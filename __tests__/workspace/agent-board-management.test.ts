@@ -13,6 +13,8 @@ vi.mock("@/lib/workspace/boardCommit", () => ({ commitBoardContent: db.commit })
 vi.mock("@/lib/workspace/ws-repository-notify", () => ({
   notifyWorkspaceAgentMutation: vi.fn(),
   diffRecordMap: () => ({ upsert: {}, removeIds: [] }),
+  workspaceRealtimeDeliveryConfigured: () => false,
+  postWorkspaceAgentPatch: vi.fn(),
 }));
 vi.mock("@/lib/workspace/ws-access-notify", () => ({ notifyWorkspaceAccessChanged: vi.fn() }));
 vi.mock("@/app/api/workspaces/_notify", () => ({ notifyUser: vi.fn() }));

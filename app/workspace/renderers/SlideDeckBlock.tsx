@@ -111,6 +111,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
             blockId={block.id}
             html={activeSlide.html}
             isEditing={isEditingBody && !readOnly}
+            readOnly={readOnly}
             onChange={(next) => actions.updateHtml(activeSlide.id, next)}
             onStopEditing={stopEditingBody}
           />

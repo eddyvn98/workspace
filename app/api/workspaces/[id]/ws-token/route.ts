@@ -65,6 +65,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     // under the mindmap name. Reuse it unless Workspace has an explicit URL.
     wsUrl: process.env.NEXT_PUBLIC_WORKSPACE_WS_URL
       || process.env.NEXT_PUBLIC_MINDMAP_WS_URL
-      || "ws://localhost:1234",
+      || "ws://localhost:3002",
   });
 }

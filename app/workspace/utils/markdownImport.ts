@@ -5,6 +5,8 @@ import { createConnectorId } from "../types/connector";
 import { convertMindmapTreesToBlocks } from "./markdownMindmapBlocks";
 import { convertOutlineItemsToBlocks } from "./markdownOutlineBlocks";
 import { buildImportedTableBlocks, extractPipeTables } from "./markdownImportTables";
+import { remapWorkspaceDocReferences } from './workspaceDocReferences';
+import { remapContainerReferences } from './blockReferences';
 
 const DATA_BLOCK_START = "<!--WORKSPACE_DATA";
 const DATA_BLOCK_END = "WORKSPACE_DATA-->";
@@ -43,13 +45,14 @@ function extractWorkspaceData(text: string): {
     for (const [oldId, oldBlock] of Object.entries(rawBlocks)) {
       const newId = idMap.get(oldId)!;
       const newParentId = oldBlock.parentId ? idMap.get(oldBlock.parentId) : undefined;
-      const newBlock: CanvasBlock = {
+      const newBlock: CanvasBlock = remapWorkspaceDocReferences({
         ...oldBlock,
         id: newId,
         parentId: newParentId,
+        data: remapContainerReferences(oldBlock.data, idMap),
         createdAt: Date.now(),
         updatedAt: Date.now(),
-      };
+      }, idMap);
       newBlocks.push(newBlock);
     }
 

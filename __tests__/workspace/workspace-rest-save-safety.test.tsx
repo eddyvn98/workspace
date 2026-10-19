@@ -4,11 +4,11 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  save: vi.fn(), access: vi.fn(), getKnown: vi.fn(), announce: vi.fn(), index: vi.fn(),
+  save: vi.fn(), access: vi.fn(), getKnown: vi.fn(), remember: vi.fn(), announce: vi.fn(), index: vi.fn(),
   notify: vi.fn(), realtime: vi.fn(() => false), consume: vi.fn(() => null),
 }));
 vi.mock("@/app/workspace/hooks/workspaceBoardApi", () => ({
-  saveRemoteBoard: mocks.save, checkBoardAccess: mocks.access, getKnownContent: mocks.getKnown,
+  saveRemoteBoard: mocks.save, checkBoardAccess: mocks.access, getKnownContent: mocks.getKnown, rememberRevision: mocks.remember,
 }));
 vi.mock("@/app/workspace/hooks/workspaceBoardIndex", () => ({
   boardKey: (id: string) => `board:${id}`, upsertIndexEntry: mocks.index,
@@ -26,6 +26,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.realtime.mockReturnValue(false);
   mocks.consume.mockReturnValue(null);
+  mocks.getKnown.mockReturnValue(undefined);
   mocks.access.mockResolvedValue({ status: "ok", board: { id: "board", blocks: {}, blockOrder: [], connectors: {} } });
   useWorkspaceStore.setState({ boardId: "board", isReadOnly: false, blocks: {}, blockOrder: [], connectors: {}, title: "Unsaved" });
 });
@@ -70,6 +71,56 @@ describe("Workspace REST save failure safety", () => {
     expect(await host.api.flushPendingSave()).toBe(true);
     expect(mocks.save).toHaveBeenCalledTimes(2);
     expect(mocks.save.mock.calls[1][1].title).toBe("Newer edit");
+    host.unmount();
+  });
+
+  it("retries a completed failed request once when Save is pressed again", async () => {
+    mocks.save.mockResolvedValueOnce({ ok: false, error: "Offline" }).mockResolvedValue({ ok: true });
+    const host = mount();
+    await act(async () => { host.api.save(); });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(host.api.saveError).toBe("Offline");
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(true); });
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    expect(host.api.saveError).toBeNull();
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(true); });
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    host.unmount();
+  });
+
+  it("returns false after one failed manual retry without an endless retry loop", async () => {
+    mocks.save.mockResolvedValue({ ok: false, error: "Still offline" });
+    const host = mount();
+    await act(async () => { host.api.save(); });
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(false); });
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    expect(host.api.isSavePending).toBe(false);
+    host.unmount();
+  });
+
+  it("does not start a request for a clean flush or a failed draft that became read-only", async () => {
+    mocks.save.mockResolvedValue({ ok: false, error: "Offline" });
+    const host = mount();
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(true); });
+    expect(mocks.save).not.toHaveBeenCalled();
+    await act(async () => { host.api.save(); });
+    useWorkspaceStore.setState({ isReadOnly: true });
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(false); });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    host.unmount();
+  });
+
+  it("never remembers a newer conflict snapshot without a common ancestor", async () => {
+    mocks.save.mockResolvedValue({ ok: false, conflict: true });
+    const host = mount();
+    const draft = useWorkspaceStore.getState().blocks;
+    await act(async () => { host.api.save(); });
+    await act(async () => { expect(await host.api.flushPendingSave()).toBe(false); });
+    expect(mocks.save).toHaveBeenCalledTimes(2);
+    expect(mocks.access).toHaveBeenCalledWith("board", { remember: false });
+    expect(mocks.remember).not.toHaveBeenCalled();
+    expect(host.adopted).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().blocks).toBe(draft);
     host.unmount();
   });
 });
