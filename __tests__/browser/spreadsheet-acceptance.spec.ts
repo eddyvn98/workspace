@@ -26,6 +26,25 @@ test("CSV import is confirmed, survives reload and exports a real XLSX through t
   await page.screenshot({ path: info.outputPath("spreadsheet.png"), fullPage: true });
 });
 
+test("a Native backup can be restored directly in Spreadsheet", async ({ page }) => {
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Native backup", exact: true }).click();
+  const saved = await download, path = await saved.path();
+  expect(saved.suggestedFilename()).toMatch(/\\.workspace\\.json$/);
+  expect(path).toBeTruthy();
+  await page.getByLabel("Import spreadsheet file", { exact: true }).setInputFiles({
+    name: "replacement.csv", mimeType: "text/csv", buffer: Buffer.from("Changed,Now\\n1,2\\n"),
+  });
+  await page.getByRole("button", { name: "Replace workbook", exact: true }).click();
+  await expect(page.getByTestId("current-data")).toContainText("Changed");
+  await page.getByLabel("Import spreadsheet file", { exact: true }).setInputFiles({
+    name: "original.workspace.json", mimeType: "application/json", buffer: await readFile(path!),
+  });
+  await expect(page.getByRole("dialog")).toContainText("current Office file identity");
+  await page.getByRole("button", { name: "Replace workbook", exact: true }).click();
+  await expect(page.getByTestId("current-data")).toContainText("Quantity");
+});
+
 test("active formula-bar typing is committed before explicit flush, and Escape stays in the app", async ({ page }) => {
   const input = page.locator(".fortune-fx-input");
   await input.click(); await input.press("ControlOrMeta+a"); await input.pressSequentially("Flushed draft");
