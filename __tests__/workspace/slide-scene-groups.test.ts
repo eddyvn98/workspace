@@ -51,6 +51,11 @@ describe("Slide Scene logical groups",()=>{
     expect(duplicateSceneSelection(locked,["a"],()=>"new").objects).toHaveLength(3);
     expect(moveSceneSelectionLayer(locked,["a"],1)).toBe(locked);
   });
+  it("does not partially delete or ungroup a locked group",()=>{
+    const locked={...grouped,objects:grouped.objects.map(o=>o.id==="b"?{...o,locked:true}:o)};
+    expect(deleteSceneSelection(locked,["a"]).objects.map(o=>o.id)).toEqual(["a","b","c"]);
+    expect(ungroupSceneObjects(locked,["a"])).toBe(locked);
+  });
   it("returns the input on single-object grouping or no-op",()=>{
     expect(groupSceneObjects(base,["a"],()=>"unused")).toBe(base);
     expect(ungroupSceneObjects(base,["a"])).toBe(base);
