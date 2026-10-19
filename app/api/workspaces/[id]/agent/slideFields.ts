@@ -64,6 +64,7 @@ export function parseSlideFields(raw: JsonMap, options: { allowLayout: boolean; 
     const selectedStyle = String(designStyle ?? "editorial");
     if (!Object.hasOwn(SLIDE_SCENE_STYLES,selectedStyle)) return {ok:false,reason:"Invalid designStyle; use editorial, technology, minimal or playful."};
     set.scene = composeSlideScene({title:String(param(raw,"title") ?? ""),subtitle:String(param(raw,"subtitle")??""),bullets:Array.isArray(param(raw,"bullets"))?param(raw,"bullets") as string[]:[],imageUrl:String(param(raw,"imageUrl")??""),metric:String(param(raw,"metric")??""),metricLabel:String(param(raw,"metricLabel")??"")},selectedStyle as SceneDesignStyle,composition as SceneComposition);
+    set.backgroundColor = SLIDE_SCENE_STYLES[selectedStyle as SceneDesignStyle].background;
     notes.push("Generated editable Scene V2 composition with consistent design tokens.");
   }
   const sceneInput = param(raw, "scene");
