@@ -90,6 +90,8 @@ export function SlidePresentOverlay({ data, index, showGrid, showNotes, onToggle
       <SlidePresentControls
         index={index}
         total={data.slideOrder.length}
+        canStepBack={step > 0}
+        canStepForward={step < clickCount}
         showGrid={showGrid}
         showNotes={showNotes}
         onPrev={prev}
