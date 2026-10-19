@@ -41,3 +41,17 @@ pnpm build
 The zoom label is *relative to automatic Fit*, not a fixed 100%-physical-pixel zoom. Inspector docking still changes the base Fit size as available viewport space changes, but manual zoom multiplier/pan are retained rather than reset. A fully fixed visual pixel scale across panel toggles would require a separate absolute-zoom model and explicit overflow/panning policies; it is not claimed here.
 
 No real-browser test, full Vitest run, production build, or current-HEAD CI result is asserted by this remote implementation. The local agent owns that report. Keep PR Draft until UX browser verification and host integration pass.
+
+## Code review follow-up (after ergonomic controls landed)
+
+Reviewed newest PR #56 ergonomics changes and fixed the following correctness regressions:
+
+- **History loss on Studio entry/exit (high):** Switching an editor subtree between embedded and fullscreen React portal remounts the editor. Undo/Redo history was stored only in `useSlideSceneHistory` inside that subtree, so it was lost. The parent SlideDeckBlock now owns a bounded per-slide `SlideSceneHistorySlot` passed through the editor wrappers. Unexpected external scene edits still invalidate stale history; scoped-group editing has separate history to avoid corrupting the full-scene cache. Regression: `slide-studio-history.test.tsx`.
+- **Grip scale/hit target regression (medium):** 40px resize/rotation handles were zoomed with the stage, shrinking to 20px at 50% and becoming huge at 400%. The Stage now publishes an inverse interaction scale. Selection handles counter-scale to keep the rendered pointer target approximately 40px across zoom levels. Rotator offset is screen-anchored to avoid drifting far away under zoom.
+- **Edge clipping (medium):** Editing handles near slide boundaries were clipped by both the stage and surface. Editor surfaces now permit visible out-of-slide handles within the gray viewport; presenter mode remains clipped.
+- **Escape cancels active interactions (medium):** Escape during a pan, object move/resize, or inspector resize now cancels that active operation (reverting view-only pan) before it can close Studio. Pointer cancellation and window blur also terminate sessions.
+- **Inspector width was forgotten (low/medium):** The width was local to a conditionally mounted Inspector and reset to 288px each time it was hidden. EditorCore now keeps the width state and passes it to the resizable panel, without persisting any presentation mutation. Regression: `slide-studio-layout.test.tsx`.
+
+Focused tests: `slide-studio-history.test.tsx`, extended `slide-studio-ergonomics.test.tsx`, `slide-studio-layout.test.tsx`. All changes are pushed; remote authoring did **not** run full Vitest or Playwright here. Local agent must verify the newest HEAD, especially Undo after open/exit Studio, Escape behavior, object grip hitboxes at 50/100/400% zoom, and active drag cancellation during Inspector resizing.
+
+Additional acceptance risks: in-progress inline text/modal drafts when closing Studio, mixed mouse/touch gestures and viewport-relative zoom changes across dock resizing. Browser QA should explicitly validate those before declaring full production acceptance.
