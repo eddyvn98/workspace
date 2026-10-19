@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import sharp from "sharp";
 import { exportBoardPdf } from "@/lib/workspace/pdf-export";
 import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
 
