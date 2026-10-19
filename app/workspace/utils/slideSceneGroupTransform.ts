@@ -1,5 +1,6 @@
 import type { SlideScene, SlideSceneObject } from "../types/slideScene";
 import { normalizeSlideScene } from "../types/slideScene";
+import { scaleSceneRichText } from "../types/slideSceneText";
 import { expandSceneSelection } from "./slideSceneGroups";
 export type SceneBounds={x:number;y:number;w:number;h:number};
 const round=(n:number)=>Math.round(n*100)/100;
@@ -23,8 +24,8 @@ export function resizeSceneSelection(scene:SlideScene,ids:string[],target:SceneB
   const sx=target.w/bounds.w,sy=target.h/bounds.h,textScale=Math.sqrt(sx*sy);
   return changeScene(scene,selected,o=>({
     ...o,x:round(target.x+(o.x-bounds.x)*sx),y:round(target.y+(o.y-bounds.y)*sy),w:clamp(round(o.w*sx),8,2560),h:clamp(round(o.h*sy),8,1920),
-    ...(o.kind==="text"?{fontSize:clamp(round((o.fontSize??44)*textScale),8,180)}:{}),
-    ...(o.kind==="shape"?{radius:clamp(round((o.radius??0)*Math.min(sx,sy)),0,200)}:{}),
+    ...(o.kind==="text"?{fontSize:clamp(round((o.fontSize??44)*textScale),8,180),...(o.richText?{richText:scaleSceneRichText(o.richText,textScale)}:{})}:{}),
+    ...(o.kind==="shape"?{radius:clamp(round((o.radius??0)*Math.min(sx,sy)),0,200),strokeWidth:clamp(round((o.strokeWidth??2)*textScale),0,40)}:{}),
     ...(o.kind==="table"&&o.table?{fontSize:clamp(round((o.fontSize??22)*textScale),8,120),table:{...o.table,rows:o.table.rows.map(row=>row.map(cell=>cell.fontSize===undefined?cell:{...cell,fontSize:clamp(round(cell.fontSize*textScale),8,120)}))}}:{}),
   }));
 }
