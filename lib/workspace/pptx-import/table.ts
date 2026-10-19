@@ -1,6 +1,6 @@
 import type { SlideSceneObject } from "@/app/workspace/types/slideScene";
 import { normalizeSceneTable, SCENE_TABLE_LIMITS, tableMergeAt, type SceneTableCell, type SceneTableMerge } from "@/app/workspace/types/slideSceneTable";
-import { child, children, descendants, first, numeric, NS } from "./xml";
+import { child, children, first, numeric, NS } from "./xml";
 import { frame, type Matrix } from "./geometry";
 import { paint, opacity, readText } from "./style";
 import type { ObjectContext } from "./objects";
@@ -9,7 +9,7 @@ function paintAlpha(node:Element|undefined,ctx:ObjectContext,fallback:string):st
   const color=paint(node,ctx.theme,fallback),alpha=opacity(node);
   return /^#[0-9a-f]{6}$/i.test(color)&&alpha<1?color+Math.round(alpha*255).toString(16).padStart(2,"0"):color;
 }
-/** Every native grid cell is retained, including covered text under a merged origin. */
+/** Keep the native grid and every cell's rich content, including covered merged-cell values. */
 export function readNativeTable(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):SlideSceneObject{
   const widths=children(child(node,NS.a,"tblGrid"),NS.a,"gridCol").map(c=>numeric(c,"w"));
   const rows=children(node,NS.a,"tr"),heights=rows.map(r=>numeric(r,"h"));
@@ -18,8 +18,7 @@ export function readNativeTable(node:Element,matrix:Matrix,groupId:string|undefi
   if(grid.some(cells=>cells.length!==widths.length))throw new Error("Unsupported PowerPoint table grid: every row must include the covered cells of merged regions.");
   const totalWidth=widths.reduce((a,b)=>a+b,0),fontScale=Math.hypot(matrix[0],matrix[1])/totalWidth;
   const merged:SceneTableMerge[]=[],borderColors=new Set<string>();
-  const styleId=child(child(node,NS.a,"tblPr"),NS.a,"tableStyleId");
-  if(styleId)ctx.notice("table-style","Native table values and cell formatting were imported; theme table-style inheritance may differ where cells have no explicit style.");
+  if(child(child(node,NS.a,"tblPr"),NS.a,"tableStyleId"))ctx.notice("table-style","Native cell values and rich text were imported; theme table-style inheritance may differ where cells have no explicit style.");
   const data=grid.map((cells,r)=>cells.map((source,c):SceneTableCell=>{
     const rowSpan=numeric(source,"rowSpan",1),colSpan=numeric(source,"gridSpan",1),hMerge=truth(source,"hMerge"),vMerge=truth(source,"vMerge");
     if(!Number.isInteger(rowSpan)||!Number.isInteger(colSpan)||rowSpan<1||colSpan<1)throw new Error("Invalid table merge spans.");
@@ -27,20 +26,14 @@ export function readNativeTable(node:Element,matrix:Matrix,groupId:string|undefi
     const body=child(source,NS.a,"txBody"),props=child(source,NS.a,"tcPr");
     const result:SceneTableCell={text:""};
     if(body){
-      const runs=descendants(body,NS.a,"rPr"),run=runs[0],defaults=first(body,NS.a,"defRPr");
-      const signatures=new Set(runs.map(n=>`${n.getAttribute("sz")}|${n.getAttribute("b")}|${n.getAttribute("i")}|${n.getAttribute("u")}|${paint(n,ctx.theme,"")}`));
-      const text=readText(body,ctx.theme,fontScale,(code,message)=>{
-        if(code==="text-style"&&signatures.size<=1&&!first(body,NS.a,"hlinkClick"))return;
-        ctx.notice(code,message);
-      });
-      if(signatures.size>1||text.richText?.paragraphs.some(p=>(p.align??"left")!==(text.align??"left")||p.lineHeight!==undefined&&Math.abs(p.lineHeight-1.12)>0.01||!!p.spaceBefore||!!p.spaceAfter))ctx.notice("table-rich-text","Mixed run or paragraph formatting inside a table cell was reduced to one cell style. Text and native table structure were retained.");
-      result.text=text.text??"";result.fontSize=Math.min(120,text.fontSize??22);result.fontFamily=text.fontFamily??ctx.theme.minorFont;
-      result.bold=text.fontWeight==="bold";result.italic=truth(run??defaults,"i");
-      const underline=run?.getAttribute("u")??defaults?.getAttribute("u");result.underline=!!underline&&underline!=="none";
-      result.align=text.align??"left";
-      result.color=paintAlpha(run,ctx,paintAlpha(defaults,ctx,text.color??"#0f172a"));
-      if((text.fontSize??22)>120)ctx.notice("table-font-size","A table-cell font was fitted to the supported 8-120 px range.");
-      if(first(body,NS.a,"hlinkClick"))ctx.notice("table-link","Table hyperlinks are retained as text, not activated actions.");
+      const text=readText(body,ctx.theme,fontScale,ctx.notice);
+      result.text=text.text??"";
+      if(result.text.length>SCENE_TABLE_LIMITS.cellText)throw new Error("Imported table cell exceeds 2,000 characters.");
+      if(text.richText)result.richText=text.richText;
+      result.fontSize=Math.min(120,text.fontSize??22);result.fontFamily=text.fontFamily??ctx.theme.minorFont;
+      result.bold=text.fontWeight==="bold";result.italic=text.italic??false;result.underline=text.underline??false;result.strike=text.strike??false;
+      result.align=text.align??"left";result.color=text.color??"#0f172a";
+      if(first(body,NS.a,"hlinkClick"))ctx.notice("table-link","Table hyperlinks remain inert text, not activated actions.");
     }
     result.fill=paintAlpha(props,ctx,"#ffffff");
     const anchor=props?.getAttribute("anchor")??child(body,NS.a,"bodyPr")?.getAttribute("anchor");
@@ -56,7 +49,7 @@ export function readNativeTable(node:Element,matrix:Matrix,groupId:string|undefi
     return result;
   }));
   const table=normalizeSceneTable({rows:data,columnWidths:widths,rowHeights:heights,merges:merged,headerRow:truth(child(node,NS.a,"tblPr"),"firstRow")});
-  if(!table)throw new Error("Ambiguous PowerPoint merged-cell flags. Unmerge and re-save this table before import.");
+  if(!table)throw new Error("Ambiguous PowerPoint merged-cell flags or excessive cell text/formatting. Simplify and re-save this table before import.");
   grid.forEach((cells,r)=>cells.forEach((source,c)=>{
     const merge=tableMergeAt(table,r,c),expectedH=!!merge&&c>merge.column,expectedV=!!merge&&r>merge.row;
     if(truth(source,"hMerge")!==expectedH||truth(source,"vMerge")!==expectedV)throw new Error("Ambiguous PowerPoint merged-cell flags. Unmerge and re-save this table before import.");
