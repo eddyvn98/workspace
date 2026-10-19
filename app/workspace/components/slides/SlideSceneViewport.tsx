@@ -76,7 +76,7 @@ export function SlideSceneViewport({scene,backgroundColor,children,onStagePointe
     style={{containerType:"size",cursor:hand||dragging?"grab":undefined,touchAction:hand?"none":undefined}}
     onPointerEnter={()=>{hover.current=true;}} onPointerLeave={()=>{hover.current=false;}}
     onPointerDownCapture={startPan}>
-    <div data-slide-stage className="relative shrink-0 overflow-hidden border border-slate-300 shadow-xl"
+    <div data-slide-stage className="relative shrink-0 overflow-visible border border-slate-300 shadow-xl"
       style={{aspectRatio:`${scene.width}/${scene.height}`,
         width:`min(calc(100cqw - 32px), calc((100cqh - 32px) * ${scene.width/scene.height}))`,
         height:`min(calc((100cqw - 32px) * ${scene.height/scene.width}), calc(100cqh - 32px))`,
