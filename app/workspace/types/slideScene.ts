@@ -71,7 +71,7 @@ export function normalizeSlideScene(input: unknown, ratio: "16:9" | "4:3" = "16:
       fill: color(obj.fill, kind === "shape" ? "#4f46e5" : "transparent"), stroke: color(obj.stroke, "transparent"), color: color(obj.color, "#0f172a"),
       fontSize: num(obj.fontSize, kind === "table" ? 22 : 44, 8, 180), fontFamily: typeof obj.fontFamily === "string" && /^[\w\s,'"-]{1,100}$/.test(obj.fontFamily) ? obj.fontFamily : "Arial",
       fontWeight: obj.fontWeight === "bold" ? "bold" : "normal", align: ["left", "center", "right"].includes(String(obj.align)) ? obj.align as SlideSceneObject["align"] : "left",
-      radius: num(obj.radius, 0, 0, 200), opacity: num(obj.opacity, 1, 0, 1), locked: obj.locked === true,
+      radius: num(obj.radius, shape?.shapeKind === "roundRect" ? Math.min(num(obj.w, 420, 8, 2560), num(obj.h, 130, 8, 1920)) / 6 : 0, 0, 200), opacity: num(obj.opacity, 1, 0, 1), locked: obj.locked === true,
       ...(typeof obj.groupId === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(obj.groupId) ? { groupId: obj.groupId } : {}),
       ...(obj.motion != null ? { motion: normalizeSceneMotion(obj.motion) } : {}), ...(animations !== undefined ? { animations } : {}),
     });
