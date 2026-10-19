@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { exportSceneShape } from "./pptx-scene";
 import { exportSceneTable } from "./pptx-scene-table";
+import { exportScenePicture } from "./pptx-scene-paint";
 import { groupPptxSceneShapes } from "./pptx-scene-groups";
 import { scenePptxTiming } from "./pptx-scene-timing";
 import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
@@ -10,7 +11,6 @@ import { addPptxChart } from "./pptx-chart";
 import { addPptxNotes, addPptxPackage } from "./pptx-package";
 import { slideExportImages, type SlideImageReader } from "./slide-export-images";
 import { slideExportLayout } from "./slide-export-layout";
-import { sceneImageLayout } from "./slide-image-layout";
 import { slideExportStyle } from "./slide-export-style";
 export const PPTX_MIME="application/vnd.openxmlformats-officedocument.presentationml.presentation";
 /** Native editable objects and timing. Image bytes come from persisted Workspace assets only. */
@@ -39,8 +39,7 @@ export async function exportBoardPptx(board:{title:string;blocks:unknown;blockOr
           const picture=await loadImage(obj.src),relId=`rId${relationships.length+1}`;
           zip.file(`ppt/media/image${picture.index}.png`,picture.buffer);
           relationships.push({id:relId,type:"image",target:`../media/image${picture.index}.png`});
-          const layout=sceneImageLayout({x:obj.x*factor,y:obj.y*factor,w:obj.w*factor,h:obj.h*factor},picture,obj.imageFit,obj.imageFocusX,obj.imageFocusY);
-          shapes.push(imageShape(id,relId,obj.id,layout.rect.x,layout.rect.y,layout.rect.w,layout.rect.h,layout.crop,obj.rotation));
+          shapes.push(exportScenePicture(obj,id,relId,picture,factor));
         }else shapes.push(exportSceneShape(obj,id,factor));
       }
       const grouped=groupPptxSceneShapes(scene,shapes,factor);shapes.splice(0,shapes.length,...grouped);
