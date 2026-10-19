@@ -5,7 +5,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { SlideSceneViewport } from "@/app/workspace/components/slides/SlideSceneViewport";
 import { SlideSceneResizableInspector } from "@/app/workspace/components/slides/SlideSceneResizableInspector";
 import { SlideRibbonScrollableRow } from "@/app/workspace/components/slides/SlideRibbonScrollableRow";
-import { emptySlideScene } from "@/app/workspace/types/slideScene";
+import { SlideSceneSurface } from "@/app/workspace/components/slides/SlideSceneSurface";
+import { emptySlideScene, sceneObject } from "@/app/workspace/types/slideScene";
 afterEach(cleanup);
 const scene=emptySlideScene("16:9");
 describe("Slide Studio ergonomics",()=>{
@@ -53,6 +54,22 @@ describe("Slide Studio ergonomics",()=>{
     fireEvent.keyDown(window,{key:"Escape",code:"Escape"});
     expect(stage.style.transform).toContain("translate(0px, 0px)");
     expect(screen.getByRole("button",{name:"Pan canvas"}).getAttribute("aria-pressed")).toBe("true");
+  });
+  it("Escape cancels object drag and resize without committing geometry",()=>{
+    const one=sceneObject("text",80,90);one.id="selection";
+    const source={...scene,objects:[one]},onMove=vi.fn(),onResize=vi.fn();
+    render(<SlideSceneSurface scene={source} editing selected="selection" selectedIds={["selection"]} onMove={onMove} onResize={onResize}/>);
+    const object=document.querySelector('[data-scene-object="selection"]') as HTMLElement;
+    fireEvent.pointerDown(object,{button:0,pointerId:11,clientX:80,clientY:90});
+    fireEvent.keyDown(window,{key:"Escape",code:"Escape"});
+    fireEvent.pointerUp(window,{pointerId:11,clientX:150,clientY:160});
+    expect(onMove).not.toHaveBeenCalled();
+    const corner=document.querySelector('[data-resize-handle="se"]') as HTMLElement;
+    fireEvent.pointerDown(corner,{button:0,pointerId:12,clientX:100,clientY:100});
+    fireEvent.keyDown(window,{key:"Escape",code:"Escape"});
+    fireEvent.pointerUp(window,{pointerId:12,clientX:180,clientY:200});
+    expect(onResize).not.toHaveBeenCalled();
+    expect(source.objects[0].x).toBe(80);
   });
   it("resizes the Inspector with keyboard arrows without changing persisted properties",()=>{
     render(<SlideSceneResizableInspector><span>Properties</span></SlideSceneResizableInspector>);
