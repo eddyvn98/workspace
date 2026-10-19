@@ -98,6 +98,11 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
             if (activeSlide.html.trim() && !window.confirm("Convert legacy content to editable V2 objects? Layout is approximate; the original HTML remains saved as backup.")) return;
             onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene: legacyHtmlToScene(activeSlide.html,data.aspectRatio) } } });
           }}>{activeSlide.scene ? "Scene V2" : "Enable Scene V2"}</button>
+          {activeSlide.scene && <button type="button" disabled={readOnly} className="rounded border px-2 py-1" onClick={() => {
+            if (!window.confirm("Restore the original HTML slide view? The V2 scene on this slide will be removed.")) return;
+            const { scene: ignoredScene, ...rest } = activeSlide;
+            onChange({ slides: { ...data.slides, [activeSlide.id]: rest } });
+          }}>Restore HTML</button>}
           {!activeSlide.scene && <SlideContentTools blockId={block.id} slideId={activeSlide.id} onEdit={startEditingBody} />}
         </div>
       </>}
