@@ -30,10 +30,10 @@ test("a Native backup can be restored directly in Spreadsheet", async ({ page })
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Native backup", exact: true }).click();
   const saved = await download, path = await saved.path();
-  expect(saved.suggestedFilename()).toMatch(/\\.workspace\\.json$/);
+  expect(saved.suggestedFilename()).toMatch(/\.workspace\.json$/);
   expect(path).toBeTruthy();
   await page.getByLabel("Import spreadsheet file", { exact: true }).setInputFiles({
-    name: "replacement.csv", mimeType: "text/csv", buffer: Buffer.from("Changed,Now\\n1,2\\n"),
+    name: "replacement.csv", mimeType: "text/csv", buffer: Buffer.from("Changed,Now\n1,2\n"),
   });
   await page.getByRole("button", { name: "Replace workbook", exact: true }).click();
   await expect(page.getByTestId("current-data")).toContainText("Changed");
