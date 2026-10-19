@@ -20,7 +20,7 @@ export function groupSceneObjects(scene: SlideScene, ids: string[], makeId: () =
 
 export function ungroupSceneObjects(scene: SlideScene, ids: string[]): SlideScene {
   const selected = new Set(expandSceneSelection(scene, ids));
-  if (!scene.objects.some(o => selected.has(o.id) && o.groupId)) return scene;
+  if (!scene.objects.some(o => selected.has(o.id) && o.groupId) || scene.objects.some(o => selected.has(o.id) && o.locked)) return scene;
   return normalized(scene, scene.objects.map(o => {
     if (!selected.has(o.id)) return o;
     const object = {...o};
@@ -40,7 +40,8 @@ export function translateSceneSelection(scene: SlideScene, ids: string[], dx: nu
 
 export function deleteSceneSelection(scene: SlideScene, ids: string[]): SlideScene {
   const selected = new Set(expandSceneSelection(scene, ids));
-  return {...scene, objects:scene.objects.filter(o => !selected.has(o.id) || o.locked)};
+  const blockedGroups = new Set(scene.objects.filter(o=>selected.has(o.id)&&o.locked&&o.groupId).map(o=>o.groupId!));
+  return {...scene, objects:scene.objects.filter(o => !selected.has(o.id) || o.locked || (o.groupId && blockedGroups.has(o.groupId)))};
 }
 
 /** Duplicate selected groups with new ids to avoid unintentionally linking copy and original. */
