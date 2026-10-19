@@ -36,9 +36,9 @@ export function SlideFilmstrip({
   const vertical = orientation === "vertical";
   return (
     <nav aria-label="Presentation slides" className={vertical
-      ? "flex h-28 w-full shrink-0 items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50 p-2 md:h-full md:w-48 md:flex-col md:items-stretch md:overflow-x-hidden md:overflow-y-auto md:border-t-0 md:border-r md:p-3 dark:border-slate-800 dark:bg-slate-900"
+      ? "flex h-28 w-full shrink-0 items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50 p-2 lg:h-full lg:w-48 lg:flex-col lg:items-stretch lg:overflow-x-hidden lg:overflow-y-auto lg:border-t-0 lg:border-r lg:p-3 dark:border-slate-800 dark:bg-slate-900"
       : "flex items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60"}>
-      {vertical && <div className="hidden items-center justify-between px-1 text-xs font-semibold text-slate-600 md:flex dark:text-slate-300"><span>Slides</span><span>{data.slideOrder.length}</span></div>}
+      {vertical && <div className="hidden items-center justify-between px-1 text-xs font-semibold text-slate-600 lg:flex dark:text-slate-300"><span>Slides</span><span>{data.slideOrder.length}</span></div>}
       {data.slideOrder.map((id, index) => {
         const slide = data.slides[id];
         if (!slide) return null;
