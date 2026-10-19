@@ -6,6 +6,7 @@ import { paint, readText, opacity } from "./style";
 import { loadAsset } from "./media";
 import { PptxArchive } from "./archive";
 import { readNativeTable } from "./table";
+import { readSceneShape } from "./shape";
 export type ObjectContext={
   archive:PptxArchive;rels:Map<string,Relationship>;assets:Map<string,ImportAsset>;
   theme:Theme;rootScale:number;notice:NoticeSink;objects:SlideSceneObject[];
@@ -24,21 +25,19 @@ function objectMatrix(node:Element,parent:Matrix,ctx:ObjectContext):Matrix|null{
 function shape(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):void{
   const geometry=frame(matrix,ctx.notice),props=shapeProperties(node),body=child(node,NS.p,"txBody");
   const id=ctx.nextId(),fill=paint(props,ctx.theme,"transparent"),stroke=paint(child(props,NS.a,"ln"),ctx.theme,"transparent");
-  const preset=child(props,NS.a,"prstGeom")?.getAttribute("prst");
-  if(preset&&!["rect","roundRect"].includes(preset)||child(props,NS.a,"custGeom"))ctx.notice("shape-geometry","A non-rectangular shape was approximated by a rectangle; its text is retained.");
+  const source=child(props,NS.a,"xfrm")||child(shapeProperties(inherited(node,ctx)||node),NS.a,"xfrm");
+  const ext=child(source,NS.a,"ext"),sw=numeric(ext,"cx",geometry.w/ctx.rootScale),sh=numeric(ext,"cy",geometry.h/ctx.rootScale);
+  const fontScale=sw>0?Math.hypot(matrix[0],matrix[1])/sw:ctx.rootScale;
+  const shapeFields=readSceneShape(props,geometry,fontScale,ctx.notice);
   if(first(props,NS.a,"gradFill")||first(props,NS.a,"blipFill")||first(props,NS.a,"effectLst")?.hasChildNodes())ctx.notice("shape-effects","A shape fill/effect needs review; gradients, picture fills and shadows are not reproduced.");
   const output:SlideSceneObject[]=[];
-  if(fill!=="transparent"||stroke!=="transparent"||!body)output.push({id:`${id}-shape`,kind:"shape",...geometry,fill,stroke,opacity:opacity(props),radius:preset==="roundRect"?Math.min(geometry.w,geometry.h)*0.16:0,groupId});
+  if(fill!=="transparent"||stroke!=="transparent"||!body)output.push({id:`${id}-shape`,kind:"shape",...geometry,...shapeFields,fill,stroke,opacity:opacity(props),groupId});
   if(body){
     if(placeholder(node)&&!first(body,NS.a,"rPr")?.hasAttribute("sz"))ctx.notice("placeholder-style","Inherited placeholder text styling requires visual review.");
-    const source=child(props,NS.a,"xfrm")||child(shapeProperties(inherited(node,ctx)||node),NS.a,"xfrm");
-    const ext=child(source,NS.a,"ext"),sw=numeric(ext,"cx",geometry.w/ctx.rootScale),sh=numeric(ext,"cy",geometry.h/ctx.rootScale);
     const bp=child(body,NS.a,"bodyPr"),left=numeric(bp,"lIns",91440),right=numeric(bp,"rIns",91440),top=numeric(bp,"tIns",45720),bottom=numeric(bp,"bIns",45720);
     const tx=subFrame(matrix,left/sw,top/sh,Math.max(0.01,1-(left+right)/sw),Math.max(0.01,1-(top+bottom)/sh));
-    const fontScale=sw>0?Math.hypot(matrix[0],matrix[1])/sw:ctx.rootScale;
     const text=readText(body,ctx.theme,fontScale,ctx.notice);
     if(text.text)output.push({id:`${id}-text`,kind:"text",...frame(tx,ctx.notice),...text,groupId});
-    if(bp?.getAttribute("anchor")&&bp.getAttribute("anchor")!=="t")ctx.notice("text-anchor","A vertically aligned text box uses top alignment after import.");
   }
   if(output.length>1&&!groupId)for(const object of output)object.groupId=id;
   appendObjects(ctx.objects,output);
