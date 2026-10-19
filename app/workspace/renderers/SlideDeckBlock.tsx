@@ -144,7 +144,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   if (!studioOpen || typeof document === "undefined") return editorContent;
   return createPortal(
     <div ref={studioRef} role="dialog" aria-modal="true" aria-label="Slide Studio" data-slide-studio
-      className="fixed inset-0 z-[1050] bg-slate-100 text-slate-900"
+      className="fixed inset-0 z-[950] bg-slate-100 text-slate-900"
       onPointerDown={event => event.stopPropagation()}
       onClick={event => event.stopPropagation()}
       onKeyDown={event => {
