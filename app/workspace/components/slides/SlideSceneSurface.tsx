@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import type { SlideScene } from "../../types/slideScene";
 import { resizeSceneRect, type SceneResizeHandle } from "../../utils/slideSceneGeometry";
 
-type Props = { scene: SlideScene; selected?: string | null; editing?: boolean; onSelect?: (id: string) => void; onMove?: (id: string, x: number, y: number) => void; onResize?: (id: string, rect: {x:number;y:number;w:number;h:number}) => void; step?: number };
+type Props = { scene: SlideScene; selected?: string | null; editing?: boolean; onSelect?: (id: string, additive?: boolean) => void; onMove?: (id: string, x: number, y: number) => void; onResize?: (id: string, rect: {x:number;y:number;w:number;h:number}) => void; step?: number };
 export function SlideSceneSurface({ scene, selected, editing = false, onSelect, onMove, onResize, step }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ id: string; x: number; y: number; left: number; top: number } | null>(null);
@@ -50,7 +50,7 @@ export function SlideSceneSurface({ scene, selected, editing = false, onSelect, 
         data-duration={motion?.durationMs || 450} data-delay={motion?.delayMs || 0}
         onPointerDown={e => {
           if (!editing || o.locked) return;
-          e.preventDefault();e.stopPropagation();onSelect?.(o.id);
+          e.preventDefault();e.stopPropagation();onSelect?.(o.id, e.shiftKey);
           setDrag({id:o.id,x:o.x,y:o.y,left:e.clientX,top:e.clientY});setOffset({x:0,y:0});
         }}
         className={editing && !o.locked ? "cursor-move" : ""}
