@@ -34,6 +34,26 @@ describe("Slide Studio ergonomics",()=>{
     fireEvent.click(hand);
     expect(hand.getAttribute("aria-pressed")).toBe("false");
   });
+  it("keeps resize hit targets at constant screen size as zoom changes",()=>{
+    render(<SlideSceneViewport scene={scene} backgroundColor="#ffffff"><span>Slide</span></SlideSceneViewport>);
+    const stage=document.querySelector("[data-slide-stage]") as HTMLElement;
+    expect(stage.style.getPropertyValue("--slide-interaction-scale")).toBe("1");
+    fireEvent.click(screen.getByRole("button",{name:"Zoom in"}));
+    expect(Number(stage.style.getPropertyValue("--slide-interaction-scale"))).toBeCloseTo(0.8);
+    fireEvent.click(screen.getByRole("button",{name:"Zoom out"}));
+    expect(stage.style.getPropertyValue("--slide-interaction-scale")).toBe("1");
+  });
+  it("Escape cancels an unfinished pan without losing Studio or editing content",()=>{
+    render(<SlideSceneViewport scene={scene} backgroundColor="#ffffff"><span>Slide</span></SlideSceneViewport>);
+    fireEvent.click(screen.getByRole("button",{name:"Pan canvas"}));
+    const stage=document.querySelector("[data-slide-stage]") as HTMLElement;
+    fireEvent.pointerDown(stage,{button:0,pointerId:9,clientX:100,clientY:120});
+    fireEvent.pointerMove(window,{pointerId:9,clientX:150,clientY:140});
+    expect(stage.style.transform).toContain("translate(50px, 20px)");
+    fireEvent.keyDown(window,{key:"Escape",code:"Escape"});
+    expect(stage.style.transform).toContain("translate(0px, 0px)");
+    expect(screen.getByRole("button",{name:"Pan canvas"}).getAttribute("aria-pressed")).toBe("true");
+  });
   it("resizes the Inspector with keyboard arrows without changing persisted properties",()=>{
     render(<SlideSceneResizableInspector><span>Properties</span></SlideSceneResizableInspector>);
     const separator=screen.getByRole("separator",{name:"Resize inspector"});
