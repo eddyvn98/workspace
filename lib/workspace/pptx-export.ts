@@ -35,14 +35,14 @@ export async function exportBoardPptx(
           const index = ++chartCount, relId = `rId${relationships.length + 1}`;
           await addPptxChart(zip,index,obj.series,accent);
           relationships.push({id:relId,type:"chart",target:`../charts/chart${index}.xml`});
-          shapes.push(chartShape(id,relId,obj.x*factor,obj.y*factor,obj.w*factor,obj.h*factor));
+          shapes.push(chartShape(id,relId,obj.x*factor,obj.y*factor,obj.w*factor,obj.h*factor,obj.rotation));
         } else if (obj.kind === "image" && obj.src) {
           const picture = await loadImage(obj.src);
           zip.file(`ppt/media/image${picture.index}.png`, picture.buffer);
           const relId = `rId${relationships.length + 1}`;
           relationships.push({ id: relId, type: "image", target: `../media/image${picture.index}.png` });
           const layout=sceneImageLayout({x:obj.x*factor,y:obj.y*factor,w:obj.w*factor,h:obj.h*factor},picture,obj.imageFit);
-          shapes.push(imageShape(id,relId,obj.id,layout.rect.x,layout.rect.y,layout.rect.w,layout.rect.h,layout.crop));
+          shapes.push(imageShape(id,relId,obj.id,layout.rect.x,layout.rect.y,layout.rect.w,layout.rect.h,layout.crop,obj.rotation));
         } else shapes.push(exportSceneShape(obj,id,factor));
       }
     }
