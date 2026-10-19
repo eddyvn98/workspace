@@ -4,7 +4,7 @@
 
 Implemented on branch `feat/office-slide-scene-v2` without waiting for remote CI:
 - Freeform Slide Scene V2 with independent text, shape and image objects, object order, geometric properties, optional per-object animation.
-- Opt-in V2 editor on each slide; legacy Tiptap HTML slides are preserved, never automatically destructively converted.
+- Opt-in V2 editor on each slide; converts legacy rich text into approximate text/image objects while preserving original Tiptap HTML as a non-destructive backup.
 - Layer sidebar with ordering/locking, position and size controls, motion properties; pointer drag on scalable scene.
 - V2 preview in filmstrip, overview grid and fullscreen Presenter.
 - Motion primitives per object, on-click reveal steps before advancing slides.
@@ -22,7 +22,7 @@ Implemented on branch `feat/office-slide-scene-v2` without waiting for remote CI
 - AI generation requires a caller that emits `scene`; there is no dedicated art-direction planning/review agent yet.
 - On-click reveal uses a sequential scene-object count. Other trigger modes still use initial entrance animation.
 - External image URLs may not be exportable: use image uploads stored in Workspace.
-- No migration from legacy rich HTML to independent scene objects; opt-in creates a new scene and retains HTML as backup.
+- Best-effort legacy HTML conversion is implemented; table structures, complex formatting and some media are not reconstructed precisely. Original HTML stays available as backup in the stored payload.
 - No local browser verification. Do not mark production-ready before local CI/playwright, interactive and PPTX inspection.
 
 ## Local agent test hand-off (do not wait for CI)
@@ -39,7 +39,7 @@ Manual test:
 1. Open Office > Presentation with an existing HTML deck, confirm no visual or storage regression.
 2. Add a new slide and enable Scene V2. Add text and shape; move, resize via sidebar, lock, reorder, delete.
 3. Add an image using a Workspace-served URL; reload and verify persisted position and layering.
-4. Set one object `on-click` animation; present and verify right arrow reveals it before advancing.
+4. Set one object `on-click` animation; present and verify right arrow reveals it before advancing. Verify after-previous sequencing.
 5. Verify thumbnails and Presenter draw the same positions.
 6. Create a deck using `create_slide_deck` with a scene-only slide; verify objects render.
 7. Export to PPTX, open in Microsoft PowerPoint and LibreOffice; verify editability, page size and object positions.
