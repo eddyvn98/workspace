@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { exportSceneShape } from "./pptx-scene";
+import { groupPptxSceneShapes } from "./pptx-scene-groups";
 import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
 import { boardExportSlides } from "./slide-export-scene";
 import { chartShape, group, imageShape, NS, rels, tableShape, textShape, xml } from "./pptx-elements";
@@ -45,6 +46,8 @@ export async function exportBoardPptx(
           shapes.push(imageShape(id,relId,obj.id,layout.rect.x,layout.rect.y,layout.rect.w,layout.rect.h,layout.crop,obj.rotation));
         } else shapes.push(exportSceneShape(obj,id,factor));
       }
+      const grouped = groupPptxSceneShapes(scene,shapes,factor);
+      shapes.splice(0,shapes.length,...grouped);
     }
     for (const [j, element] of elements.entries()) {
       const height = heights[j] * scale, id = j + 2;
