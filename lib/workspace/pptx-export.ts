@@ -21,6 +21,7 @@ export async function exportBoardPptx(
   for (const [i, entry] of slides.entries()) {
     const { slide, theme, elements } = entry;
     const scene = normalizeSlideScene(slide.scene, width === 960 ? "4:3" : "16:9");
+    if (slide.scene && !scene) throw new Error(`Slide ${i + 1} contains an invalid V2 scene; export aborted instead of silently dropping objects.`);
     const { contentWidth, heights, scale } = scene ? { contentWidth: width - 112, heights: [] as number[], scale: 1 } : slideExportLayout(elements, width, i);
     const relationships = [{ id: "rId1", type: "slideLayout", target: "../slideLayouts/slideLayout1.xml" }, { id: "rId2", type: "notesSlide", target: `../notesSlides/notesSlide${i + 1}.xml` }];
     const { fill, accent, font, background } = await style(slide, theme);
