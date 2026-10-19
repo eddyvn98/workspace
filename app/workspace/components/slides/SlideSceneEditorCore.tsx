@@ -6,6 +6,7 @@ import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { SlideSceneProperties, sceneField as field } from "./SlideSceneProperties";
 import { SlideSceneRichTextEditor } from "./SlideSceneRichTextEditor";
+import { SlideSceneDiagramInsert } from "./SlideSceneDiagramInsert";
 import { useSlideSceneHistory } from "../../hooks/useSlideSceneHistory";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
@@ -20,67 +21,48 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
   const [snap,setSnap]=useState(true),[imageUrl,setImageUrl]=useState(""),[uploading,setUploading]=useState(false),[message,setMessage]=useState("");
   const history=useSlideSceneHistory(scene,onChange,readOnly),{commit}=history;
   const item=scene.objects.find(o=>o.id===selected),locked=scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked);
-  const warnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]);
-  const ids=selectedIds.length?selectedIds:selected?[selected]:[];
+  const warnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]),ids=selectedIds.length?selectedIds:selected?[selected]:[];
   const select=(id:string,additive=false,source=scene)=>{
     const expanded=expandSceneSelection(source,[id]),members=expanded.length?expanded:[id];
     const next=additive?(members.every(key=>selectedIds.includes(key))?selectedIds.filter(key=>!members.includes(key)):[...new Set([...selectedIds,...members])]):members;
     setSelectedIds(next);setSelected(next.includes(id)?id:next[0]??null);
   };
   useEffect(()=>{
-    const existing=new Set(scene.objects.map(o=>o.id));
-    setSelectedIds(current=>current.every(id=>existing.has(id))?current:current.filter(id=>existing.has(id)));
+    const existing=new Set(scene.objects.map(o=>o.id));setSelectedIds(current=>current.every(id=>existing.has(id))?current:current.filter(id=>existing.has(id)));
     if(selected&&!existing.has(selected))setSelected(null);
     if(textEdit&&(!existing.has(textEdit.id)||readOnly))setTextEdit(null);
     if(richEdit&&(!existing.has(richEdit.object.id)||readOnly||scene.objects.find(o=>o.id===richEdit.object.id)?.locked))setRichEdit(null);
   },[scene.objects,selected,textEdit,richEdit,readOnly]);
   const patch=(values:Partial<SlideSceneObject>)=>{if(item&&!readOnly&&!item.locked)commit(scenePatchObject(scene,item.id,values));};
-  const beginRichText=(id:string)=>{
-    const object=scene.objects.find(o=>o.id===id);
-    if(!readOnly&&object?.kind==="text"&&!object.locked){setTextEdit(null);setRichEdit({object:structuredClone(object),signature:sceneTextSignature(object)});}
-  };
+  const beginRichText=(id:string)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object?.kind==="text"&&!object.locked){setTextEdit(null);setRichEdit({object:structuredClone(object),signature:sceneTextSignature(object)});}};
   const beginText=(id:string)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object?.kind==="text"&&!object.locked){if(object.richText)beginRichText(id);else setTextEdit({id,signature:sceneTextSignature(object)});}};
   const finishText=(id:string,text:string)=>{
     const object=scene.objects.find(o=>o.id===id);
     if(object&&textEdit?.id===id&&sceneTextSignature(object)!==textEdit.signature)setMessage("This text was changed elsewhere. Your draft was not applied over it.");
-    else if(object&&!object.locked&&!readOnly)commit(scenePatchObject(scene,id,{text}));
-    setTextEdit(null);
+    else if(object&&!object.locked&&!readOnly)commit(scenePatchObject(scene,id,{text}));setTextEdit(null);
   };
-  const duplicate=()=>{
-    const next=duplicateSceneSelection(scene,ids,()=>crypto.randomUUID());
-    if(next!==scene&&commit(next)){const added=next.objects.filter(o=>!scene.objects.some(before=>before.id===o.id));setSelectedIds(added.map(o=>o.id));setSelected(added[0]?.id??null);}
-  };
+  const duplicate=()=>{const next=duplicateSceneSelection(scene,ids,()=>crypto.randomUUID());if(next!==scene&&commit(next)){const added=next.objects.filter(o=>!scene.objects.some(before=>before.id===o.id));setSelectedIds(added.map(o=>o.id));setSelected(added[0]?.id??null);}};
   const remove=()=>{if(readOnly)return;commit(deleteSceneSelection(scene,ids));setSelected(null);setSelectedIds([]);};
   const add=(kind:SceneObjectKind)=>{
-    if(readOnly||scene.objects.length>=120)return;
-    const next=sceneObject(kind,80+(scene.objects.length%12)*16,100+(scene.objects.length%12)*12);
-    if(kind==="image")next.src=imageUrl.trim();
-    const draft={...scene,objects:[...scene.objects,next]};
+    if(readOnly||scene.objects.length>=120)return;const next=sceneObject(kind,80+(scene.objects.length%12)*16,100+(scene.objects.length%12)*12);
+    if(kind==="image")next.src=imageUrl.trim();const draft={...scene,objects:[...scene.objects,next]};
     if(commit(draft)){select(next.id,false,draft);setMessage("");}else setMessage("The object could not be inserted. Check its image URL or data.");
   };
   const upload=async(file?:File)=>{
-    if(!file||readOnly||uploading||scene.objects.length>=120)return;
-    const started=history.signature;setUploading(true);setMessage("");
-    try{
-      const result=await uploadWorkspaceImageWithOriginal(file);if(!result?.url)throw new Error("Image upload failed.");
+    if(!file||readOnly||uploading||scene.objects.length>=120)return;const started=history.signature;setUploading(true);setMessage("");
+    try{const result=await uploadWorkspaceImageWithOriginal(file);if(!result?.url)throw new Error("Image upload failed.");
       if(!history.isCurrent(started))throw new Error("The slide changed during upload. Insert the image again to avoid overwriting newer edits.");
-      const object=sceneObject("image",100,100);object.src=result.url;
-      const draft={...scene,objects:[...scene.objects,object]};if(commit(draft))select(object.id,false,draft);
+      const object=sceneObject("image",100,100);object.src=result.url;const draft={...scene,objects:[...scene.objects,object]};if(commit(draft))select(object.id,false,draft);
     }catch(error){setMessage(error instanceof Error?error.message:"Image upload failed.");}finally{setUploading(false);}
   };
   const keyDown=(e:React.KeyboardEvent)=>{
-    if(readOnly||e.isDefaultPrevented()||e.nativeEvent.isComposing)return;
-    const target=e.target as HTMLElement;if(target.closest('input,textarea,select,button,[contenteditable="true"]'))return;
+    if(readOnly||e.isDefaultPrevented()||e.nativeEvent.isComposing)return;const target=e.target as HTMLElement;if(target.closest('input,textarea,select,button,[contenteditable="true"]'))return;
     const consume=()=>{e.preventDefault();e.stopPropagation();},modifier=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
-    if(modifier&&key==="z"){consume();e.shiftKey?history.redo():history.undo();return;}
-    if(modifier&&key==="y"){consume();history.redo();return;}
+    if(modifier&&key==="z"){consume();e.shiftKey?history.redo():history.undo();return;}if(modifier&&key==="y"){consume();history.redo();return;}
     if(modifier&&key==="a"){consume();setSelectedIds(scene.objects.map(o=>o.id));setSelected(scene.objects[0]?.id??null);return;}
-    if(textEdit||richEdit||!selected)return;
-    if(e.key==="F2"||e.key==="Enter"){consume();beginText(selected);return;}
+    if(textEdit||richEdit||!selected)return;if(e.key==="F2"||e.key==="Enter"){consume();beginText(selected);return;}
     if(modifier&&key==="g"){consume();commit(e.shiftKey?ungroupSceneObjects(scene,ids):groupSceneObjects(scene,ids,()=>crypto.randomUUID()));return;}
-    if(modifier&&key==="d"){consume();duplicate();return;}
-    if(e.key==="Delete"||e.key==="Backspace"){consume();remove();return;}
-    if(e.key==="Escape"){consume();setSelected(null);setSelectedIds([]);return;}
+    if(modifier&&key==="d"){consume();duplicate();return;}if(e.key==="Delete"||e.key==="Backspace"){consume();remove();return;}if(e.key==="Escape"){consume();setSelected(null);setSelectedIds([]);return;}
     const move:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     if(!modifier&&move[e.key]){consume();const [dx,dy]=move[e.key],amount=e.shiftKey?10:1;commit(translateSceneSelection(scene,ids,dx*amount,dy*amount));}
   };
@@ -90,11 +72,10 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
       <strong>Scene editor</strong><label className="flex items-center gap-1"><input aria-label="Snap to grid" type="checkbox" checked={snap} onChange={e=>setSnap(e.target.checked)}/>Snap 8px</label>
       <button type="button" className={field} disabled={readOnly||!history.canUndo} onClick={history.undo}>Undo</button><button type="button" className={field} disabled={readOnly||!history.canRedo} onClick={history.redo}>Redo</button>
       {(["text","shape","chart","table"] as const).map(kind=><button type="button" key={kind} className={field} disabled={readOnly||scene.objects.length>=120} onClick={()=>add(kind)}>+ {kind}</button>)}
+      <SlideSceneDiagramInsert scene={scene} readOnly={readOnly} onInsert={next=>commit(next)}/>
       <input className={field+" w-40"} aria-label="Image URL" disabled={readOnly} value={imageUrl} placeholder="Image URL" onChange={e=>setImageUrl(e.target.value)}/>
-      <button type="button" className={field} disabled={readOnly||!imageUrl.trim()} onClick={()=>add("image")}>+ Image URL</button>
-      <button type="button" className={field} disabled={readOnly||uploading} onClick={()=>fileInput.current?.click()}>{uploading?"Uploading...":"Upload image"}</button>
-      <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/>
-      <span className="ml-auto text-slate-500">{scene.objects.length} objects</span>
+      <button type="button" className={field} disabled={readOnly||!imageUrl.trim()} onClick={()=>add("image")}>+ Image URL</button><button type="button" className={field} disabled={readOnly||uploading} onClick={()=>fileInput.current?.click()}>{uploading?"Uploading...":"Upload image"}</button>
+      <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/><span className="ml-auto text-slate-500">{scene.objects.length} objects</span>
     </div>
     {message&&<p role="status" className="px-3 py-1 text-xs text-amber-900">{message}</p>}
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
@@ -119,11 +100,8 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
     </div>
     <div ref={timeline} tabIndex={-1}><SlideSceneTimeline scene={scene} selected={selected} onSelect={select} onChange={next=>commit(next)} readOnly={readOnly} backgroundColor={backgroundColor}/></div>
     {richEdit&&!readOnly&&<SlideSceneRichTextEditor key={richEdit.object.id} object={richEdit.object} backgroundColor={backgroundColor} onCancel={()=>setRichEdit(null)} onApply={richText=>{
-      const current=scene.objects.find(o=>o.id===richEdit.object.id);
-      if(!current||current.locked||sceneTextSignature(current)!==richEdit.signature)return false;
-      const next=scenePatchObject(scene,current.id,{richText});
-      if(JSON.stringify(next)!==JSON.stringify(scene)&&!commit(next))return false;
-      setRichEdit(null);return true;
+      const current=scene.objects.find(o=>o.id===richEdit.object.id);if(!current||current.locked||sceneTextSignature(current)!==richEdit.signature)return false;
+      const next=scenePatchObject(scene,current.id,{richText});if(JSON.stringify(next)!==JSON.stringify(scene)&&!commit(next))return false;setRichEdit(null);return true;
     }}/>}
   </div>;
 }
