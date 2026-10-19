@@ -13,6 +13,7 @@ export interface SlideThumbnailProps {
   theme?: SlideTheme;
   aspectRatio?: SlideAspectRatio;
   index: number;
+  vertical?: boolean;
   isActive: boolean;
   canDelete: boolean;
   onSelect: () => void;
@@ -33,13 +34,15 @@ export interface SlideThumbnailProps {
  *  editor), a status dot, native HTML5 drag-and-drop for reordering, and a
  *  self-contained settings popover (rename/status/background/notes/duplicate/delete). */
 export function SlideThumbnail({
-  slide, theme, aspectRatio, index, isActive, canDelete, onSelect, onDragStart, onDragOver, onDrop,
+  slide, theme, aspectRatio, index, vertical = false, isActive, canDelete, onSelect, onDragStart, onDragOver, onDrop,
   onRename, onDuplicate, onDelete, onSetStatus, onSetBackground, onSetNotes, onSetHidden,
 }: SlideThumbnailProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div
+      role="button" tabIndex={0} aria-label={`Select slide ${index + 1}: ${slide.name}`} aria-current={isActive ? "true" : undefined}
+      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onSelect(); } }}
       draggable
       onPointerDown={(e) => e.stopPropagation()}
       onDragStart={() => onDragStart(index)}
@@ -52,7 +55,7 @@ export function SlideThumbnail({
         onDrop();
       }}
       onClick={onSelect}
-      className={`group relative flex w-28 shrink-0 cursor-pointer flex-col gap-1 rounded-md p-1 ${
+      className={`group relative flex ${vertical ? "w-full" : "w-28 shrink-0"} cursor-pointer flex-col gap-1 rounded-md p-1.5 ${
         isActive ? "bg-blue-50 ring-2 ring-blue-500 dark:bg-blue-950/40" : "hover:bg-slate-100 dark:hover:bg-slate-800"
       } ${slide.hidden ? "opacity-50" : ""}`}
     >
