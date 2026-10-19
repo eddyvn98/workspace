@@ -52,7 +52,7 @@ describe("PPTX import and nondestructive application", () => {
       zip.file("ppt/slides/slide1.xml",slideXml(imageShape(3,"rIdImg","Remote",100,200,400,200),'<p:timing/>'));
       const result=await parsePptx(await pack(zip),"deck.pptx");
       expect(result.assets).toEqual([]); expect(fetcher).not.toHaveBeenCalled();
-      expect(result.notices.some(n=>n.code==="external-image")).toBe(true); expect(result.notices.some(n=>n.code==="animation")).toBe(true);
+      expect(result.notices.some(n=>n.code==="external-image")).toBe(true); expect(result.notices.some(n=>n.code==="animation"||n.code==="animation-sequence")).toBe(true);
     } finally { fetcher.mockRestore(); }
   });
   it("fits a different ratio uniformly and reports it", async () => {
