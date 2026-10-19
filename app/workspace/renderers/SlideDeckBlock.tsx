@@ -13,6 +13,7 @@ import { SlideDeckToolbar } from "../components/slides/SlideDeckToolbar";
 import { SlideFilmstrip } from "../components/slides/SlideFilmstrip";
 import { SlidePresentOverlay } from "../components/slides/SlidePresentOverlay";
 import { SlideSceneEditor } from "../components/slides/SlideSceneEditor";
+import type { SlideSceneHistorySlot } from "../hooks/useSlideSceneHistory";
 import { SlidePptxImport } from "../components/slides/SlidePptxImport";
 import { appendImportedSlides } from "@/lib/workspace/pptx-import/apply";
 import { legacyHtmlToScene } from "../utils/slideLegacyToScene";
@@ -31,6 +32,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const [studioOpen, setStudioOpen] = useState(false);
   const studioRef = useRef<HTMLDivElement>(null);
   const previousStudioState = useRef(false);
+  const editHistoryBySlide=useRef<Map<string,SlideSceneHistorySlot>>(new Map());
   useEffect(() => {
     if (!studioOpen) return;
     const prior = document.body.style.overflow;
@@ -71,6 +73,16 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const activeSlide = data.slides[activeSlideId];
   // A brand-new/empty slide immediately exposes the object ribbon; only populated legacy HTML needs conversion.
   const activeScene = activeSlide?.scene ?? (activeSlide && !activeSlide.html.trim() ? emptySlideScene(data.aspectRatio) : undefined);
+  // Studio portal changes the React editor root, but must not discard the user's Undo history.
+  let sceneHistory=activeScene?editHistoryBySlide.current.get(activeSlideId):undefined;
+  if(activeScene&&!sceneHistory){
+    sceneHistory={current:{undo:[],redo:[],expected:JSON.stringify(activeScene)}};
+    editHistoryBySlide.current.set(activeSlideId,sceneHistory);
+    if(editHistoryBySlide.current.size>12){
+      const oldest=editHistoryBySlide.current.keys().next().value;
+      if(oldest!==undefined)editHistoryBySlide.current.delete(oldest);
+    }
+  }
 
   const filmstrip = <SlideFilmstrip data={data} readOnly={readOnly} orientation={studioOpen ? "vertical" : "horizontal"}
     onSelect={actions.selectSlide} onAdd={actions.addSlide} onReorder={actions.reorderSlide}
@@ -136,7 +148,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
         onClick={(e) => { if (activeScene || e.detail < 2 || isEditingBody) return; e.stopPropagation(); startEditingBody(); }}>
         <style>{THEMED_EDITOR_CSS + SLIDE_TYPOGRAPHY_CSS}</style>
         {data.showSlideNumbers && !activeScene && <span className="pointer-events-none absolute bottom-1 right-2 z-10 text-xs opacity-60">{data.slideOrder.indexOf(activeSlideId) + 1}</span>}
-        {activeScene ? <SlideSceneEditor key={activeSlide.id} scene={activeScene} slideNumber={data.showSlideNumbers ? data.slideOrder.indexOf(activeSlideId)+1 : undefined}
+        {activeScene ? <SlideSceneEditor key={activeSlide.id} scene={activeScene} historySlot={sceneHistory} slideNumber={data.showSlideNumbers ? data.slideOrder.indexOf(activeSlideId)+1 : undefined}
           backgroundColor={slideBackground(activeSlide.backgroundColor, data.theme)} readOnly={readOnly}
           onChange={scene => { if (!readOnly) onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene } } }); }} />
           : activeSlide && <WorkspaceDocRichEditor key={activeSlide.id} blockId={block.id} html={activeSlide.html}
