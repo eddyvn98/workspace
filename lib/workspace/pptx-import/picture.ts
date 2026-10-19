@@ -18,8 +18,7 @@ export async function readScenePicture(node:Element,matrix:Matrix,groupId:string
     const visibleRatio=asset.width*(1-l-r)/(asset.height*(1-t-b));
     if(l+r>0&&t+b>0||Math.abs(visibleRatio-geometry.w/geometry.h)>0.03)ctx.notice("image-crop","A custom two-axis crop was approximated with cover fit; verify the focal point.");
   }
-  const fillRect=child(first(node,NS.a,"stretch"),NS.a,"fillRect");
-  const fl=numeric(fillRect,"l")/100000,fr=numeric(fillRect,"r")/100000,ft=numeric(fillRect,"t")/100000,fb=numeric(fillRect,"b")/100000;
+  const fillRect=child(first(node,NS.a,"stretch"),NS.a,"fillRect"),fl=numeric(fillRect,"l")/100000,fr=numeric(fillRect,"r")/100000,ft=numeric(fillRect,"t")/100000,fb=numeric(fillRect,"b")/100000;
   if(!hasCrop&&(fl||fr||ft||fb)){
     const ratio=geometry.w*(1-fl-fr)/(geometry.h*(1-ft-fb));
     if(Math.min(fl,fr,ft,fb)>=0&&fl+fr<1&&ft+fb<1&&Math.abs(ratio-asset.width/asset.height)<0.03){
@@ -28,6 +27,7 @@ export async function readScenePicture(node:Element,matrix:Matrix,groupId:string
   }
   const props=child(node,NS.p,"spPr"),sourceWidth=numeric(child(child(props,NS.a,"xfrm"),NS.a,"ext"),"cx");
   const scale=sourceWidth>0?Math.hypot(matrix[0],matrix[1])/sourceWidth:ctx.rootScale;
-  const effects=readScenePaint(props,ctx.theme,scale,ctx.notice),imageMask=readPictureMask(props,geometry,scale,ctx.notice);
-  appendObjects(ctx.objects,[{id:ctx.nextId(),kind:"image",...geometry,src:asset.src,groupId,imageFit,imageFocusX,imageFocusY,opacity:pictureOpacity(node),...(effects.shadow?{shadow:effects.shadow}:{}),...(imageMask?{imageMask}:{})}]);
+  const effects=readScenePaint(props,ctx.theme,scale,ctx.notice),imageMask=readPictureMask(props,geometry,scale,ctx.notice),opacity=pictureOpacity(node);
+  const shadow=effects.shadow?{...effects.shadow,opacity:Math.min(1,effects.shadow.opacity/(opacity||1))}:undefined;
+  appendObjects(ctx.objects,[{id:ctx.nextId(),kind:"image",...geometry,src:asset.src,groupId,imageFit,imageFocusX,imageFocusY,opacity,...(shadow?{shadow}:{}),...(imageMask?{imageMask}:{})}]);
 }
