@@ -8,6 +8,8 @@ import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { SlideSceneProperties, sceneField as field } from "./SlideSceneProperties";
 import { SlideSceneRichTextEditor } from "./SlideSceneRichTextEditor";
 import { SlideSceneRibbon } from "./SlideSceneRibbon";
+import { SlideSceneViewport } from "./SlideSceneViewport";
+import { SlideSceneResizableInspector } from "./SlideSceneResizableInspector";
 import { useSlideSceneHistory } from "../../hooks/useSlideSceneHistory";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
@@ -86,19 +88,14 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
     <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/>
     {message&&<p role="status" className="px-3 py-1 text-xs text-amber-900">{message}</p>}
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-      <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-slate-200 p-4" style={{containerType:"size"}}>
-        <div data-slide-stage className="relative shrink-0 overflow-hidden border border-slate-300 shadow-xl" style={{
-          aspectRatio:`${scene.width}/${scene.height}`,
-          width:`min(calc(100cqw - 32px), calc((100cqh - 32px) * ${scene.width / scene.height}))`,
-          height:`min(calc((100cqw - 32px) * ${scene.height / scene.width}), calc(100cqh - 32px))`,
-          backgroundColor
-        }} onPointerDown={e=>{if(textEdit||richEdit)return;editor.current?.focus({preventScroll:true});if(!(e.target as Element).closest("[data-scene-object],[data-slide-selection-box]")){setSelected(null);setSelectedIds([]);}}}>
+      <SlideSceneViewport scene={scene} backgroundColor={backgroundColor}
+        onStagePointerDown={e=>{if(textEdit||richEdit)return;editor.current?.focus({preventScroll:true});if(!(e.target as Element).closest("[data-scene-object],[data-slide-selection-box]")){setSelected(null);setSelectedIds([]);}}}>
         <SlideSceneSurface scene={scene} selected={selected} selectedIds={selectedIds} editing={!readOnly} onSelect={select} editingTextId={textEdit?.id} onRequestTextEdit={beginText} onTextCancel={()=>setTextEdit(null)} onTextCommit={finishText}
           onMove={(id,x,y)=>{const original=scene.objects.find(o=>o.id===id);if(!original||readOnly||original.locked)return;const next=snapSceneRect({...original,x,y},snap);commit(translateSceneSelection(scene,selectedIds.includes(id)?selectedIds:[id],next.x-original.x,next.y-original.y));}}
           onResize={(id,rect)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object&&!object.locked)commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snap)));}} onTransformSelection={next=>commit(next)}/>
         {slideNumber !== undefined && <span className="pointer-events-none absolute bottom-[2%] right-[2%] z-10 text-[1.2cqw] text-white mix-blend-difference" aria-label={`Slide number ${slideNumber}`}>{slideNumber}</span>}
-      </div></div>
-      {showInspector && <aside aria-label="Slide inspector" className="max-h-60 shrink-0 space-y-3 overflow-auto border-l border-slate-200 bg-white p-3 text-xs lg:max-h-none lg:w-72">
+      </SlideSceneViewport>
+      {showInspector && <SlideSceneResizableInspector><div className="space-y-3">
         <div className="sticky top-0 z-10 -mx-3 -mt-3 flex gap-1 border-b border-slate-200 bg-white p-2">
           <button type="button" aria-pressed={inspectorTab==="layers"} onClick={()=>setInspectorTab("layers")}
             className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-2 text-sm ${inspectorTab==="layers"?"bg-indigo-50 font-semibold text-indigo-700":"text-slate-600 hover:bg-slate-100"}`}>
@@ -123,7 +120,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
           <div className="flex flex-wrap gap-1"><button type="button" className={field} disabled={readOnly||locked||scene.objects.length>=120} onClick={duplicate}>Duplicate</button><button type="button" className={field} disabled={readOnly||locked} onClick={()=>commit(moveSceneSelectionLayer(scene,ids,-1))}>Back</button><button type="button" className={field} disabled={readOnly||locked} onClick={()=>commit(moveSceneSelectionLayer(scene,ids,1))}>Front</button><button type="button" className={field} disabled={readOnly||locked} onClick={remove}>Delete</button></div>
         </>}
         </>}
-      </aside>}
+      </div></SlideSceneResizableInspector>}
     </div>
     {showTimeline && <div className="max-h-[36%] shrink-0 overflow-auto"><SlideSceneTimeline scene={scene} selected={selected} onSelect={select} onChange={next=>commit(next)} readOnly={readOnly} backgroundColor={backgroundColor}/></div>}
     {richEdit&&!readOnly&&<SlideSceneRichTextEditor key={richEdit.object.id} object={richEdit.object} backgroundColor={backgroundColor} onCancel={()=>setRichEdit(null)} onApply={richText=>{
