@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-type Props={children:React.ReactNode};
+type Props={children:React.ReactNode;width?:number;onWidthChange?:React.Dispatch<React.SetStateAction<number>>};
 const clamp=(value:number)=>Math.max(240,Math.min(480,Math.round(value)));
 /** Desktop Inspector splitter; mobile stays a full-width bottom panel. */
-export function SlideSceneResizableInspector({children}:Props){
-  const [width,setWidth]=useState(288),[resizing,setResizing]=useState(false);
+export function SlideSceneResizableInspector({children,width:controlledWidth,onWidthChange}:Props){
+  const [localWidth,setLocalWidth]=useState(288),[resizing,setResizing]=useState(false);
+  const width=controlledWidth??localWidth,setWidth=onWidthChange??setLocalWidth;
   const start=useRef<{pointerId:number;x:number;width:number}|null>(null);
   useEffect(()=>{
     if(!resizing)return;
