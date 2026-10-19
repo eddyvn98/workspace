@@ -34,7 +34,7 @@ export function importSceneTiming(document:Document,objects:SlideSceneObject[],t
   if(timeNodes.some(n=>n.getAttribute("nodeType")==="interactiveSeq"))notice("animation-interactive","Object-click interactive sequences are not imported; main slide-click builds are supported.");
   if(first(timing,NS.p,"cmd")||first(timing,NS.p,"audio")||first(timing,NS.p,"video"))notice("animation-media","Media/command timing nodes are not executed or imported.");
   const main=timeNodes.find(n=>n.getAttribute("nodeType")==="mainSeq");
-  if(!main){notice("animation-sequence","This animation structure has no supported main sequence.");return 0;}
+  if(!main){notice("animation","This animation structure has no supported main sequence.");return 0;}
   const lookup=new Map(objects.map(o=>[o.id,o]));
   let order=0;
   for(const group of elements(child(main,NS.p,"childTnLst"))){
