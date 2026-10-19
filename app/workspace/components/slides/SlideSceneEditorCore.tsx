@@ -81,6 +81,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
       onGroup={()=>commit(groupSceneObjects(scene,ids,()=>crypto.randomUUID()))}
       onUngroup={()=>commit(ungroupSceneObjects(scene,ids))}
       onPatch={patch} onFormat={()=>{if(item)beginRichText(item.id);}}
+      onShowProperties={()=>{setShowInspector(true);setInspectorTab("properties");}}
       onSnap={setSnap} onToggleInspector={()=>setShowInspector(v=>!v)} onToggleTimeline={()=>setShowTimeline(v=>!v)}/>
     <input ref={fileInput} hidden type="file" accept="image/*" onChange={e=>{const file=e.target.files?.[0];e.target.value="";void upload(file);}}/>
     {message&&<p role="status" className="px-3 py-1 text-xs text-amber-900">{message}</p>}
