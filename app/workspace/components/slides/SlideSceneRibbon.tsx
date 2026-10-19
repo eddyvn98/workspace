@@ -4,6 +4,7 @@ import { AlignCenter, AlignLeft, AlignRight, ChartColumn, Clapperboard, Copy, Im
 import { SCENE_SHAPES, type SceneShapeKind } from "../../types/slideSceneShape";
 import type { SlideScene, SlideSceneObject, SceneObjectKind } from "../../types/slideScene";
 import { SlideSceneDiagramInsert } from "./SlideSceneDiagramInsert";
+import { SlideRibbonScrollableRow } from "./SlideRibbonScrollableRow";
 
 type Props = {
   scene:SlideScene; item?:SlideSceneObject; selectedCount:number; selectedLocked:boolean;
@@ -17,7 +18,7 @@ type Props = {
   onShowProperties:()=>void;
   onSnap:(value:boolean)=>void; onToggleInspector:()=>void; onToggleTimeline:()=>void;
 };
-const button="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-40";
+const button="inline-flex min-h-11 lg:min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-40";
 const active="border-indigo-300 bg-indigo-50 text-indigo-700";
 const divider="mx-1 h-6 shrink-0 border-l border-slate-200";
 const tools:[SceneObjectKind,string,React.ComponentType<{className?:string}>][]=[
@@ -28,7 +29,7 @@ export function SlideSceneRibbon(p:Props) {
   const selected=!!p.item,editable=selected&&!p.readOnly&&!p.item?.locked,canArrange=p.selectedCount>0&&!p.readOnly&&!p.selectedLocked;
   const isText=p.item?.kind==="text";
   return <div aria-label="Slide editing tools" className="shrink-0 border-b border-slate-200 bg-white text-slate-800">
-    <div className="flex items-center gap-1.5 overflow-x-auto px-2 py-2" aria-label="Insert and edit slide objects">
+    <SlideRibbonScrollableRow label="insert tools">
       <span className="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Home</span>
       <button type="button" className={button} aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={p.readOnly||!p.canUndo} onClick={p.onUndo}><Undo2 className="h-4 w-4"/></button>
       <button type="button" className={button} aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={p.readOnly||!p.canRedo} onClick={p.onRedo}><Redo2 className="h-4 w-4"/></button>
@@ -44,8 +45,8 @@ export function SlideSceneRibbon(p:Props) {
           {p.showInspector?<PanelRightClose className="h-4 w-4"/>:<PanelRightOpen className="h-4 w-4"/>}Inspector
         </button>
       </div>
-    </div>
-    <div className="flex min-h-10 items-center gap-1.5 overflow-x-auto border-t border-slate-100 bg-slate-50/80 px-2 py-1.5" aria-label="Selection and formatting tools">
+    </SlideRibbonScrollableRow>
+    <SlideRibbonScrollableRow label="format tools" secondary>
       <span className="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Format</span>
       {isText&&<>
         <button type="button" className={button+(p.item?.fontWeight==="bold"?" "+active:"")} aria-label="Bold text" title="Bold entire text box" disabled={!editable} onClick={()=>p.onPatch({fontWeight:p.item?.fontWeight==="bold"?"normal":"bold"})}><strong>B</strong></button>
@@ -90,6 +91,6 @@ export function SlideSceneRibbon(p:Props) {
         </div>
       </details>
       <span className="shrink-0 text-[11px] text-slate-400">{p.scene.objects.length}/120</span>
-    </div>
+    </SlideRibbonScrollableRow>
   </div>;
 }
