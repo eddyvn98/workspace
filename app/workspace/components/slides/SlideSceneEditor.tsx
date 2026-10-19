@@ -15,6 +15,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
   const editorRef=useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const select = (id:string,additive=false) => {
     setSelected(id);
     setSelectedIds(current => additive ? (current.includes(id)?current.filter(x=>x!==id):[...current,id]) : [id]);
@@ -52,11 +53,11 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
   useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(readOnly)return;const target=e.target as HTMLElement;if(!editorRef.current?.contains(target))return;if(target?.closest("input,textarea,select,[contenteditable=true]"))return;
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return;}
-    if(!selected)return;
+    if(editingTextId || !selected)return;
     if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();commit(sceneDeleteObject(scene,selected));setSelected(null);setSelectedIds([]);return;}
     const direction:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(nudgeSceneObjects(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
-  };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,readOnly,historyVersion]);
+  };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,editingTextId,readOnly,historyVersion]);
   return <div ref={editorRef} tabIndex={0} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-white p-2 text-xs">
       <strong>Scene editor</strong>
@@ -72,8 +73,10 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-3">
         <div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{ aspectRatio: `${scene.width} / ${scene.height}`,backgroundColor }}
-          onPointerDown={e => { editorRef.current?.focus({preventScroll:true});if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
+          onPointerDown={e => { if(editingTextId) return; editorRef.current?.focus({preventScroll:true});if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
           <SlideSceneSurface scene={scene} selected={selected} editing={!readOnly} onSelect={select}
+            editingTextId={editingTextId} onRequestTextEdit={setEditingTextId} onTextCancel={() => setEditingTextId(null)}
+            onTextCommit={(id,text) => {const old = scene.objects.find(o=>o.id===id); if(old && !old.locked && !readOnly) commit(scenePatchObject(scene,id,{text})); setEditingTextId(null);}}
             onMove={(id, x, y) => { if (!readOnly) commit(setSceneObjectGeometry(scene, id, snapSceneRect({...scene.objects.find(o=>o.id===id)!,x,y}))); }}
             onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect))); }} />
         </div>
@@ -88,6 +91,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
         {item && <>
           <hr/><strong className="block">Object properties</strong>
           {item.kind === "chart" && <label className="block">Chart data (label, value per line)<textarea rows={4} className={field+" mt-1 w-full"} disabled={readOnly||item.locked} value={(item.series||[]).map(x=>`${x.label},${x.value}`).join("\n")} onChange={e=>{const series=e.target.value.split("\n").filter(Boolean).map(row=>{const comma=row.lastIndexOf(",");return {label:row.slice(0,comma).trim(),value:Number(row.slice(comma+1))};}); if(series.length>=1 && series.length<=24 && series.every(x=>x.label && Number.isFinite(x.value) && x.value>=0)) patch({series});}} /></label>}
+          {item.kind === "text" && !readOnly && !item.locked && <button className={field+" w-full"} type="button" onClick={()=>setEditingTextId(item.id)}>Edit text on slide</button>}
           {item.kind === "text" && <label className="block">Text<textarea className={field + " mt-1 w-full"} rows={3} value={item.text || ""} disabled={readOnly} onChange={e => patch({ text: e.target.value })}/></label>}
           {(["x","y","w","h","rotation","opacity"] as const).map(k => <label key={k} className="flex items-center justify-between gap-2 capitalize">{k}<input className={field + " w-24"} type="number" step={k === "opacity" ? 0.1 : 1} value={item[k] ?? 0} disabled={readOnly || item.locked} onChange={e => patch({ [k]: Number(e.target.value) })}/></label>)}
           {item.kind === "text" && <label className="flex items-center justify-between">Font size<input type="number" className={field + " w-24"} value={item.fontSize || 44} disabled={readOnly} onChange={e => patch({fontSize:Number(e.target.value)})}/></label>}
