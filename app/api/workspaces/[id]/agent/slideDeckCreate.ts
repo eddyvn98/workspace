@@ -31,7 +31,7 @@ export function buildDeckSlides(input: unknown, notes: string[]): { ok: true; sl
     const item = record(input[index]);
     const where = `slides[${index}]`;
     if (!Object.keys(item).length) return { ok: false, reason: `${where} must be an object.` };
-    const withLayout = item.scene === undefined && item.html === undefined && item.layout === undefined ? { ...item, layout: inferLayout(item, index) } : item;
+    const withLayout = item.composition === undefined && item.scene === undefined && item.html === undefined && item.layout === undefined ? { ...item, layout: inferLayout(item, index) } : item;
     const fields = parseSlideFields(withLayout, { allowLayout: true, strict: true });
     if (!fields.ok) return { ok: false, reason: `${where}: ${fields.reason}` };
     if (!String(fields.set.html ?? "").trim() && !fields.set.scene && parseSlideLayout(withLayout.layout) !== "blank") return { ok: false, reason: `${where} has no content: give layout with its fields, or html.` };
