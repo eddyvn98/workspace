@@ -162,3 +162,37 @@ pnpm build
 Manual browser check: double-click an unlocked text box, edit and blur to save; Escape leaves text intact, F2/Enter opens edit mode, Ctrl/Cmd+Enter saves; locked/read-only text cannot be edited. Verify shortcuts work after clicking an object and do not affect neighboring Canvas editor instances. Test 4:3 and 16:9 decks after reload.
 
 **Verification:** The CI successes apply to `e80ab905`. Subsequent commits need their own checks and manual QA before this PR is merged.
+
+## Application completion batch: grouping, image fit and safe undo
+
+Implemented after CI-green baseline `e80ab90` (not yet verified by the local agent):
+- Persisted logical `groupId` in Scene V2. Group/Ungroup toolbar actions and Ctrl/Cmd+G shortcuts; Shift+G ungroups; clicking any member selects all group members.
+- Group drag, arrow-key nudge, deletion, and duplication use selection-expanded geometry. Duplicates receive new object ids and group ids; locked members are not modified.
+- Snap-to-grid toggle and horizontal/vertical distribution tools are now available in the Scene Editor.
+- History snapshots invalidate if another Workspace synchronization updates the scene, preventing stale undo from reverting another editor's changes.
+- Image fit modes `cover` / `contain` / `fill` are persisted and previewed in the editor and presenter, rendered in PDF, and mapped to native PowerPoint image cropping or contained geometry.
+- The future Slide Script SDK accepts `imageFit` in its image authoring style.
+- Async image uploads abort before inserting if the slide changed during upload, preventing stale scene overwrites.
+- Added `slide-scene-groups.test.ts` and `slide-image-fit.test.ts`.
+
+Local agent handoff:
+```sh
+pnpm install --frozen-lockfile
+pnpm exec tsc --noEmit
+pnpm exec vitest run __tests__/workspace/slide-scene-groups.test.ts __tests__/workspace/slide-image-fit.test.ts
+pnpm test:workspace
+pnpm build
+```
+
+Manual acceptance scenarios:
+1. Group 3 objects via Shift-click, move with pointer and keyboard; verify original z-order, persisted group after reload, and locked-object immutability.
+2. Ungroup; move one member without moving others. Duplicate a group; copies must not be linked to originals.
+3. Test undo/redo of grouping, movement, duplication and image fit, then trigger a remote board update and verify stale local undo is cleared.
+4. Disable snap and move a text box to non-grid coordinates; enable snap and verify 8px grid alignment.
+5. Upload square and wide images, switch Cover/Contain/Fill, inspect editor, presenter, PDF and PowerPoint side by side; PowerPoint Cover uses editable `a:srcRect` crop.
+6. Confirm user can modify slide while upload is pending without reverting that change.
+7. Confirm read-only presentation can view groups and image fits without access to mutation controls.
+
+Current limitations: Groups are logical in Scene V2 and are **not exported as a native PPTX group element**. Resizing a member affects only that member; group bounding-box transform, native PPTX grouping, and rich crop focal-point editing are future tasks.
+
+PR remains draft until this new batch is tested. Do not infer CI results for HEAD from the prior `e80ab90` run.
