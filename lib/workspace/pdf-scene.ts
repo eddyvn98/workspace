@@ -4,6 +4,7 @@ import { xml } from "./pptx-elements";
 import { sceneImageRenderRect } from "./slide-image-layout";
 import { pdfSceneRichText } from "./pdf-scene-text";
 import { pdfSceneTableSvg } from "./pdf-scene-table";
+import { svgScenePaint } from "./svg-scene-paint";
 import type { ExportImage } from "./slide-export-images";
 type ImageLoader=(src:string)=>Promise<ExportImage>;
 const attr=(value:string|undefined,fallback:string)=>xml(value||fallback);
@@ -18,11 +19,10 @@ function sceneChart(object:SlideSceneObject):string{
   }).join("")}`;
 }
 async function sceneObjectSvg(object:SlideSceneObject,index:number,loadImage:ImageLoader):Promise<string>{
-  const cx=object.x+object.w/2,cy=object.y+object.h/2,clipId=`scene-clip-${index}`;
-  const opening=`<defs><clipPath id="${clipId}"><rect x="${object.x}" y="${object.y}" width="${object.w}" height="${object.h}"/></clipPath></defs>`;
+  const cx=object.x+object.w/2,cy=object.y+object.h/2,paint=svgScenePaint(object,index);
   let child="";
   if(object.kind==="text")child=pdfSceneRichText(object);
-  if(object.kind==="shape")child=`<path transform="translate(${object.x} ${object.y})" d="${sceneShapePath(object)}" fill="${object.shapeKind==="line"?"none":shapeColor(object.fill,"#4f46e5")}" stroke="${shapeColor(object.stroke,"none")}" stroke-width="${object.strokeWidth??2}"${sceneShapeDash(object)?` stroke-dasharray="${sceneShapeDash(object)}"`:""} stroke-linejoin="round" stroke-linecap="round"/>`;
+  if(object.kind==="shape")child=`<path transform="translate(${object.x} ${object.y})" d="${sceneShapePath(object)}" fill="${object.shapeKind==="line"?"none":paint.fill}" stroke="${shapeColor(object.stroke,"none")}" stroke-width="${object.strokeWidth??2}"${sceneShapeDash(object)?` stroke-dasharray="${sceneShapeDash(object)}"`:""} stroke-linejoin="round" stroke-linecap="round"/>`;
   if(object.kind==="chart")child=sceneChart(object);
   if(object.kind==="table")child=pdfSceneTableSvg(object,`scene-table-${index}`);
   if(object.kind==="image"&&object.src){
@@ -30,9 +30,9 @@ async function sceneObjectSvg(object:SlideSceneObject,index:number,loadImage:Ima
     child=`<image x="${fit.x}" y="${fit.y}" width="${fit.w}" height="${fit.h}" preserveAspectRatio="none" href="data:image/png;base64,${image.buffer.toString("base64")}"/>`;
   }
   const rotation=Number.isFinite(object.rotation)?object.rotation:0,opacity=object.opacity??1;
-  return `${opening}<g transform="rotate(${rotation} ${cx} ${cy})" opacity="${opacity}" clip-path="url(#${clipId})">${child}</g>`;
+  return `${paint.defs}<g transform="rotate(${rotation} ${cx} ${cy})" opacity="${opacity}"><g${paint.filter}><g clip-path="url(#${paint.clipId})">${child}</g></g></g>`;
 }
-/** Static design export: all objects appear in authored z-order, including styled text, vectors and native table cells. */
+/** Static design export. Effects are applied after content clipping so shadows remain visible. */
 export async function slideScenePdfSvg(scene:SlideScene,exportWidth:number,loadImage:ImageLoader):Promise<string>{
   const shapes=await Promise.all(scene.objects.map((object,index)=>sceneObjectSvg(object,index,loadImage)));
   return `<g transform="scale(${exportWidth/scene.width})">${shapes.join("")}</g>`;
