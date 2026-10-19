@@ -4,6 +4,7 @@ import type { SlideSceneObject } from "../../types/slideScene";
 import { objectMotions } from "../../types/slideSceneMotion";
 import { SlideSceneTableControls } from "./SlideSceneTableEditor";
 import { SlideSceneShapeControls } from "./SlideSceneShapeControls";
+import { SlideScenePaintControls } from "./SlideScenePaintControls";
 export const sceneField="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900 disabled:opacity-40";
 function ValueField({label,value,type="text",disabled,onSave}:{label:string;value:string|number;type?:"text"|"number";disabled:boolean;onSave:(value:string)=>void}){
   const [draft,setDraft]=useState(String(value));useEffect(()=>setDraft(String(value)),[value]);
@@ -47,6 +48,7 @@ export function SlideSceneProperties({object:o,readOnly,onPatch,onLock,onEditTex
       {(["imageFocusX","imageFocusY"] as const).map(axis=><label className="block" key={axis}>{axis==="imageFocusX"?"Horizontal focus":"Vertical focus"}: {Math.round((o[axis]??0.5)*100)}%<input aria-label={axis==="imageFocusX"?"Horizontal crop focus":"Vertical crop focus"} className="w-full" type="range" min={0} max={100} value={Math.round((o[axis]??0.5)*100)} disabled={disabled||o.imageFit==="fill"} onChange={e=>onPatch({[axis]:Number(e.target.value)/100})}/></label>)}
       <button type="button" className={sceneField} disabled={disabled} onClick={()=>onPatch({imageFocusX:0.5,imageFocusY:0.5})}>Center image focus</button>
     </>}
+    <SlideScenePaintControls key={o.id} object={o} disabled={disabled} onPatch={onPatch}/>
     <label className="flex justify-between">Locked<input aria-label="Lock object" type="checkbox" checked={!!o.locked} disabled={readOnly} onChange={e=>onLock(e.target.checked)}/></label>
     <div className="rounded border border-indigo-200 p-2"><strong>{objectMotions(o).filter(m=>m.kind!=="none").length} animation effects</strong><p className="my-1 text-slate-500">Entrance, emphasis, exit and paths are edited in the shared timeline below.</p><button type="button" className={sceneField} onClick={onTimeline}>Open animation timeline</button></div>
   </div>;
