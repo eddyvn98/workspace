@@ -7,6 +7,7 @@ import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
+import { resizeSceneSelection, rotateSceneSelection, sceneSelectionBounds } from "../../utils/slideSceneGroupTransform";
 import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
 
@@ -105,7 +106,8 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
             onMove={(id, x, y) => { if(readOnly)return;const original=scene.objects.find(o=>o.id===id);if(!original||original.locked)return;
               const snapped=snapSceneRect({...original,x,y},snapEnabled);const ids=selectedIds.includes(id)?selectedIds:[id];
               commit(translateSceneSelection(scene,ids,snapped.x-original.x,snapped.y-original.y)); }}
-            onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snapEnabled))); }} />
+            onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snapEnabled))); }}
+            onTransformSelection={next=>commit(next)} />
         </div>
       </div>
       <aside className="hidden w-56 shrink-0 space-y-3 overflow-auto border-l bg-white p-3 text-xs lg:block">
@@ -114,6 +116,11 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
         {[...scene.objects].reverse().map(o => <button key={o.id} onClick={(e) => select(o.id,e.shiftKey)}
           className={`block w-full truncate rounded px-2 py-1 text-left ${selectedIds.includes(o.id) ? "bg-indigo-100" : "hover:bg-slate-100"}`}>{o.locked ? "🔒 " : ""}{o.kind} · {o.text?.slice(0, 18) || o.id.slice(0, 8)}</button>)}
         {selectedIds.length > 1 && <p className="text-indigo-700">{selectedIds.length} selected (Shift+click). Align selected objects:</p>}
+        {selectedIds.length > 1 && !readOnly && !scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked) && <div className="flex flex-wrap gap-1" aria-label="Group transformations">
+          <button className={field} type="button" onClick={()=>commit(rotateSceneSelection(scene,selectedIds,-15))}>Rotate −15°</button>
+          <button className={field} type="button" onClick={()=>commit(rotateSceneSelection(scene,selectedIds,15))}>Rotate +15°</button>
+          {[0.9,1.1].map(scale=><button className={field} key={scale} type="button" onClick={()=>{const b=sceneSelectionBounds(scene,selectedIds);if(!b)return;const delta=1-scale;commit(resizeSceneSelection(scene,selectedIds,{x:b.x+b.w*delta/2,y:b.y+b.h*delta/2,w:b.w*scale,h:b.h*scale}));}}>{scale<1?"Scale −10%":"Scale +10%"}</button>)}
+        </div>}
         {selectedIds.length > 2 && !readOnly && <div className="flex flex-wrap gap-1"><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"x"))}>Distribute H</button><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"y"))}>Distribute V</button></div>}
         {selectedIds.length > 1 && !readOnly && <div className="flex flex-wrap gap-1"><button className={field} type="button" title="Group (Ctrl/Cmd+G)" onClick={()=>commit(groupSceneObjects(scene,selectedIds,()=>crypto.randomUUID()))}>Group</button><button className={field} type="button" title="Ungroup (Ctrl/Cmd+Shift+G)" onClick={()=>commit(ungroupSceneObjects(scene,selectedIds))}>Ungroup</button></div>}
         {item && <div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button key={direction} className={field} disabled={readOnly || item.locked} onClick={()=>commit(alignSceneObjects(scene,selectedIds.length?selectedIds:[item.id],direction))}>{direction}</button>)}</div>}
