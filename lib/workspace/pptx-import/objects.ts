@@ -1,5 +1,5 @@
 import type { SlideSceneObject } from "@/app/workspace/types/slideScene";
-import { withSceneGroupPath } from "@/app/workspace/types/slideSceneGroupPath";
+import { withSceneGroupPath, objectGroupPath } from "@/app/workspace/types/slideSceneGroupPath";
 import { child, elements, first, numeric, NS, type Relationship } from "./xml";
 import { frame, transform, subFrame, type Matrix } from "./geometry";
 import { appendObjects, type ImportAsset, type NoticeSink, type Theme } from "./model";
@@ -10,9 +10,11 @@ import { readSceneShape } from "./shape";
 import { readScenePaint } from "./paint-effects";
 import { readScenePicture } from "./picture";
 import { readSceneChart } from "./chart";
+import { readSceneSmartArt } from "./smartart";
 export type ObjectContext={
   archive:PptxArchive;rels:Map<string,Relationship>;assets:Map<string,ImportAsset>;theme:Theme;rootScale:number;notice:NoticeSink;objects:SlideSceneObject[];
   nextId:()=>string;placeholders:Element[];onImported?:(source:Element,objects:SlideSceneObject[])=>void;
+  diagramDepth?:number;
 };
 function shapeProperties(node:Element):Element|undefined{return child(node,NS.p,"spPr");}
 function placeholder(node:Element):Element|undefined{return first(node,NS.p,"ph");}
@@ -37,7 +39,8 @@ function shape(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectCon
     if(placeholder(node)&&!first(body,NS.a,"rPr")?.hasAttribute("sz"))ctx.notice("placeholder-style","Inherited placeholder text styling requires visual review.");
     const bp=child(body,NS.a,"bodyPr"),left=numeric(bp,"lIns",91440),right=numeric(bp,"rIns",91440),top=numeric(bp,"tIns",45720),bottom=numeric(bp,"bIns",45720);
     const tx=subFrame(matrix,left/sw,top/sh,Math.max(0.01,1-(left+right)/sw),Math.max(0.01,1-(top+bottom)/sh)),text=readText(body,ctx.theme,fontScale,ctx.notice);
-    if(text.text)output.push({id:`${id}-text`,kind:"text",...frame(tx,ctx.notice),...text,...(!output.length&&effects.shadow?{shadow:effects.shadow}:{}),groupId});
+    const textShadow=effects.shadow?{...effects.shadow,opacity:Math.min(1,effects.shadow.opacity/(text.opacity||1))}:undefined;
+    if(text.text)output.push({id:`${id}-text`,kind:"text",...frame(tx,ctx.notice),...text,...(!output.length&&textShadow?{shadow:textShadow}:{}),groupId});
   }
   if(output.length>1&&!groupId)for(const object of output)object.groupId=id;
   appendObjects(ctx.objects,output);
@@ -45,9 +48,10 @@ function shape(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectCon
 async function graphic(node:Element,matrix:Matrix,groupId:string|undefined,ctx:ObjectContext):Promise<void>{
   const table=first(node,NS.a,"tbl");
   if(table){appendObjects(ctx.objects,[readNativeTable(table,matrix,groupId,ctx)]);return;}
+  if(await readSceneSmartArt(node,matrix,groupId,ctx,readObjects))return;
   await readSceneChart(node,matrix,groupId,ctx);
 }
-/** Matrix geometry is flattened, but the native group hierarchy is retained as a reversible groupPath. */
+/** Native coordinate transforms become scene geometry; hierarchy and embedded drawing data remain editable. */
 export async function readObjects(tree:Element|undefined,parent:Matrix,ctx:ObjectContext,groupId?:string,depth=0,path:string[]=groupId?[groupId]:[]):Promise<void>{
   if(depth>16||path.length>16)throw new Error("PPTX group nesting limit exceeded");
   for(const node of elements(tree)){
@@ -68,8 +72,14 @@ export async function readObjects(tree:Element|undefined,parent:Matrix,ctx:Objec
     else if(node.localName==="graphicFrame")await graphic(node,matrix,groupId,ctx);
     else ctx.notice("object-kind",`Unsupported object ${node.localName} was omitted.`);
     if(path.length){
-      const members=ctx.objects.length-before,objectPath=members>1&&path.length<16?[...path,ctx.nextId()]:path;
-      for(let i=before;i<ctx.objects.length;i++)ctx.objects[i]=withSceneGroupPath(ctx.objects[i],objectPath);
+      const compound=ctx.objects.length-before>1?ctx.nextId():undefined;
+      for(let i=before;i<ctx.objects.length;i++){
+        const current=objectGroupPath(ctx.objects[i]);
+        const suffix=current[0]===groupId?current.slice(1):current;
+        const next=[...path,...(suffix.length?suffix:compound?[compound]:[])];
+        if(next.length>16)throw new Error("Imported nested group exceeds 16 levels.");
+        ctx.objects[i]=withSceneGroupPath(ctx.objects[i],next);
+      }
     }
     ctx.onImported?.(node,ctx.objects.slice(before));
   }
