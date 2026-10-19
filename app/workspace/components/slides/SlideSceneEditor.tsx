@@ -4,6 +4,7 @@ import type { SlideScene, SlideSceneObject } from "../../types/slideScene";
 import { sceneDeleteObject, sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slideScene";
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
+import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, duplicateSceneObjects, nudgeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
@@ -26,6 +27,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
   const undo = () => {const prior=history.current.undo.pop();if(!prior)return;history.current.redo.push(scene);onChange(prior);setHistoryVersion(v=>v+1);};
   const redo = () => {const next=history.current.redo.pop();if(!next)return;history.current.undo.push(scene);onChange(next);setHistoryVersion(v=>v+1);};
   const item = useMemo(() => scene.objects.find(o => o.id === selected), [scene, selected]);
+  const qualityWarnings=useMemo(()=>inspectSlideScene(scene),[scene]);
   const patch = (values: Partial<SlideSceneObject>) => { if (item && !readOnly && !item.locked) commit(scenePatchObject(scene, item.id, values)); };
   const add = (kind: "text" | "shape" | "image" | "chart") => {
     if (readOnly) return;
@@ -77,6 +79,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false }: Props) {
       </div>
       <aside className="hidden w-56 shrink-0 space-y-3 overflow-auto border-l bg-white p-3 text-xs lg:block">
         <strong className="block">Layers</strong>
+        {qualityWarnings.length>0 && <details className="rounded border border-amber-300 p-2"><summary className="cursor-pointer">{qualityWarnings.length} layout warnings</summary>{qualityWarnings.map((w,i)=><button type="button" key={`${w.objectId}-${i}`} onClick={()=>select(w.objectId)} className="mt-1 block w-full text-left text-amber-800">{w.code}: {w.message}</button>)}</details>}
         {[...scene.objects].reverse().map(o => <button key={o.id} onClick={(e) => select(o.id,e.shiftKey)}
           className={`block w-full truncate rounded px-2 py-1 text-left ${selectedIds.includes(o.id) ? "bg-indigo-100" : "hover:bg-slate-100"}`}>{o.locked ? "🔒 " : ""}{o.kind} · {o.text?.slice(0, 18) || o.id.slice(0, 8)}</button>)}
         {selectedIds.length > 1 && <p className="text-indigo-700">{selectedIds.length} selected (Shift+click). Align selected objects:</p>}
