@@ -60,9 +60,22 @@ export function SlideSceneViewport({scene,backgroundColor,children,onStagePointe
       setView(prev=>({...prev,x:current.x+event.clientX-current.startX,y:current.y+event.clientY-current.startY}));
     };
     const end=(event:PointerEvent)=>{if(event.pointerId!==drag.current?.pointerId)return;drag.current=null;setDragging(false);};
+    const cancel=()=>{
+      const initial=drag.current;
+      if(initial)setView(previous=>({...previous,x:initial.x,y:initial.y}));
+      drag.current=null;setDragging(false);
+    };
+    const pointerCancel=(event:PointerEvent)=>{if(event.pointerId===drag.current?.pointerId)cancel();};
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key!=="Escape")return;
+      event.preventDefault();event.stopPropagation();cancel();
+    };
     window.addEventListener("pointermove",move);window.addEventListener("pointerup",end);
-    window.addEventListener("pointercancel",end);
-    return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",end);window.removeEventListener("pointercancel",end);};
+    window.addEventListener("pointercancel",pointerCancel);window.addEventListener("keydown",escape,true);
+    window.addEventListener("blur",cancel);
+    return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",end);
+      window.removeEventListener("pointercancel",pointerCancel);window.removeEventListener("keydown",escape,true);
+      window.removeEventListener("blur",cancel);};
   },[dragging]);
   const startPan=(event:React.PointerEvent<HTMLDivElement>)=>{
     if(event.button!==0||(!hand&&!space.current)||((event.target as Element).closest('[aria-label="Canvas view controls"]')))return;
