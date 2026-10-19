@@ -26,7 +26,7 @@ export function SlidePresentGrid({ data, currentIndex, onJump }: SlidePresentGri
             onClick={() => onJump(index)}
             className={`flex flex-col gap-1 rounded-md p-1 text-left ${index === currentIndex ? "ring-2 ring-blue-500" : "hover:bg-white/10"}`}
           >
-            <SlideMiniPreview html={slide.html} backgroundColor={slide.backgroundColor} theme={data.theme} aspectRatio={data.aspectRatio} />
+            <SlideMiniPreview html={slide.html} scene={slide.scene} backgroundColor={slide.backgroundColor} theme={data.theme} aspectRatio={data.aspectRatio} />
             <span className="truncate text-xs text-slate-200">{index + 1}. {slide.name}</span>
           </button>
         );
