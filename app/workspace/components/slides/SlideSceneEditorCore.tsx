@@ -14,8 +14,8 @@ import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjec
 import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, moveSceneSelectionLayer, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
 import { resizeSceneSelection, rotateSceneSelection, sceneSelectionBounds } from "../../utils/slideSceneGroupTransform";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
-type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string};
-export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF"}:Props){
+type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string;slideNumber?:number};
+export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF",slideNumber}:Props){
   const editor=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null),timeline=useRef<HTMLDivElement>(null);
   const [selectedIds,setSelectedIds]=useState<string[]>([]),[selected,setSelected]=useState<string|null>(null),[textEdit,setTextEdit]=useState<{id:string;signature:string}|null>(null);
   const [richEdit,setRichEdit]=useState<{object:SlideSceneObject;signature:string}|null>(null);
@@ -115,6 +115,7 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
         <SlideSceneSurface scene={scene} selected={selected} selectedIds={selectedIds} editing={!readOnly} onSelect={select} editingTextId={textEdit?.id} onRequestTextEdit={beginText} onTextCancel={()=>setTextEdit(null)} onTextCommit={finishText}
           onMove={(id,x,y)=>{const original=scene.objects.find(o=>o.id===id);if(!original||readOnly||original.locked)return;const next=snapSceneRect({...original,x,y},snap);commit(translateSceneSelection(scene,selectedIds.includes(id)?selectedIds:[id],next.x-original.x,next.y-original.y));}}
           onResize={(id,rect)=>{const object=scene.objects.find(o=>o.id===id);if(!readOnly&&object&&!object.locked)commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snap)));}} onTransformSelection={next=>commit(next)}/>
+        {slideNumber !== undefined && <span className="pointer-events-none absolute bottom-[2%] right-[2%] z-10 text-[1.2cqw] text-white mix-blend-difference" aria-label={`Slide number ${slideNumber}`}>{slideNumber}</span>}
       </div></div>
       {showInspector && <aside aria-label="Slide inspector" className="max-h-60 shrink-0 space-y-3 overflow-auto border-l border-slate-200 bg-white p-3 text-xs md:max-h-none md:w-72">
         <div className="sticky top-0 z-10 -mx-3 -mt-3 flex gap-1 border-b border-slate-200 bg-white p-2">
