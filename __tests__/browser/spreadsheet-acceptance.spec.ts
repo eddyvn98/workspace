@@ -38,7 +38,7 @@ test("active formula-bar typing is committed before explicit flush, and Escape s
 
 test("read-only blocks import and editing; malformed files do not replace a workbook", async ({ page }) => {
   await page.getByLabel("Import spreadsheet file", { exact: true }).setInputFiles({ name: "bad.xlsx", mimeType: "application/octet-stream", buffer: Buffer.from("not an xlsx") });
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "XLSX must be a ZIP workbook" })).toBeVisible();
   await expect(page.getByTestId("current-data")).toContainText("Quantity");
   await page.goto("/spreadsheet-acceptance?readonly=1");
   await expect(page.getByRole("button", { name: "Import file", exact: true })).toBeDisabled();

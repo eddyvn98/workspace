@@ -28,6 +28,11 @@ export default function SpreadsheetAcceptanceClient() {
     <output data-testid="current-data" hidden>{JSON.stringify(block.data)}</output>
     <div className="min-h-0 flex-1"><Spreadsheet block={block} boardId="fixture" standalone fillParent hideHeader
       onDirtyChange={setDirty} allowEdit={!readOnly} boardTitle="Acceptance" onClose={() => {}}
-      onChange={(patch) => { if (!readOnly) setBlock((current) => current ? { ...current, data: { ...current.data, ...patch } } : current); }} /></div>
+      onChange={(patch) => {
+      if (!readOnly) {
+        latest.current = latest.current ? { ...latest.current, data: { ...latest.current.data, ...patch } } : latest.current;
+        setBlock((current) => current ? { ...current, data: { ...current.data, ...patch } } : current);
+      }
+    }} /></div>
   </main>;
 }

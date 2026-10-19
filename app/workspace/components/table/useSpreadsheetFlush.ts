@@ -21,7 +21,7 @@ export function useSpreadsheetFlush({ boardId, root, emitNow, onDirtyChange }: P
     if (input && input.getClientRects().length) {
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
     }
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
     emitNow(); markClean(); return true;
   }, [root, emitNow, markClean]);
   useEffect(() => { if (boardId) return registerWorkspaceEditorFlush(boardId, flush); }, [boardId, flush]);
