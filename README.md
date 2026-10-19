@@ -1,34 +1,43 @@
 # Workspace
 
-A collaborative canvas for documents, diagrams, tables, and AI-assisted image flows.
+A collaborative canvas for documents, diagrams, tables, and AI-assisted image flows. This is an **identity-neutral feature extraction** intended to be reintegrated into a host application. The host provides its existing sign-in, session, navigation and permissions integration; this repository is not a separate identity product.
 
 ## Requirements
 
-- Node.js 20 or newer
-- pnpm 9
-- MongoDB and PostgreSQL
-- Dify API credentials for Workspace AI features
+- Node.js 22.13+ or 24, pnpm **9.10.0**
+- PostgreSQL and MongoDB for the features that use them
+- Dify API credentials for enabled Workspace AI features
+- Dedicated document-aware Workspace WebSocket service for live TipTap/Yjs collaboration
 
-## Setup
+## Development setup
 
-1. Copy `.env.example` to `.env.local` and set the values for your environment.
-2. Install dependencies with `pnpm install`.
-3. Generate the database client with `pnpm prisma:generate`.
-4. Start the app with `pnpm dev` and open `http://localhost:3000/workspace`.
+1. Copy `.env.example` to `.env.local`; configure development database, image storage and AI providers as needed.
+2. Install dependencies: `pnpm install --frozen-lockfile`.
+3. Apply migrations to a **development** database: `pnpm exec prisma migrate deploy`, then `pnpm prisma:generate`.
+4. Configure the same `WORKSPACE_WS_TOKEN_SECRET` in the Next.js app and service. Set `NEXT_PUBLIC_WORKSPACE_WS_URL`, `WORKSPACE_WS_INTERNAL_URL` and `WORKSPACE_INTERNAL_API_ORIGIN` as described below.
+5. Start `pnpm workspace:ws` and `pnpm dev` in separate terminals. Open `http://localhost:3000/workspace`.
 
-Workspace uses a local-only development identity configured by `WORKSPACE_DEV_USER_EMAIL`; this identity provider is disabled in production. Boards and access are stored in PostgreSQL. Realtime state uses MongoDB. AI requests are sent to the configured Dify server.
+The development-only identity `WORKSPACE_DEV_USER_EMAIL` is **not** a production sign-in mechanism. Board ownership and access currently use PostgreSQL. Document collaboration stores Yjs checkpoints in PostgreSQL through the app's persistence API; other Workspace modules may also use MongoDB. If the realtime service is unavailable, the app retains its revision-checked REST save path.
 
-## Configuration
+Never apply the extraction's migration by resetting a database that already contains host data. The document-aware room registry currently runs as **one service instance**; see the runtime guide before deploying or scaling.
 
-See `.env.example` for the supported environment variables. No tenant, organization, or hosted Dify endpoint is hard-coded in this repository.
+## Document integration and operations
+
+- **[Host integration boundary / merge-back checklist](docs/workspace-upstream-integration.md)** — what must move together; where to plug in the host's existing identity, permissions, storage and infrastructure without implementing another login.
+- [Document WebSocket and persistence](docs/workspace-document-realtime.md)
+- [Document copy/import/export contract](docs/workspace-document-export.md)
+- [Agent-local acceptance matrix](docs/workspace-document-local-test.md)
+- [Release / staging acceptance and rollback](docs/implementation/03-release-acceptance.md)
+
+The Document completion implementation was merged in [PR #58](https://github.com/eddyvn98/workspace/pull/58). Passing CI and local unit/fixture tests in the extraction **do not establish** that the integrated host's real services, WebSocket, credentials, or storage have been validated.
 
 ## Implementation blueprint
 
-The complete production-readiness plan is documented separately from implemented behavior:
+The broader product-readiness plan is documented separately from implemented behavior:
 
 - [00 — Master plan: architecture, phases, dependencies and definition of done](docs/implementation/00-master-plan.md)
 - [01 — Library capability matrix and integration audit](docs/implementation/01-library-capability-matrix.md)
 - [02 — Implementation backlog with work item IDs and acceptance criteria](docs/implementation/02-implementation-backlog.md)
 - [03 — Release/staging E2E, security, operations and rollback runbook](docs/implementation/03-release-acceptance.md)
 
-**Documentation does not mark features as delivered.** Check the linked PRs, CI runs, authenticated staging tests and restore evidence before marking a milestone complete.
+**Documentation is not proof of deployment.** Check the linked PRs, CI runs and agent-local host integration reports before declaring a release production-ready.
