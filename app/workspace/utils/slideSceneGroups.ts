@@ -23,8 +23,9 @@ export function ungroupSceneObjects(scene: SlideScene, ids: string[]): SlideScen
   if (!scene.objects.some(o => selected.has(o.id) && o.groupId)) return scene;
   return normalized(scene, scene.objects.map(o => {
     if (!selected.has(o.id)) return o;
-    const { groupId: removed, ...rest } = o;
-    return rest;
+    const object = {...o};
+    delete object.groupId;
+    return object;
   }));
 }
 
