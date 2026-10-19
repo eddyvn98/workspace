@@ -29,6 +29,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   const [isEditingBody, setIsEditingBody] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
   const studioRef = useRef<HTMLDivElement>(null);
+  const previousStudioState = useRef(false);
   useEffect(() => {
     if (!studioOpen) return;
     const prior = document.body.style.overflow;
@@ -36,9 +37,15 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
     return () => { document.body.style.overflow = prior; };
   }, [studioOpen]);
   useEffect(() => {
-    if (!studioOpen) return;
-    studioRef.current?.querySelector<HTMLButtonElement>('button[aria-label="Exit Slide Studio"]')?.focus({preventScroll:true});
-  }, [studioOpen]);
+    if (studioOpen) {
+      studioRef.current?.querySelector<HTMLButtonElement>('button[aria-label="Exit Slide Studio"]')?.focus({preventScroll:true});
+    } else if (previousStudioState.current) {
+      const instance = Array.from(document.querySelectorAll<HTMLElement>("[data-slide-deck-id]"))
+        .find(node => node.dataset.slideDeckId === block.id);
+      instance?.querySelector<HTMLButtonElement>('button[aria-label="Open Slide Studio"]')?.focus({preventScroll:true});
+    }
+    previousStudioState.current = studioOpen;
+  }, [studioOpen, block.id]);
   const boardId = useWorkspaceStore(state => state.boardId);
   const pendingEditBlockId = useWorkspaceStore((state) => state.pendingEditBlockId);
   const setPendingEditBlockId = useWorkspaceStore((state) => state.setPendingEditBlockId);
