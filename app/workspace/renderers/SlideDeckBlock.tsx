@@ -16,6 +16,7 @@ import { SlideSceneEditor } from "../components/slides/SlideSceneEditor";
 import { SlidePptxImport } from "../components/slides/SlidePptxImport";
 import { appendImportedSlides } from "@/lib/workspace/pptx-import/apply";
 import { legacyHtmlToScene } from "../utils/slideLegacyToScene";
+import { emptySlideScene } from "../types/slideScene";
 import { slideBackground, slideTextStyle } from "../utils/slideTheme";
 import { SLIDE_TYPOGRAPHY_CSS } from "../utils/slideTypography";
 
@@ -68,6 +69,8 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
   }, [block.id, setEditingBlockId]);
   const activeSlideId = data.activeSlideId ?? data.slideOrder[0];
   const activeSlide = data.slides[activeSlideId];
+  // A brand-new/empty slide immediately exposes the object ribbon; only populated legacy HTML needs conversion.
+  const activeScene = activeSlide?.scene ?? (activeSlide && !activeSlide.html.trim() ? emptySlideScene(data.aspectRatio) : undefined);
 
   const filmstrip = <SlideFilmstrip data={data} readOnly={readOnly} orientation={studioOpen ? "vertical" : "horizontal"}
     onSelect={actions.selectSlide} onAdd={actions.addSlide} onReorder={actions.reorderSlide}
@@ -102,12 +105,12 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {activeSlide && <>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-1 text-xs">
-          <SlideMotionControls slide={activeSlide} readOnly={readOnly} showContentAnimation={!activeSlide.scene}
+          <SlideMotionControls slide={activeSlide} readOnly={readOnly} showContentAnimation={!activeScene}
             onChange={patch=>{if(!readOnly)onChange({slides:{...data.slides,[activeSlide.id]:{...activeSlide,...patch}}});}}/>
           <div className="flex items-center gap-2">
-            {activeSlide.scene ? <>
+            {activeScene ? <>
               <span className="font-medium text-slate-500">Object editor</span>
-              {!readOnly && <details className="relative">
+              {!readOnly && activeSlide.scene && <details className="relative">
                 <summary className="cursor-pointer rounded px-2 py-1 text-slate-500 hover:bg-slate-100">Advanced</summary>
                 <div className="absolute right-0 z-30 w-52 rounded border border-slate-200 bg-white p-2 shadow-lg">
                   <button type="button" className="w-full rounded px-2 py-2 text-left text-slate-700 hover:bg-slate-100" onClick={()=>{
@@ -130,10 +133,10 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
       </>}
       <div className="slide-deck-themed slide-cq relative flex-1 overflow-hidden"
         style={{ backgroundColor: slideBackground(activeSlide?.backgroundColor, data.theme), ...slideTextStyle(data.theme) }}
-        onClick={(e) => { if (activeSlide?.scene || e.detail < 2 || isEditingBody) return; e.stopPropagation(); startEditingBody(); }}>
+        onClick={(e) => { if (activeScene || e.detail < 2 || isEditingBody) return; e.stopPropagation(); startEditingBody(); }}>
         <style>{THEMED_EDITOR_CSS + SLIDE_TYPOGRAPHY_CSS}</style>
-        {data.showSlideNumbers && !activeSlide?.scene && <span className="pointer-events-none absolute bottom-1 right-2 z-10 text-xs opacity-60">{data.slideOrder.indexOf(activeSlideId) + 1}</span>}
-        {activeSlide?.scene ? <SlideSceneEditor key={activeSlide.id} scene={activeSlide.scene} slideNumber={data.showSlideNumbers ? data.slideOrder.indexOf(activeSlideId)+1 : undefined}
+        {data.showSlideNumbers && !activeScene && <span className="pointer-events-none absolute bottom-1 right-2 z-10 text-xs opacity-60">{data.slideOrder.indexOf(activeSlideId) + 1}</span>}
+        {activeScene ? <SlideSceneEditor key={activeSlide.id} scene={activeScene} slideNumber={data.showSlideNumbers ? data.slideOrder.indexOf(activeSlideId)+1 : undefined}
           backgroundColor={slideBackground(activeSlide.backgroundColor, data.theme)} readOnly={readOnly}
           onChange={scene => { if (!readOnly) onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene } } }); }} />
           : activeSlide && <WorkspaceDocRichEditor key={activeSlide.id} blockId={block.id} html={activeSlide.html}
