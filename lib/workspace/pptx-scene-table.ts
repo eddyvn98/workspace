@@ -3,29 +3,31 @@ import { tableMergeAt } from "@/app/workspace/types/slideSceneTable";
 import { sceneTableCellStyle } from "@/app/workspace/utils/slideSceneTableStyle";
 import { emu, xml } from "./pptx-elements";
 import { createTablePaintResolver, tableFillXml } from "./pptx-table-paint";
-function measures(weights:number[],extent:number):number[]{
-  const total=weights.reduce((a,b)=>a+b,0),values=weights.map(w=>Math.max(1,Math.round(w/total*extent)));
-  values[values.length-1]+=extent-values.reduce((a,b)=>a+b,0);return values;
+/** Allocate at least one EMU per row/column and distribute all remaining units without negative tails. */
+export function tableExportMeasures(weights:number[],extent:number):number[]{
+  if(!weights.length||!Number.isInteger(extent)||extent<weights.length||weights.some(w=>!Number.isFinite(w)||w<=0))throw new Error("Invalid table size weights.");
+  const total=weights.reduce((a,b)=>a+b,0),available=extent-weights.length;
+  const values=weights.map(w=>1+Math.floor(w/total*available));
+  let remainder=extent-values.reduce((a,b)=>a+b,0);
+  const priority=weights.map((w,index)=>({index,fraction:w/total*available-Math.floor(w/total*available)})).sort((a,b)=>b.fraction-a.fraction);
+  for(let i=0;remainder>0;i++,remainder--)values[priority[i%priority.length].index]+=1;
+  return values;
 }
-/** DrawingML table remains one editable/animatable graphicFrame, not a grid of slide shapes. */
+/** Each table is one native editable/animatable graphicFrame, including its merged cells. */
 export async function exportSceneTable(object:SlideSceneObject,id:number,scale:number):Promise<string>{
   const table=object.table;if(!table)throw new Error("Table scene object is missing its grid data.");
-  const widths=measures(table.columnWidths,emu(object.w*scale)),heights=measures(table.rowHeights,emu(object.h*scale));
-  const paint=createTablePaintResolver(),opacity=object.opacity??1;
-  const rows:string[]=[];
+  const widths=tableExportMeasures(table.columnWidths,emu(object.w*scale)),heights=tableExportMeasures(table.rowHeights,emu(object.h*scale));
+  const paint=createTablePaintResolver(),opacity=object.opacity??1,rows:string[]=[];
   for(const [r,row] of table.rows.entries()){
     const cells:string[]=[];
     for(const [c,cell] of row.entries()){
       const style=sceneTableCellStyle(object,table,r,cell),merge=tableMergeAt(table,r,c);
-      // Office requires matching rowSpan across the top row and gridSpan down the left column.
       const mergeAttrs=merge?[
-        r===merge.row&&merge.rowSpan>1?` rowSpan="${merge.rowSpan}"`:"",
-        c===merge.column&&merge.colSpan>1?` gridSpan="${merge.colSpan}"`:"",
+        r===merge.row&&merge.rowSpan>1?` rowSpan="${merge.rowSpan}"`:"",c===merge.column&&merge.colSpan>1?` gridSpan="${merge.colSpan}"`:"",
         c>merge.column?' hMerge="1"':"",r>merge.row?' vMerge="1"':"",
       ].join(""):"";
       const [background,foreground,border]=await Promise.all([paint(style.fill),paint(style.color),paint(style.border)]);
-      const align=style.align==="center"?"ctr":style.align==="right"?"r":"l";
-      const anchor=style.verticalAlign==="top"?"t":style.verticalAlign==="bottom"?"b":"ctr";
+      const align=style.align==="center"?"ctr":style.align==="right"?"r":"l",anchor=style.verticalAlign==="top"?"t":style.verticalAlign==="bottom"?"b":"ctr";
       const size=Math.round(style.fontSize*scale*0.75*100),margin=emu(style.padding*scale);
       const runProperties=`<a:rPr lang="vi-VN" sz="${size}" b="${style.bold?1:0}" i="${style.italic?1:0}" u="${style.underline?"sng":"none"}">${tableFillXml(foreground,opacity)}<a:latin typeface="${xml(style.fontFamily)}"/><a:ea typeface="${xml(style.fontFamily)}"/></a:rPr>`;
       const paragraphs=cell.text.split("\n").map(line=>`<a:p><a:pPr algn="${align}"><a:lnSpc><a:spcPct val="115000"/></a:lnSpc></a:pPr><a:r>${runProperties}<a:t xml:space="preserve">${xml(line)}</a:t></a:r><a:endParaRPr lang="vi-VN" sz="${size}"/></a:p>`).join("");
