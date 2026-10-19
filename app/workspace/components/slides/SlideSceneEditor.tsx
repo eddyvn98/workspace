@@ -3,9 +3,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { SlideScene } from "../../types/slideScene";
 import { applySceneGroupEdit, sceneChildGroups, sceneInGroup } from "../../utils/slideSceneGroupScope";
 import { SlideSceneEditor as EditorCore } from "./SlideSceneEditorCore";
-type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string};
+type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string;slideNumber?:number};
 /** View-only group isolation: the host still saves one complete scene, with no separate identity system. */
-export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF"}:Props){
+export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF",slideNumber}:Props){
   const [scope,setScope]=useState<string[]>([]),[message,setMessage]=useState("");
   const signature=JSON.stringify(scene),latest=useRef(signature);latest.current=signature;
   const scoped=useMemo(()=>{try{return sceneInGroup(scene,scope);}catch{return null;}},[scene,scope]);
@@ -26,6 +26,6 @@ export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor=
       </select>
     </div>}
     {message&&<p role="status" className="px-2 py-1 text-xs text-amber-800">{message}</p>}
-    <div className="min-h-0 flex-1"><EditorCore key={scope.join("/")} scene={view} readOnly={readOnly} backgroundColor={backgroundColor} onChange={publish}/></div>
+    <div className="min-h-0 flex-1"><EditorCore key={scope.join("/")} scene={view} slideNumber={slideNumber} readOnly={readOnly} backgroundColor={backgroundColor} onChange={publish}/></div>
   </div>;
 }
