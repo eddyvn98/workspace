@@ -5,7 +5,7 @@ import { sceneMoveObject, sceneObject, scenePatchObject } from "../../types/slid
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
-import { alignSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
+import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
 import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
@@ -17,10 +17,13 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [snapEnabled,setSnapEnabled]=useState(true);
   const select = (id:string,additive=false) => {
-    const members=expandSceneSelection(scene,[id]);
-    setSelected(id);
-    setSelectedIds(current => additive ? (members.every(x=>current.includes(x))?current.filter(x=>!members.includes(x)):[...new Set([...current,...members])]) : members);
+    const found=expandSceneSelection(scene,[id]);
+    const members=found.length?found:[id];
+    const updated=additive ? (members.every(x=>selectedIds.includes(x))?selectedIds.filter(x=>!members.includes(x)):[...new Set([...selectedIds,...members])]) : members;
+    setSelected(updated.includes(id)?id:updated[0]??null);
+    setSelectedIds(updated);
   };
   const [imageUrl, setImageUrl] = useState("");
   const imageFileInput = useRef<HTMLInputElement>(null);
@@ -78,7 +81,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
   };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,editingTextId,readOnly,historyVersion]);
   return <div ref={editorRef} tabIndex={0} onPointerDownCapture={event => {const target = event.target as HTMLElement; if (target.closest("[data-scene-object]") && !target.closest("textarea,input,[contenteditable]")) editorRef.current?.focus({preventScroll:true});}} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-white p-2 text-xs">
-      <strong>Scene editor</strong>
+      <strong>Scene editor</strong><label className="flex items-center gap-1"><input aria-label="Snap to grid" type="checkbox" checked={snapEnabled} onChange={e=>setSnapEnabled(e.target.checked)}/>Snap 8px</label>
       <button className={field} disabled={readOnly || !history.current.undo.length} onClick={undo}>Undo</button><button className={field} disabled={readOnly || !history.current.redo.length} onClick={redo}>Redo</button>
       <button className={field} disabled={readOnly} onClick={() => add("text")}>+ Text</button>
       <button className={field} disabled={readOnly} onClick={() => add("shape")}>+ Shape</button><button className={field} disabled={readOnly} onClick={() => add("chart")}>+ Chart</button>
@@ -96,9 +99,9 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
             editingTextId={editingTextId} onRequestTextEdit={setEditingTextId} onTextCancel={() => setEditingTextId(null)}
             onTextCommit={(id,text) => {const old = scene.objects.find(o=>o.id===id); if(old && !old.locked && !readOnly) commit(scenePatchObject(scene,id,{text})); setEditingTextId(null);}}
             onMove={(id, x, y) => { if(readOnly)return;const original=scene.objects.find(o=>o.id===id);if(!original||original.locked)return;
-              const snapped=snapSceneRect({...original,x,y});const ids=selectedIds.includes(id)?selectedIds:[id];
+              const snapped=snapSceneRect({...original,x,y},snapEnabled);const ids=selectedIds.includes(id)?selectedIds:[id];
               commit(translateSceneSelection(scene,ids,snapped.x-original.x,snapped.y-original.y)); }}
-            onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect))); }} />
+            onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect,snapEnabled))); }} />
         </div>
       </div>
       <aside className="hidden w-56 shrink-0 space-y-3 overflow-auto border-l bg-white p-3 text-xs lg:block">
@@ -107,24 +110,25 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
         {[...scene.objects].reverse().map(o => <button key={o.id} onClick={(e) => select(o.id,e.shiftKey)}
           className={`block w-full truncate rounded px-2 py-1 text-left ${selectedIds.includes(o.id) ? "bg-indigo-100" : "hover:bg-slate-100"}`}>{o.locked ? "🔒 " : ""}{o.kind} · {o.text?.slice(0, 18) || o.id.slice(0, 8)}</button>)}
         {selectedIds.length > 1 && <p className="text-indigo-700">{selectedIds.length} selected (Shift+click). Align selected objects:</p>}
+        {selectedIds.length > 2 && !readOnly && <div className="flex flex-wrap gap-1"><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"x"))}>Distribute H</button><button className={field} type="button" onClick={()=>commit(distributeSceneObjects(scene,selectedIds,"y"))}>Distribute V</button></div>}
         {selectedIds.length > 1 && !readOnly && <div className="flex flex-wrap gap-1"><button className={field} type="button" title="Group (Ctrl/Cmd+G)" onClick={()=>commit(groupSceneObjects(scene,selectedIds,()=>crypto.randomUUID()))}>Group</button><button className={field} type="button" title="Ungroup (Ctrl/Cmd+Shift+G)" onClick={()=>commit(ungroupSceneObjects(scene,selectedIds))}>Ungroup</button></div>}
         {item && <div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button key={direction} className={field} disabled={readOnly || item.locked} onClick={()=>commit(alignSceneObjects(scene,selectedIds.length?selectedIds:[item.id],direction))}>{direction}</button>)}</div>}
         {item && <>
           <hr/><strong className="block">Object properties</strong>
           {item.kind === "chart" && <label className="block">Chart data (label, value per line)<textarea rows={4} className={field+" mt-1 w-full"} disabled={readOnly||item.locked} value={(item.series||[]).map(x=>`${x.label},${x.value}`).join("\n")} onChange={e=>{const series=e.target.value.split("\n").filter(Boolean).map(row=>{const comma=row.lastIndexOf(",");return {label:row.slice(0,comma).trim(),value:Number(row.slice(comma+1))};}); if(series.length>=1 && series.length<=24 && series.every(x=>x.label && Number.isFinite(x.value) && x.value>=0)) patch({series});}} /></label>}
           {item.kind === "text" && !readOnly && !item.locked && <button className={field+" w-full"} type="button" onClick={()=>setEditingTextId(item.id)}>Edit text on slide</button>}
-          {item.kind === "text" && <label className="block">Text<textarea className={field + " mt-1 w-full"} rows={3} value={item.text || ""} disabled={readOnly} onChange={e => patch({ text: e.target.value })}/></label>}
+          {item.kind === "text" && <label className="block">Text<textarea className={field + " mt-1 w-full"} rows={3} value={item.text || ""} disabled={readOnly || !!item.locked} onChange={e => patch({ text: e.target.value })}/></label>}
           {(["x","y","w","h","rotation","opacity"] as const).map(k => <label key={k} className="flex items-center justify-between gap-2 capitalize">{k}<input className={field + " w-24"} type="number" step={k === "opacity" ? 0.1 : 1} value={item[k] ?? 0} disabled={readOnly || item.locked} onChange={e => patch({ [k]: Number(e.target.value) })}/></label>)}
-          {item.kind === "text" && <label className="flex items-center justify-between">Font size<input type="number" className={field + " w-24"} value={item.fontSize || 44} disabled={readOnly} onChange={e => patch({fontSize:Number(e.target.value)})}/></label>}
-          <label className="flex items-center justify-between">Color<input className={field + " w-24"} value={item.kind === "text" ? item.color || "" : item.fill || ""} disabled={readOnly} onChange={e => patch(item.kind === "text" ? { color: e.target.value } : { fill: e.target.value })}/></label>
+          {item.kind === "text" && <label className="flex items-center justify-between">Font size<input type="number" className={field + " w-24"} value={item.fontSize || 44} disabled={readOnly || !!item.locked} onChange={e => patch({fontSize:Number(e.target.value)})}/></label>}
+          <label className="flex items-center justify-between">Color<input className={field + " w-24"} value={item.kind === "text" ? item.color || "" : item.fill || ""} disabled={readOnly || !!item.locked} onChange={e => patch(item.kind === "text" ? { color: e.target.value } : { fill: e.target.value })}/></label>
           <label className="flex items-center justify-between">Locked<input type="checkbox" checked={!!item.locked} disabled={readOnly} onChange={e => commit(scenePatchObject(scene,item.id,{locked:e.target.checked}))}/></label>
           <strong className="block">Animation</strong>
-          <label className="block">Effect<select className={field + " w-full"} value={item.motion?.kind || "none"} disabled={readOnly} onChange={e => patch({motion:{kind:e.target.value as NonNullable<SlideSceneObject["motion"]>["kind"],trigger:item.motion?.trigger||"with-previous",durationMs:item.motion?.durationMs||450,delayMs:item.motion?.delayMs||0}})}>
+          <label className="block">Effect<select className={field + " w-full"} value={item.motion?.kind || "none"} disabled={readOnly || !!item.locked} onChange={e => patch({motion:{kind:e.target.value as NonNullable<SlideSceneObject["motion"]>["kind"],trigger:item.motion?.trigger||"with-previous",durationMs:item.motion?.durationMs||450,delayMs:item.motion?.delayMs||0}})}>
             {["none","fade","rise","slide","zoom","wipe"].map(v => <option key={v} value={v}>{v}</option>)}</select></label>
           <label className="block">Trigger<select className={field + " w-full"} value={item.motion?.trigger || "with-previous"} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:e.target.value as NonNullable<SlideSceneObject["motion"]>["trigger"],durationMs:item.motion?.durationMs||450,delayMs:item.motion?.delayMs||0}})}>
             {["with-previous","after-previous","on-click"].map(v => <option key={v}>{v}</option>)}</select></label>
           <label className="flex items-center justify-between">Duration ms<input className={field + " w-24"} type="number" value={item.motion?.durationMs || 450} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:item.motion?.trigger||"with-previous",durationMs:Number(e.target.value),delayMs:item.motion?.delayMs||0}})}/></label>
-          <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120} onClick={()=>{const next=duplicateSceneSelection(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());commit(next);select(next.objects[next.objects.length-1].id);}}>Duplicate</button>
+          <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120 || !!item.locked} onClick={()=>{const next=duplicateSceneSelection(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());if(next!==scene){commit(next);select(next.objects[next.objects.length-1].id);}}}>Duplicate</button>
             <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(sceneMoveObject(scene,item.id,-1))}>Back</button>
             <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(sceneMoveObject(scene,item.id,1))}>Front</button>
             <button className={field} disabled={readOnly || !!item.locked} onClick={() => {commit(deleteSceneSelection(scene,selectedIds.length?selectedIds:[item.id]));setSelected(null);setSelectedIds([]);}}>Delete</button>
