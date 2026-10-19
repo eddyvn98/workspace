@@ -36,7 +36,7 @@ export function SlideSceneSurface({ scene, selected, editing = false, onSelect, 
         className={editing && !o.locked ? "cursor-move" : ""}
         style={{position:"absolute",left:`${(o.x+(drag?.id===o.id?offset.x:0))/scene.width*100}%`,top:`${(o.y+(drag?.id===o.id?offset.y:0))/scene.height*100}%`,
           width:`${o.w/scene.width*100}%`,height:`${o.h/scene.height*100}%`,transform:`rotate(${o.rotation}deg)`,opacity:hiddenByClick?0:o.opacity??1,
-          outline: editing && selected===o.id?"2px solid #6366f1":undefined,transformOrigin:"center",overflow:"hidden",pointerEvents:editing?"auto":"none"}}>
+          outline: editing && selected===o.id?"2px solid #6366f1":undefined,transformOrigin:"center",overflow:"hidden",transition:!editing?"opacity 350ms ease-out":undefined,pointerEvents:editing?"auto":"none"}}>
         {o.kind==="text" && <div style={{color:o.color,fontSize:`${(o.fontSize || 44)/scene.width*100}cqw`,fontFamily:o.fontFamily || "Arial",fontWeight:o.fontWeight,
           textAlign:o.align,whiteSpace:"pre-wrap",overflowWrap:"anywhere",lineHeight:1.12}}>{o.text}</div>}
         {o.kind==="shape" && <div className="h-full w-full" style={{background:o.fill,border:o.stroke && o.stroke!=="transparent" ? `2px solid ${o.stroke}`:undefined,borderRadius:`${o.radius||0}px`}}/>}
