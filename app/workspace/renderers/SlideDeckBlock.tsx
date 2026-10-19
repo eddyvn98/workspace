@@ -93,7 +93,7 @@ export const SlideDeckBlock: React.FC<BlockRendererProps<"slideDeck">> = ({ bloc
       {activeSlide && <>
         <SlideMotionControls slide={activeSlide} onChange={(patch) => onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, ...patch } } })} />
         <div className="flex items-center gap-2 border-b px-2 py-1 text-xs">
-          <button type="button" disabled={readOnly} className="rounded border px-2 py-1" onClick={() => {
+          <button type="button" disabled={readOnly || !!activeSlide.scene} className="rounded border px-2 py-1" onClick={() => {
             if (activeSlide.scene) return;
             if (activeSlide.html.trim() && !window.confirm("Switch to Scene V2? Existing rich text stays stored but Scene V2 becomes the visible slide.")) return;
             onChange({ slides: { ...data.slides, [activeSlide.id]: { ...activeSlide, scene: emptySlideScene(data.aspectRatio) } } });
