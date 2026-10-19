@@ -1,6 +1,5 @@
 import { attrValue, nodeText, parseHtml, type HtmlNode } from "@/app/api/workspaces/[id]/agent/docHtmlParse";
 import { parseSlideChart } from "@/app/workspace/utils/slideChart";
-import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
 import type { SlideMeta, SlideTheme } from "@/app/workspace/types/slide";
 
 export type SlideElement = { kind: "text"; text: string; heading: boolean } | { kind: "table"; rows: string[][] } | { kind: "image"; src: string; alt: string } | { kind: "chart"; series: { label: string; value: number }[] };
