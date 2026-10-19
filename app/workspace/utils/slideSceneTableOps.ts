@@ -1,4 +1,5 @@
 import { normalizeSceneTable, SCENE_TABLE_LIMITS, type SceneTableCell, type SceneTableData, type SceneTableMerge } from "../types/slideSceneTable";
+import { patchSceneTableCell } from "./slideSceneTableText";
 export type TableRange={row:number;column:number;endRow:number;endColumn:number};
 export function tableRange(a:{row:number;column:number},b=a):TableRange{return {row:Math.min(a.row,b.row),column:Math.min(a.column,b.column),endRow:Math.max(a.row,b.row),endColumn:Math.max(a.column,b.column)};}
 const intersects=(m:SceneTableMerge,r:TableRange)=>m.row<=r.endRow&&m.row+m.rowSpan>r.row&&m.column<=r.endColumn&&m.column+m.colSpan>r.column;
@@ -8,10 +9,10 @@ function checkRange(table:SceneTableData,r:TableRange):void{
 }
 export function patchSceneTable(table:SceneTableData,range:TableRange,patch:Partial<SceneTableCell>):SceneTableData{
   checkRange(table,range);
-  const rows=table.rows.map((row,r)=>row.map((cell,c)=>r>=range.row&&r<=range.endRow&&c>=range.column&&c<=range.endColumn?{...cell,...patch}:cell));
+  const rows=table.rows.map((row,r)=>row.map((cell,c)=>r>=range.row&&r<=range.endRow&&c>=range.column&&c<=range.endColumn?patchSceneTableCell(cell,patch):cell));
   return validate({...table,rows});
 }
-/** Only display geometry is merged; covered values remain stored and recoverable on unmerge. */
+/** Only display geometry is merged; covered values and styles are recoverable on unmerge. */
 export function mergeSceneTable(table:SceneTableData,range:TableRange):SceneTableData{
   checkRange(table,range);
   if(range.row===range.endRow&&range.column===range.endColumn)return table;
@@ -54,7 +55,7 @@ export function setSceneTableWeight(table:SceneTableData,axis:"row"|"column",ind
   if(!Number.isInteger(index)||index<0||index>=weights.length)throw new Error("Invalid row or column.");
   weights[index]=value;return {...table,[key]:weights};
 }
-/** TSV/plain text only; spreadsheet formulas remain inert text, never executed. */
+/** TSV explicitly replaces only destination text; rich formatting of other cells remains intact. */
 export function pasteSceneTable(table:SceneTableData,row:number,column:number,text:string):SceneTableData{
   if(text.length>SCENE_TABLE_LIMITS.totalText)throw new Error("Pasted table text is too large.");
   if(!Number.isInteger(row)||!Number.isInteger(column)||row<0||column<0)throw new Error("Invalid paste position.");
@@ -67,6 +68,6 @@ export function pasteSceneTable(table:SceneTableData,row:number,column:number,te
   const range={row,column,endRow:rowsNeeded-1,endColumn:colsNeeded-1};
   if(next.merges.some(m=>intersects(m,range)))throw new Error("Unmerge the paste destination before pasting a grid.");
   const rows=next.rows.map(cells=>cells.map(cell=>({...cell})));
-  values.forEach((cells,r)=>cells.forEach((value,c)=>{rows[row+r][column+c].text=value;}));
+  values.forEach((cells,r)=>cells.forEach((value,c)=>{rows[row+r][column+c]={...rows[row+r][column+c],text:value};delete rows[row+r][column+c].richText;}));
   return validate({...next,rows});
 }
