@@ -65,7 +65,7 @@ export function SlideSceneViewport({scene,backgroundColor,children,onStagePointe
     return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",end);window.removeEventListener("pointercancel",end);};
   },[dragging]);
   const startPan=(event:React.PointerEvent<HTMLDivElement>)=>{
-    if(event.button!==0||(!hand&&!space.current))return;
+    if(event.button!==0||(!hand&&!space.current)||((event.target as Element).closest('[aria-label="Canvas view controls"]')))return;
     event.preventDefault();event.stopPropagation();
     drag.current={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:view.x,y:view.y};
     setDragging(true);
