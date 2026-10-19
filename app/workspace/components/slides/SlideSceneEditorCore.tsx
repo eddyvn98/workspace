@@ -10,21 +10,21 @@ import { SlideSceneRichTextEditor } from "./SlideSceneRichTextEditor";
 import { SlideSceneRibbon } from "./SlideSceneRibbon";
 import { SlideSceneViewport } from "./SlideSceneViewport";
 import { SlideSceneResizableInspector } from "./SlideSceneResizableInspector";
-import { useSlideSceneHistory } from "../../hooks/useSlideSceneHistory";
+import { useSlideSceneHistory, type SlideSceneHistorySlot } from "../../hooks/useSlideSceneHistory";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
 import { alignSceneObjects, distributeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
 import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, moveSceneSelectionLayer, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
 import { resizeSceneSelection, rotateSceneSelection, sceneSelectionBounds } from "../../utils/slideSceneGroupTransform";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
-type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string;slideNumber?:number};
-export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF",slideNumber}:Props){
+type Props={scene:SlideScene;onChange:(scene:SlideScene)=>void;readOnly?:boolean;backgroundColor?:string;slideNumber?:number;historySlot?:SlideSceneHistorySlot};
+export function SlideSceneEditor({scene,onChange,readOnly=false,backgroundColor="#FFFFFF",slideNumber,historySlot}:Props){
   const editor=useRef<HTMLDivElement>(null),fileInput=useRef<HTMLInputElement>(null);
   const [selectedIds,setSelectedIds]=useState<string[]>([]),[selected,setSelected]=useState<string|null>(null),[textEdit,setTextEdit]=useState<{id:string;signature:string}|null>(null);
   const [richEdit,setRichEdit]=useState<{object:SlideSceneObject;signature:string}|null>(null);
   const [snap,setSnap]=useState(true),[imageUrl,setImageUrl]=useState(""),[uploading,setUploading]=useState(false),[message,setMessage]=useState("");
   const [showInspector,setShowInspector]=useState(true),[inspectorTab,setInspectorTab]=useState<"layers"|"properties">("layers");
   const [showTimeline,setShowTimeline]=useState(false);
-  const history=useSlideSceneHistory(scene,onChange,readOnly),{commit}=history;
+  const history=useSlideSceneHistory(scene,onChange,readOnly,historySlot),{commit}=history;
   const item=scene.objects.find(o=>o.id===selected),locked=scene.objects.some(o=>selectedIds.includes(o.id)&&o.locked);
   const warnings=useMemo(()=>inspectSlideScene(scene,backgroundColor),[scene,backgroundColor]),ids=selectedIds.length?selectedIds:selected?[selected]:[];
   const select=(id:string,additive=false,source=scene,focusProperties=true)=>{
