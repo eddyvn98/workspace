@@ -71,7 +71,7 @@ export function SlideSceneSurface({ scene, selected, selectedIds = [], editing =
             : o.text}</div>}
         {o.kind==="shape" && <div className="h-full w-full" style={{background:o.fill,border:o.stroke && o.stroke!=="transparent" ? `2px solid ${o.stroke}`:undefined,borderRadius:`${o.radius||0}px`}}/>}
         {o.kind==="chart" && o.series && <div className="flex h-full w-full flex-col justify-end gap-1 rounded bg-white p-[3%]"><div className="flex min-h-0 flex-1 items-end justify-around gap-2 border-b border-slate-300">{o.series.map((item,i)=><div key={i} title={`${item.label}: ${item.value}`} className="min-w-0 flex-1 rounded-t" style={{background:o.fill||"#4f46e5",height:`${Math.max(1,item.value/Math.max(1,...o.series!.map(x=>x.value))*100)}%`}} />)}</div><div className="flex justify-around gap-2">{o.series.map((item,i)=><span key={i} className="min-w-0 flex-1 truncate text-center" style={{fontSize:"1.25cqw"}}>{item.label}</span>)}</div></div>}
-        {o.kind==="image" && o.src && <img alt="" src={o.src} draggable={false} className="h-full w-full" style={{objectFit:o.imageFit||"cover"}}/>}
+        {o.kind==="image" && o.src && <img alt="" src={o.src} draggable={false} className="h-full w-full" style={{objectFit:o.imageFit||"cover",objectPosition:`${(o.imageFocusX??0.5)*100}% ${(o.imageFocusY??0.5)*100}%`}}/>}
       </div>;
     })}
     {editing && selectedIds.length > 1 && !editingTextId && !scene.objects.some(o => selectedIds.includes(o.id) && o.locked) &&
