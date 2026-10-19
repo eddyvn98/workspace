@@ -119,3 +119,28 @@ pnpm build
 - Verify charts with negative/large data, resize, saved charts, PPTX open in actual PowerPoint.
 - Scene group, crop/masks/media, object animations in PPTX, PPTX importing/roundtrip and full AI render-critique loop are not yet complete.
 - Keep PR draft and do not merge until the above checks pass. GitHub connector commits alone do not establish runtime correctness.
+
+## Application-first reliability pass — 2026-10-19
+
+Focus: make Office Presentation usable for people and future agents **before** integrating code execution.
+
+Confirmed source issues addressed on the PR branch:
+- Previously, Scene V2 PDF export treated scene slides as empty HTML and produced blank pages. Added `pdf-scene.ts` and connected it to `pdf-export.ts`: positioned shapes/text/charts/uploaded images render through the existing PDF raster pipeline.
+- Scene editor now shows the actual slide theme background rather than a hardcoded white design surface.
+- Editor shortcuts are scoped to focus within the editor; the canvas is keyboard-focusable, reducing interference with other tools or browser tabs.
+- Present mode keeps Previous/Next enabled while there are pending per-object click animation steps at the start/end of a deck.
+- Added PDF and PowerPoint 4:3 geometry regression test files.
+
+Local agent priority:
+```sh
+pnpm install --frozen-lockfile
+pnpm prisma:generate
+pnpm exec tsc --noEmit
+pnpm exec vitest run __tests__/workspace/slide-scene-pdf-export.test.ts __tests__/workspace/slide-scene-pptx-geometry.test.ts
+pnpm test:workspace
+pnpm build
+```
+
+Manual acceptance: create a dark Scene V2 deck, edit on a 4:3 and 16:9 canvas, verify keyboard input in a second editor is unaffected, export PDF and PPTX, inspect generated pages visually and verify presenter click-step navigation on first/last slides.
+
+**Do not merge yet.** All changes are committed, but the repository is not available locally for automated build/browser execution in this tool environment. The Next.js scene editor and exporter remain unverified at runtime; advanced PPTX animation, import roundtrip and Code Execution Agent are explicitly deferred.
