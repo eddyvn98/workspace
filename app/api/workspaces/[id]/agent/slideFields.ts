@@ -1,3 +1,4 @@
+import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
 import { SLIDE_ANIMATIONS, SLIDE_TRANSITIONS, validSlideMotion } from "@/app/workspace/utils/slideMotion";
 import { sanitizeAgentHtml } from "./agentHtmlSanitize";
 import { slideHtmlLayoutProblem } from "./slideHtmlContract";
@@ -54,6 +55,12 @@ export function parseSlideFields(raw: JsonMap, options: { allowLayout: boolean; 
     if (input === undefined) continue;
     if (!validSlideMotion(input, choices)) return { ok: false, reason: `${key} must be one of ${choices.join(", ")}.` };
     set[key] = input;
+  }
+  const sceneInput = param(raw, "scene");
+  if (sceneInput !== undefined) {
+    const scene = normalizeSlideScene(sceneInput, param(raw,"aspectRatio") === "4:3" ? "4:3" : "16:9");
+    if (!scene) return { ok: false, reason: "Invalid Scene V2. Provide an objects array (max 120) containing text, shape or image objects with safe dimensions." };
+    set.scene = scene;
   }
   const html = param(raw, "html");
   const layoutInput = options.allowLayout ? param(raw, "layout") : undefined;
