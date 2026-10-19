@@ -103,3 +103,19 @@ pnpm build
 5. Edit each object animation's timing using the timeline, including click, with-previous and after-previous.
 6. Confirm deck AI input accepts `composition` + `designStyle`, with corresponding background palette.
 7. Inspect slides in PowerPoint, LibreOffice and browser; report visual discrepancies and unsupported effects.
+
+## 2026-10-19 continuation: charts and design quality preflight
+
+### Commits in this batch
+- Extended Scene V2 object kinds with validated `chart` data series and existing Workspace bar visualization.
+- Enabled chart insertion and series editing in the Scene Editor sidebar.
+- AI schema accepts chart objects, and PPTX exports chart as an editable chart with embedded workbook through the existing PPTX chart implementation.
+- Added non-destructive `inspectSlideScene` quality warnings for overflow, small text, two-text collisions and low contrast. Warnings are visible in editor and returned as notes for AI slide creation.
+- Inspector now uses actual slide background for the editor; AI composition uses chosen style background.
+- New tests: `slide-scene-charts.test.ts` and `slide-scene-inspect.test.ts`.
+
+### Remaining high priority / local agent action
+- Run `pnpm exec tsc --noEmit`, `pnpm exec vitest run __tests__/workspace/slide-scene-*.test.ts`, `pnpm test:workspace`, `pnpm build`; correct any failures.
+- Verify charts with negative/large data, resize, saved charts, PPTX open in actual PowerPoint.
+- Scene group, crop/masks/media, object animations in PPTX, PPTX importing/roundtrip and full AI render-critique loop are not yet complete.
+- Keep PR draft and do not merge until the above checks pass. GitHub connector commits alone do not establish runtime correctness.
