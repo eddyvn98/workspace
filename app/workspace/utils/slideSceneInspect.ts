@@ -1,5 +1,5 @@
 import type { SlideScene } from "../types/slideScene";
-export type SlideSceneWarning = { objectId:string; code:"overflow"|"small-text"|"collision"|"contrast"|"missing-image"; message:string };
+export type SlideSceneWarning = { objectId:string; code:"overflow"|"small-text"|"collision"|"contrast"|"missing-image"|"group-export"; message:string };
 function parseHex(value?:string): [number,number,number]|null {
   if(!value || !/^#[0-9a-f]{6}$/i.test(value)) return null;
   return [parseInt(value.slice(1,3),16),parseInt(value.slice(3,5),16),parseInt(value.slice(5,7),16)];
@@ -34,6 +34,14 @@ export function inspectSlideScene(scene:SlideScene,background="#FFFFFF"):SlideSc
       const b=scene.objects[j];if(b.kind!=="text" || !b.text?.trim())continue;
       const overlap=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
       if(overlap>Math.min(a.w*a.h,b.w*b.h)*.2)warnings.push({objectId:a.id,code:"collision",message:`Text overlaps with ${b.id}; inspect composition.`});
+    }
+  }
+  const positions = new Map<string,number[]>();
+  scene.objects.forEach((o,index)=>{if(!o.groupId)return;const list=positions.get(o.groupId)||[];list.push(index);positions.set(o.groupId,list);});
+  for(const [,indices] of positions){
+    if(indices.length>1 && indices[indices.length-1]-indices[0]+1!==indices.length){
+      const objectId=scene.objects[indices[0]].id;
+      warnings.push({objectId,code:"group-export",message:"This group has interspersed layers; PPTX export will preserve visual stacking as separate objects."});
     }
   }
   return warnings;
