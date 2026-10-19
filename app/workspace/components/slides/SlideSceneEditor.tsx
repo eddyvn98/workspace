@@ -5,7 +5,8 @@ import { sceneDeleteObject, sceneMoveObject, sceneObject, scenePatchObject } fro
 import { SlideSceneSurface } from "./SlideSceneSurface";
 import { SlideSceneTimeline } from "./SlideSceneTimeline";
 import { inspectSlideScene } from "../../utils/slideSceneInspect";
-import { alignSceneObjects, duplicateSceneObjects, nudgeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
+import { alignSceneObjects, nudgeSceneObjects, snapSceneRect, setSceneObjectGeometry, type SceneAlign } from "../../utils/slideSceneGeometry";
+import { deleteSceneSelection, duplicateSceneSelection, expandSceneSelection, groupSceneObjects, translateSceneSelection, ungroupSceneObjects } from "../../utils/slideSceneGroups";
 import { useEffect, useRef } from "react";
 import { uploadWorkspaceImageWithOriginal } from "../../utils/imageUpload";
 
@@ -17,8 +18,9 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const select = (id:string,additive=false) => {
+    const members=expandSceneSelection(scene,[id]);
     setSelected(id);
-    setSelectedIds(current => additive ? (current.includes(id)?current.filter(x=>x!==id):[...current,id]) : [id]);
+    setSelectedIds(current => additive ? (members.every(x=>current.includes(x))?current.filter(x=>!members.includes(x)):[...new Set([...current,...members])]) : members);
   };
   const [imageUrl, setImageUrl] = useState("");
   const imageFileInput = useRef<HTMLInputElement>(null);
@@ -55,9 +57,10 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="y"){e.preventDefault();redo();return;}
     if(editingTextId || !selected)return;
     if(e.key==="Enter"||e.key==="F2"){const targetObject=scene.objects.find(o=>o.id===selected);if(targetObject?.kind==="text"&&!targetObject.locked){e.preventDefault();setEditingTextId(selected);}return;}
-    if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();commit(sceneDeleteObject(scene,selected));setSelected(null);setSelectedIds([]);return;}
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="g"){e.preventDefault();const ids=selectedIds.length?selectedIds:[selected];commit(e.shiftKey?ungroupSceneObjects(scene,ids):groupSceneObjects(scene,ids,()=>crypto.randomUUID()));return;}
+    if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();commit(deleteSceneSelection(scene,selectedIds.length?selectedIds:[selected]));setSelected(null);setSelectedIds([]);return;}
     const direction:Record<string,[number,number]>={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
-    if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(nudgeSceneObjects(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
+    if(direction[e.key]){e.preventDefault();const [dx,dy]=direction[e.key];commit(translateSceneSelection(scene,selectedIds.length?selectedIds:[selected],dx*(e.shiftKey?10:1),dy*(e.shiftKey?10:1)));}
   };window.addEventListener("keydown",handle);return()=>window.removeEventListener("keydown",handle);},[scene,selected,selectedIds,editingTextId,readOnly,historyVersion]);
   return <div ref={editorRef} tabIndex={0} onPointerDownCapture={event => {const target = event.target as HTMLElement; if (target.closest("[data-scene-object]") && !target.closest("textarea,input,[contenteditable]")) editorRef.current?.focus({preventScroll:true});}} className="flex h-full min-h-0 flex-col bg-slate-100 text-slate-900">
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-white p-2 text-xs">
@@ -75,10 +78,12 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
       <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto p-3">
         <div className="relative w-full max-w-5xl overflow-hidden border shadow" style={{ aspectRatio: `${scene.width} / ${scene.height}`,backgroundColor }}
           onPointerDown={e => { if(editingTextId) return; editorRef.current?.focus({preventScroll:true});if (e.target === e.currentTarget) {setSelected(null);setSelectedIds([]);} }}>
-          <SlideSceneSurface scene={scene} selected={selected} editing={!readOnly} onSelect={select}
+          <SlideSceneSurface scene={scene} selected={selected} selectedIds={selectedIds} editing={!readOnly} onSelect={select}
             editingTextId={editingTextId} onRequestTextEdit={setEditingTextId} onTextCancel={() => setEditingTextId(null)}
             onTextCommit={(id,text) => {const old = scene.objects.find(o=>o.id===id); if(old && !old.locked && !readOnly) commit(scenePatchObject(scene,id,{text})); setEditingTextId(null);}}
-            onMove={(id, x, y) => { if (!readOnly) commit(setSceneObjectGeometry(scene, id, snapSceneRect({...scene.objects.find(o=>o.id===id)!,x,y}))); }}
+            onMove={(id, x, y) => { if(readOnly)return;const original=scene.objects.find(o=>o.id===id);if(!original||original.locked)return;
+              const snapped=snapSceneRect({...original,x,y});const ids=selectedIds.includes(id)?selectedIds:[id];
+              commit(translateSceneSelection(scene,ids,snapped.x-original.x,snapped.y-original.y)); }}
             onResize={(id, rect) => { if (!readOnly) commit(setSceneObjectGeometry(scene,id,snapSceneRect(rect))); }} />
         </div>
       </div>
@@ -88,6 +93,7 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
         {[...scene.objects].reverse().map(o => <button key={o.id} onClick={(e) => select(o.id,e.shiftKey)}
           className={`block w-full truncate rounded px-2 py-1 text-left ${selectedIds.includes(o.id) ? "bg-indigo-100" : "hover:bg-slate-100"}`}>{o.locked ? "🔒 " : ""}{o.kind} · {o.text?.slice(0, 18) || o.id.slice(0, 8)}</button>)}
         {selectedIds.length > 1 && <p className="text-indigo-700">{selectedIds.length} selected (Shift+click). Align selected objects:</p>}
+        {selectedIds.length > 1 && !readOnly && <div className="flex flex-wrap gap-1"><button className={field} type="button" title="Group (Ctrl/Cmd+G)" onClick={()=>commit(groupSceneObjects(scene,selectedIds,()=>crypto.randomUUID()))}>Group</button><button className={field} type="button" title="Ungroup (Ctrl/Cmd+Shift+G)" onClick={()=>commit(ungroupSceneObjects(scene,selectedIds))}>Ungroup</button></div>}
         {item && <div className="flex flex-wrap gap-1">{(["left","center","right","top","middle","bottom"] as SceneAlign[]).map(direction=><button key={direction} className={field} disabled={readOnly || item.locked} onClick={()=>commit(alignSceneObjects(scene,selectedIds.length?selectedIds:[item.id],direction))}>{direction}</button>)}</div>}
         {item && <>
           <hr/><strong className="block">Object properties</strong>
@@ -104,10 +110,10 @@ export function SlideSceneEditor({ scene, onChange, readOnly = false,backgroundC
           <label className="block">Trigger<select className={field + " w-full"} value={item.motion?.trigger || "with-previous"} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:e.target.value as NonNullable<SlideSceneObject["motion"]>["trigger"],durationMs:item.motion?.durationMs||450,delayMs:item.motion?.delayMs||0}})}>
             {["with-previous","after-previous","on-click"].map(v => <option key={v}>{v}</option>)}</select></label>
           <label className="flex items-center justify-between">Duration ms<input className={field + " w-24"} type="number" value={item.motion?.durationMs || 450} disabled={readOnly} onChange={e => patch({motion:{kind:item.motion?.kind||"fade",trigger:item.motion?.trigger||"with-previous",durationMs:Number(e.target.value),delayMs:item.motion?.delayMs||0}})}/></label>
-          <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120} onClick={()=>{const next=duplicateSceneObjects(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());commit(next);select(next.objects[next.objects.length-1].id);}}>Duplicate</button>
-            <button className={field} disabled={readOnly} onClick={() => commit(sceneMoveObject(scene,item.id,-1))}>Back</button>
-            <button className={field} disabled={readOnly} onClick={() => commit(sceneMoveObject(scene,item.id,1))}>Front</button>
-            <button className={field} disabled={readOnly} onClick={() => {commit(sceneDeleteObject(scene,item.id));setSelected(null);setSelectedIds([]);}}>Delete</button>
+          <div className="flex gap-2"><button className={field} disabled={readOnly || scene.objects.length>=120} onClick={()=>{const next=duplicateSceneSelection(scene,selectedIds.length?selectedIds:[item.id],()=>crypto.randomUUID());commit(next);select(next.objects[next.objects.length-1].id);}}>Duplicate</button>
+            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(sceneMoveObject(scene,item.id,-1))}>Back</button>
+            <button className={field} disabled={readOnly || !!item.locked} onClick={() => commit(sceneMoveObject(scene,item.id,1))}>Front</button>
+            <button className={field} disabled={readOnly || !!item.locked} onClick={() => {commit(deleteSceneSelection(scene,selectedIds.length?selectedIds:[item.id]));setSelected(null);setSelectedIds([]);}}>Delete</button>
           </div>
         </>}
       </aside>
