@@ -57,7 +57,14 @@ export function readText(body: Element, theme: Theme, scale: number, notice: Not
   }
   const allRuns = paragraphs.flatMap(p => p.runs).filter(run => run.text.length), alphas = new Set(allRuns.map(run => run.opacity ?? 1));
   const commonOpacity = alphas.size === 1 ? allRuns[0]?.opacity ?? 1 : 1;
-  const base: Required<SceneTextStyle> = { ...initial, opacity: commonOpacity };
+  const base: Required<SceneTextStyle> = {
+    ...initial,
+    bold: allRuns.length > 0 && allRuns.every(run => run.bold),
+    italic: allRuns.length > 0 && allRuns.every(run => run.italic),
+    underline: allRuns.length > 0 && allRuns.every(run => run.underline),
+    strike: allRuns.length > 0 && allRuns.every(run => run.strike),
+    opacity: commonOpacity,
+  };
   for (const p of paragraphs) for (const run of p.runs) {
     if (alphas.size <= 1) delete run.opacity;
     for (const key of ["bold", "italic", "underline", "strike", "fontSize", "fontFamily", "color"] as const) if (run[key] === base[key]) delete run[key];

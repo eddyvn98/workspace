@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeSlideScene, scenePatchObject, type SlideSceneObject } from "@/app/workspace/types/slideScene";
 import { normalizeSceneRichText, richTextFromObject, resolvedSceneTextStyle, sceneParagraphLabels, sceneRichTextPlainText, type SceneRichText } from "@/app/workspace/types/slideSceneText";
 import { sceneTextFromEditor, sceneTextToEditor } from "@/app/workspace/utils/slideSceneTextCodec";
-import { resizeSceneSelection } from "@/app/workspace/utils/slideSceneGroupTransform";
+import { resizeSceneSelection, sceneSelectionBounds } from "@/app/workspace/utils/slideSceneGroupTransform";
 import { createSlideScript } from "@/lib/slide-agent/slideScriptSdk";
 const rich: SceneRichText = { version: 1, paragraphs: [
   { runs: [{ text: "Xin chào ", bold: false }, { text: "Việt Nam", bold: true, color: "#CC3300", fontSize: 60, italic: true, underline: true }], align: "center", lineHeight: 1.3, spaceAfter: 12 },
@@ -54,7 +54,8 @@ describe("Scene V2 structured rich text", () => {
     expect(rewritten.text).toBe("A new plain title"); expect(rewritten.richText).toBeUndefined();
   });
   it("scales explicit run sizes and paragraph gaps with group transforms", () => {
-    const scaled = resizeSceneSelection(scene(), ["text"], { x: 100, y: 80, w: 1200, h: 600 }).objects[0];
+    const bounds = sceneSelectionBounds(scene(), ["text"])!;
+    const scaled = resizeSceneSelection(scene(), ["text"], { ...bounds, w: bounds.w * 2, h: bounds.h * 2 }).objects[0];
     expect(scaled.fontSize).toBe(80);
     expect(scaled.richText!.paragraphs[0].runs[1].fontSize).toBe(120);
     expect(scaled.richText!.paragraphs[0].spaceAfter).toBe(24);

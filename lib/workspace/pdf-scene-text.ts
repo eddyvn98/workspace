@@ -13,7 +13,7 @@ function advance(text:string,style:Required<SceneTextStyle>):number{
   return units*style.fontSize*(style.bold?1.035:1);
 }
 function fragment(text:string,style:Required<SceneTextStyle>):Fragment{return {text,width:advance(text,style),style};}
-/** Keep every run's style through wrapping; never flatten mixed formatting into the first run. */
+const sameStyle=(a:Required<SceneTextStyle>,b:Required<SceneTextStyle>)=>a.fontFamily===b.fontFamily&&a.fontSize===b.fontSize&&a.bold===b.bold&&a.italic===b.italic&&a.underline===b.underline&&a.strike===b.strike&&a.color===b.color&&a.opacity===b.opacity;
 export function pdfSceneRichText(object:SlideSceneObject):string{
   const rich=richTextFromObject(object),labels=sceneParagraphLabels(rich),base=resolvedSceneTextStyle(object),lines:Line[]=[];let cursor=0;
   rich.paragraphs.forEach((p,index)=>{
@@ -22,7 +22,13 @@ export function pdfSceneRichText(object:SlideSceneObject):string{
     cursor+=p.spaceBefore??0;
     const flush=()=>{
       const font=Math.max(base.fontSize,...parts.map(part=>part.style.fontSize)),height=font*(p.lineHeight??1.12);
-      lines.push({parts,width,font,height,indent,align,y:cursor,...(firstLine&&labels[index]?{label:labels[index],labelX:base.fontSize*1.2*(p.level??0)}:{})});
+      const merged:Fragment[]=[];
+      for(const part of parts){
+        const prev=merged[merged.length-1];
+        if(prev&&sameStyle(prev.style,part.style)){prev.text+=part.text;prev.width+=part.width;}
+        else merged.push({...part});
+      }
+      lines.push({parts:merged,width,font,height,indent,align,y:cursor,...(firstLine&&labels[index]?{label:labels[index],labelX:base.fontSize*1.2*(p.level??0)}:{})});
       cursor+=height;parts=[];width=0;firstLine=false;
     };
     const append=(value:Fragment)=>{parts.push(value);width+=value.width;};
