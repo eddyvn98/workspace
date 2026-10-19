@@ -52,6 +52,13 @@ export function WorkspaceSpreadsheetEditor({
   blockRef.current = block;
   const onChangeRef = React.useRef(onChange);
   onChangeRef.current = onChange;
+  const notifyChange = React.useCallback((patch: Partial<TableBlockPayload>) => {
+    // A flush can synchronously emit a patch before React renders new props.
+    // File export/backup must read that committed draft, never the old block.
+    const current = blockRef.current;
+    blockRef.current = { ...current, data: { ...current.data, ...patch } };
+    onChangeRef.current(patch);
+  }, []);
   const selectionRef = React.useRef<Range>([]);
   const activeSheetRef = React.useRef(sheet.id);
   React.useEffect(() => { activeSheetRef.current = sheet.id; }, [sheet.id]);
@@ -70,8 +77,8 @@ export function WorkspaceSpreadsheetEditor({
     const pending = pendingPatchRef.current; pendingPatchRef.current = null;
     if (!pending || !allowEditRef.current) return;
     lastEmittedRef.current = pending.signature;
-    onChangeRef.current(pending.data);
-  }, []);
+    notifyChange(pending.data);
+  }, [notifyChange]);
   const editing = useSpreadsheetFlush({ boardId, root: rootRef, emitNow, onDirtyChange });
   const getBlock = React.useCallback(() => blockRef.current, []);
   const formulaRefreshSignature = React.useMemo(() => JSON.stringify({ activeId: sheet.id, sheets: sheets.map((item) => ({
@@ -209,7 +216,7 @@ export function WorkspaceSpreadsheetEditor({
           </button>
         )}
       </header>}
-      <SpreadsheetFileToolbar getBlock={getBlock} flush={editing.flush} onChange={(patch) => onChangeRef.current(patch)} allowEdit={allowEdit} title={boardTitle || "Spreadsheet"} />
+      <SpreadsheetFileToolbar getBlock={getBlock} flush={editing.flush} onChange={notifyChange} allowEdit={allowEdit} title={boardTitle || "Spreadsheet"} />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className={standalone ? "min-h-0 min-w-0 flex-1 p-3" : "min-h-0 min-w-0 flex-1 p-2"}>
           <div className="h-full w-full overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
