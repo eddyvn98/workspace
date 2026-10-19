@@ -1,0 +1,22 @@
+name: Spreadsheet review kit
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  review-kit:
+    if: github.head_ref == 'feat/spreadsheet-production-readiness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Package exact source for offline review
+        run: git archive --format=tar.gz -o workspace-review-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spreadsheet-review-source
+          path: workspace-review-source.tar.gz
+          retention-days: 1
