@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { importXlsx, exportXlsx } from "@/lib/office/spreadsheet/xlsx";
+import { readNativeBackup, writeNativeBackup } from "@/lib/office/spreadsheet/nativeBackup";
+import { importedPayload } from "@/lib/office/spreadsheet/payload";
+import type { CanvasBlock } from "@/app/workspace/types/block";
 import { readCsv, writeCsv } from "@/lib/office/spreadsheet/csv";
 import { inspectXlsx } from "@/lib/office/spreadsheet/zipSafety";
 import { assertDimensions, assertFormula, assertWorkbook, safeLink } from "@/lib/office/spreadsheet/limits";
@@ -54,6 +57,34 @@ describe("bounded spreadsheet files", () => {
     const reopened = await importXlsx((await exportXlsx(edit, imported.activeSheetId)).bytes);
     expect(reopened.sheets[0].data.cells[1][0]).toBe("Changed");
     expect(reopened.sheets[1].data.formulas?.[0][0]).toBe("=Sales!C2");
+  });
+  it("preserves formatting and validation on blank template cells", async () => {
+    const wb = new ExcelJS.Workbook(), sheet = wb.addWorksheet("Template");
+    sheet.getCell("B2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF008800" } };
+    sheet.getCell("B2").font = { bold: true, size: 16 };
+    sheet.getCell("C3").dataValidation = { type: "list", formulae: ['"Yes,No"'] };
+    const restored = await importXlsx(new Uint8Array(await wb.xlsx.writeBuffer()));
+    expect(restored.sheets[0].data.cells[1][1]).toBe("");
+    expect(restored.sheets[0].data.cellBgColor?.[1][1]).toBe("#008800");
+    expect(restored.sheets[0].data.cellFontSizes?.[1][1]).toBe(16);
+    expect(restored.sheets[0].data.dataValidations?.["2_2"].value1).toBe("Yes,No");
+  });
+  it("restores multi-sheet native backup in-place without importing its block identity", () => {
+    const sheets = fixture(), backupBlock = { id: "old-office-block", type: "table",
+      data: { ...sheets[0].data, sheets, activeSheetId: "sales" } } as CanvasBlock<"table">;
+    const json = writeNativeBackup(backupBlock, "Old file name");
+    const source = JSON.parse(json);
+    expect(source.blockOrder).toEqual(["old-office-block"]);
+    const restored = readNativeBackup(new TextEncoder().encode(json));
+    const next = importedPayload(restored);
+    expect(next.sheets?.map((item) => item.name)).toEqual(["Sales", "Summary Q4"]);
+    expect(next.activeSheetId).toBe("sales");
+    expect(next.cellBgColor?.[0][0]).toBe("#112233");
+    expect(next.sheets?.[1].data.formulas?.[0][0]).toBe("=Sales!C2");
+    expect(restored.warnings.join(" ")).toMatch(/identity/);
+    expect(() => readNativeBackup(new TextEncoder().encode('{"version":1,"blocks":{},"blockOrder":[]}'))).toThrow(/single-spreadsheet/);
+    source.blocks.other = { type: "table" };
+    expect(() => readNativeBackup(new TextEncoder().encode(JSON.stringify(source)))).toThrow(/single-spreadsheet/);
   });
   it("normalizes real dates from a 1904 workbook to 1900 serials without timezone shifts", async () => {
     const wb = new ExcelJS.Workbook(); wb.properties.date1904 = true;
