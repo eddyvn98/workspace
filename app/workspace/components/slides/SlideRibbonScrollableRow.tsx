@@ -17,6 +17,7 @@ export function SlideRibbonScrollableRow({label,children,secondary=false}:{
     window.addEventListener("resize",update);
     return()=>{el.removeEventListener("scroll",update);observer?.disconnect();window.removeEventListener("resize",update);};
   },[]);
+  useEffect(()=>{const el=rail.current;if(!el)return;setLeft(el.scrollLeft>3);setRight(el.scrollLeft+el.clientWidth<el.scrollWidth-3);},[children]);
   const scroll=(by:number)=>rail.current?.scrollBy({left:by,behavior:"smooth"});
   return <div className="relative min-w-0">
     <div ref={rail} aria-label={label}
