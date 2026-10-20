@@ -1,0 +1,174 @@
+[
+  {
+    "viewport": {
+      "name": "375px",
+      "width": 375,
+      "height": 812,
+      "label": "Mobile (iPhone)"
+    },
+    "metrics": {
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "stage": {
+        "x": 51,
+        "y": 312,
+        "width": 274,
+        "height": 154,
+        "aspectRatio": 1.778,
+        "fitsInViewport": true
+      },
+      "toolbar": {
+        "width": 375,
+        "height": 119,
+        "scrollWidth": 375,
+        "hasHorizontalScroll": false
+      },
+      "filmstrip": {
+        "x": 0,
+        "y": 700,
+        "width": 375,
+        "height": 112,
+        "isVertical": false,
+        "isHorizontal": true
+      },
+      "inspector": {
+        "x": 0,
+        "y": 498,
+        "width": 375,
+        "height": 202
+      }
+    },
+    "exitedCleanly": true
+  },
+  {
+    "viewport": {
+      "name": "768px",
+      "width": 768,
+      "height": 1024,
+      "label": "Tablet (iPad portrait)"
+    },
+    "metrics": {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "stage": {
+        "x": 32,
+        "y": 269,
+        "width": 704,
+        "height": 396,
+        "aspectRatio": 1.778,
+        "fitsInViewport": true
+      },
+      "toolbar": {
+        "width": 768,
+        "height": 119,
+        "scrollWidth": 768,
+        "hasHorizontalScroll": false
+      },
+      "filmstrip": {
+        "x": 0,
+        "y": 912,
+        "width": 768,
+        "height": 112,
+        "isVertical": false,
+        "isHorizontal": true
+      },
+      "inspector": {
+        "x": 0,
+        "y": 710,
+        "width": 768,
+        "height": 202
+      }
+    },
+    "exitedCleanly": true
+  },
+  {
+    "viewport": {
+      "name": "1280px",
+      "width": 1280,
+      "height": 800,
+      "label": "Laptop / Desktop"
+    },
+    "metrics": {
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "stage": {
+        "x": 224,
+        "y": 280,
+        "width": 736,
+        "height": 414,
+        "aspectRatio": 1.778,
+        "fitsInViewport": true
+      },
+      "toolbar": {
+        "width": 1088,
+        "height": 101,
+        "scrollWidth": 1088,
+        "hasHorizontalScroll": false
+      },
+      "filmstrip": {
+        "x": 0,
+        "y": 39,
+        "width": 192,
+        "height": 761,
+        "isVertical": false,
+        "isHorizontal": false
+      },
+      "inspector": {
+        "x": 992,
+        "y": 173,
+        "width": 288,
+        "height": 627
+      }
+    },
+    "exitedCleanly": true
+  },
+  {
+    "viewport": {
+      "name": "1920px",
+      "width": 1920,
+      "height": 1080,
+      "label": "Full HD Monitor"
+    },
+    "metrics": {
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "stage": {
+        "x": 224,
+        "y": 240,
+        "width": 1376,
+        "height": 774,
+        "aspectRatio": 1.778,
+        "fitsInViewport": true
+      },
+      "toolbar": {
+        "width": 1728,
+        "height": 101,
+        "scrollWidth": 1728,
+        "hasHorizontalScroll": false
+      },
+      "filmstrip": {
+        "x": 0,
+        "y": 39,
+        "width": 192,
+        "height": 1041,
+        "isVertical": false,
+        "isHorizontal": false
+      },
+      "inspector": {
+        "x": 1632,
+        "y": 173,
+        "width": 288,
+        "height": 907
+      }
+    },
+    "exitedCleanly": true
+  }
+]
