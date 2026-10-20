@@ -56,7 +56,7 @@ export function boardExportSlides(board: { blocks: unknown; blockOrder: unknown 
     const data = record(b.data), slides = record(data.slides);
     for (const slideId of Array.isArray(data.slideOrder) ? data.slideOrder : Object.keys(slides)) {
       const s = slides[slideId]; if (!s || s.hidden) continue;
-      output.push({ slide: s, theme: record(data.theme), width: data.aspectRatio === "4:3" ? 960 : 1280, elements: slideElements(String(s.html ?? "")) });
+      output.push({ slide: s, theme: record(data.theme), width: data.aspectRatio === "4:3" ? 960 : 1280, elements: s.scene ? [] : slideElements(String(s.html ?? "")) });
     }
   }
   if (!output.length || output.length > 60) throw new Error("Select decks containing between 1 and 60 visible slides.");

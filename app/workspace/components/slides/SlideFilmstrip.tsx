@@ -10,6 +10,8 @@ import type { SlideLayout } from "@/app/api/workspaces/[id]/agent/slideLayouts";
 
 export interface SlideFilmstripProps {
   data: SlideDeckPayload;
+  readOnly?: boolean;
+  orientation?: "horizontal" | "vertical";
   onSelect: (id: string) => void;
   onAdd: (layout?: SlideLayout) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
@@ -26,13 +28,17 @@ export interface SlideFilmstripProps {
  *  surface (native HTML5 drag-and-drop - no extra dependency needed for a
  *  single-axis list reorder). */
 export function SlideFilmstrip({
-  data, onSelect, onAdd, onReorder, onRename, onDuplicate, onDelete, onSetStatus, onSetBackground, onSetNotes, onSetHidden,
+  data, readOnly = false, orientation = "horizontal", onSelect, onAdd, onReorder, onRename, onDuplicate, onDelete, onSetStatus, onSetBackground, onSetNotes, onSetHidden,
 }: SlideFilmstripProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  const vertical = orientation === "vertical";
   return (
-    <div className="flex items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60">
+    <nav aria-label="Presentation slides" className={vertical
+      ? "flex h-28 w-full shrink-0 items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50 p-2 lg:h-full lg:w-48 lg:flex-col lg:items-stretch lg:overflow-x-hidden lg:overflow-y-auto lg:border-t-0 lg:border-r lg:p-3 dark:border-slate-800 dark:bg-slate-900"
+      : "flex items-center gap-2 overflow-x-auto border-t border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/60"}>
+      {vertical && <div className="hidden items-center justify-between px-1 text-xs font-semibold text-slate-600 lg:flex dark:text-slate-300"><span>Slides</span><span>{data.slideOrder.length}</span></div>}
       {data.slideOrder.map((id, index) => {
         const slide = data.slides[id];
         if (!slide) return null;
@@ -43,6 +49,8 @@ export function SlideFilmstrip({
             theme={data.theme}
             aspectRatio={data.aspectRatio}
             index={index}
+            vertical={vertical}
+            readOnly={readOnly}
             isActive={data.activeSlideId === id}
             canDelete={data.slideOrder.length > 1}
             onSelect={() => onSelect(id)}
@@ -62,16 +70,17 @@ export function SlideFilmstrip({
           />
         );
       })}
-      <div className="relative shrink-0">
+      <div className={vertical ? "relative shrink-0 md:w-full" : "relative shrink-0"}>
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
+          disabled={readOnly}
           onClick={() => setPickerOpen((v) => !v)}
-          className="flex h-16 w-16 items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:border-slate-700"
+          className={vertical ? "flex h-14 w-14 items-center justify-center gap-2 md:h-12 md:w-full rounded-md border border-dashed border-slate-300 bg-white text-xs text-slate-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800" : "flex h-16 w-16 items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:border-slate-700"}
           aria-label="Add slide"
           title="Add slide"
         >
-          <Plus className="h-5 w-5" />
+          <Plus className="h-5 w-5" />{vertical && <span className="hidden md:inline">New slide</span>}
         </button>
         {pickerOpen && (
           <SmartPopover defaultH="left" className="!z-50" onClose={() => setPickerOpen(false)}>
@@ -92,7 +101,7 @@ export function SlideFilmstrip({
           </SmartPopover>
         )}
       </div>
-    </div>
+    </nav>
   );
 }
 

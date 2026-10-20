@@ -1,3 +1,6 @@
+import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
+import { inspectSlideScene } from "@/app/workspace/utils/slideSceneInspect";
+import { composeSlideScene, SLIDE_SCENE_STYLES, type SceneComposition, type SceneDesignStyle } from "@/app/workspace/utils/slideSceneCompositions";
 import { SLIDE_ANIMATIONS, SLIDE_TRANSITIONS, validSlideMotion } from "@/app/workspace/utils/slideMotion";
 import { sanitizeAgentHtml } from "./agentHtmlSanitize";
 import { slideHtmlLayoutProblem } from "./slideHtmlContract";
@@ -54,6 +57,25 @@ export function parseSlideFields(raw: JsonMap, options: { allowLayout: boolean; 
     if (input === undefined) continue;
     if (!validSlideMotion(input, choices)) return { ok: false, reason: `${key} must be one of ${choices.join(", ")}.` };
     set[key] = input;
+  }
+  const composition = param(raw,"composition");
+  const designStyle = param(raw,"designStyle");
+  if (composition !== undefined) {
+    if (!["hero","split","metric","statement","columns"].includes(String(composition))) return {ok:false,reason:"Invalid composition; use hero, split, metric, statement or columns."};
+    const selectedStyle = String(designStyle ?? "editorial");
+    if (!Object.hasOwn(SLIDE_SCENE_STYLES,selectedStyle)) return {ok:false,reason:"Invalid designStyle; use editorial, technology, minimal or playful."};
+    set.scene = composeSlideScene({title:String(param(raw,"title") ?? ""),subtitle:String(param(raw,"subtitle")??""),bullets:Array.isArray(param(raw,"bullets"))?param(raw,"bullets") as string[]:[],imageUrl:String(param(raw,"imageUrl")??""),metric:String(param(raw,"metric")??""),metricLabel:String(param(raw,"metricLabel")??"")},selectedStyle as SceneDesignStyle,composition as SceneComposition);
+    set.backgroundColor = SLIDE_SCENE_STYLES[selectedStyle as SceneDesignStyle].background;
+    notes.push("Generated editable Scene V2 composition with consistent design tokens.");
+    notes.push(...inspectSlideScene(set.scene as NonNullable<ReturnType<typeof normalizeSlideScene>>,String(set.backgroundColor)).map(w=>`Scene warning [${w.code}] on ${w.objectId}: ${w.message}`));
+  }
+  const sceneInput = param(raw, "scene");
+  if (sceneInput !== undefined && composition !== undefined) return {ok:false,reason:"Give either scene or composition, not both."};
+  if (sceneInput !== undefined) {
+    const scene = normalizeSlideScene(sceneInput, param(raw,"aspectRatio") === "4:3" ? "4:3" : "16:9");
+    if (!scene) return { ok: false, reason: "Invalid Scene V2. Provide an objects array (max 120) containing text, shape or image objects with safe dimensions." };
+    set.scene = scene;
+    notes.push(...inspectSlideScene(scene,typeof set.backgroundColor==="string"?set.backgroundColor:"#FFFFFF").map(w=>`Scene warning [${w.code}] on ${w.objectId}: ${w.message}`));
   }
   const html = param(raw, "html");
   const layoutInput = options.allowLayout ? param(raw, "layout") : undefined;

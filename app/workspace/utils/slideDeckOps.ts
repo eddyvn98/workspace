@@ -1,6 +1,7 @@
 import { createWorkspaceId } from "./workspaceId";
 import type { SlideDeckPayload, SlideMeta, SlideStatus, SlideTheme } from "../types/slide";
 import { normalizeSlideTheme } from "./slideTheme";
+import { normalizeSlideScene } from "../types/slideScene";
 
 function createSlide(name: string): SlideMeta {
   return { id: createWorkspaceId(), name, html: "" };
@@ -10,6 +11,12 @@ function createSlide(name: string): SlideMeta {
  *  called once by the renderer on every render, mirroring normalizeTableData. */
 export function normalizeSlideDeckData(data: Partial<SlideDeckPayload> | undefined): SlideDeckPayload {
   const slides = { ...(data?.slides ?? {}) };
+  for (const [id, slide] of Object.entries(slides)) {
+    if (slide.scene !== undefined) {
+      const scene = normalizeSlideScene(slide.scene, data?.aspectRatio === "4:3" ? "4:3" : "16:9");
+      slides[id] = { ...slide, ...(scene ? { scene } : { scene: undefined }) };
+    }
+  }
   let slideOrder = (data?.slideOrder ?? []).filter((id) => Object.hasOwn(slides, id));
   if (slideOrder.length === 0) {
     const first = createSlide("Slide 1");
@@ -58,7 +65,7 @@ export function addSlide(data: SlideDeckPayload, afterId?: string, starter?: { h
 export function duplicateSlide(data: SlideDeckPayload, id: string): SlideDeckPayload {
   const source = data.slides[id];
   if (!source) return data;
-  const copy: SlideMeta = { ...source, id: createWorkspaceId(), name: `${source.name} copy` };
+  const copy: SlideMeta = { ...source, id: createWorkspaceId(), name: `${source.name} copy`, ...(source.scene ? {scene: {...source.scene, objects: source.scene.objects.map(o=>({...o,id:createWorkspaceId()}))}} : {}) };
   const insertAt = data.slideOrder.indexOf(id) + 1;
   const slideOrder = [...data.slideOrder];
   slideOrder.splice(insertAt, 0, copy.id);

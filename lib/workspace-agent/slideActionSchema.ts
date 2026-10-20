@@ -5,7 +5,14 @@ const text = { type: "string", maxLength: 20_000 } as const;
 const strings = { type: "array", maxItems: 100, items: text } as const;
 const item = { type: "object", additionalProperties: false, properties: { value: text, number: text, label: text, text } } as const;
 const seriesItem = { type: "object", additionalProperties: false, required: ["label", "value"], properties: { label: text, value: { type: "number", minimum: 0, maximum: 1_000_000_000 } } } as const;
+const num = { type: "number" } as const;
+const sceneObject = { type: "object", additionalProperties: true, required: ["id", "kind", "x", "y", "w", "h", "rotation"] } as const;
+const scene = { type: "object", additionalProperties: false, required: ["version", "objects"], properties: { version: { type: "integer", const: 2 }, width: num, height: num, objects: { type: "array", maxItems: 120, items: sceneObject } } } as const;
 const slideFields = {
+  scene,
+  designStyle:{type:"string",enum:["editorial","technology","minimal","playful"]},
+  composition:{type:"string",enum:["hero","split","metric","statement","columns"]},
+  metric:text,metricLabel:text,
   slideId: id, id, target: id, index: { type: "integer", minimum: 1, maximum: 500 }, name: text, newName: text, afterSlideId: id, position: { type: "integer", minimum: 1, maximum: 60 }, html: text, layout: { type: "string", enum: ["title", "title-bullets", "two-column", "image-caption", "section", "blank", "agenda", "quote", "stats", "process", "comparison", "closing", "data-table", "bar-chart"] },
   heading: text, title: text, subtitle: text, bullets: strings, left: strings, right: strings, imageUrl: { type: "string", maxLength: 2000 }, caption: text,
   items: { type: "array", maxItems: 20, items: item }, steps: { ...strings, maxItems: 20 }, leftTitle: text, rightTitle: text, text, author: text,

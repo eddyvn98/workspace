@@ -1,5 +1,7 @@
 import sharp from "sharp";
 import { boardExportSlides } from "./slide-export-scene";
+import { normalizeSlideScene } from "@/app/workspace/types/slideScene";
+import { slideScenePdfSvg } from "./pdf-scene";
 import { xml } from "./pptx-elements";
 import { slideExportImages, type SlideImageReader } from "./slide-export-images";
 import { slideExportLayout, wrapExportText } from "./slide-export-layout";
@@ -15,9 +17,12 @@ export async function exportBoardPdf(board: { blocks: unknown; blockOrder: unkno
   const slides = boardExportSlides(board, ids), width = slides[0].width, loadImage = slideExportImages(readImage), style = slideExportStyle();
   const pages: Buffer[] = [];
   for (const [i, { slide, theme, elements }] of slides.entries()) {
-    const { heights, contentWidth, scale } = slideExportLayout(elements, width, i);
+    const scene = normalizeSlideScene(slide.scene, width === 960 ? "4:3" : "16:9");
+    if (slide.scene && !scene) throw new Error(`Slide ${i + 1} has invalid Scene V2 data.`);
+    const { heights, contentWidth, scale } = scene ? { heights: [] as number[], contentWidth: width - 112, scale: 1 } : slideExportLayout(elements, width, i);
     const { fill, accent, background } = await style(slide, theme);
     const shapes: string[] = []; let y = 48;
+    if (scene) shapes.push(await slideScenePdfSvg(scene, width, loadImage));
     for (const [j, element] of elements.entries()) {
       const height = heights[j] * scale;
       if (element.kind === "text") shapes.push(svgText(element.text, 56, y, contentWidth, (element.heading ? 42 : 27) * scale, fill, element.heading));

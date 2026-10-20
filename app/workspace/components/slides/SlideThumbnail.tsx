@@ -13,6 +13,8 @@ export interface SlideThumbnailProps {
   theme?: SlideTheme;
   aspectRatio?: SlideAspectRatio;
   index: number;
+  vertical?: boolean;
+  readOnly?: boolean;
   isActive: boolean;
   canDelete: boolean;
   onSelect: () => void;
@@ -33,14 +35,16 @@ export interface SlideThumbnailProps {
  *  editor), a status dot, native HTML5 drag-and-drop for reordering, and a
  *  self-contained settings popover (rename/status/background/notes/duplicate/delete). */
 export function SlideThumbnail({
-  slide, theme, aspectRatio, index, isActive, canDelete, onSelect, onDragStart, onDragOver, onDrop,
+  slide, theme, aspectRatio, index, vertical = false, readOnly = false, isActive, canDelete, onSelect, onDragStart, onDragOver, onDrop,
   onRename, onDuplicate, onDelete, onSetStatus, onSetBackground, onSetNotes, onSetHidden,
 }: SlideThumbnailProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div
-      draggable
+      role="button" tabIndex={0} aria-label={`Select slide ${index + 1}: ${slide.name}`} aria-current={isActive ? "true" : undefined}
+      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onSelect(); } }}
+      draggable={!readOnly}
       onPointerDown={(e) => e.stopPropagation()}
       onDragStart={() => onDragStart(index)}
       onDragOver={(e) => {
@@ -52,7 +56,7 @@ export function SlideThumbnail({
         onDrop();
       }}
       onClick={onSelect}
-      className={`group relative flex w-28 shrink-0 cursor-pointer flex-col gap-1 rounded-md p-1 ${
+      className={`group relative flex ${vertical ? "w-28 shrink-0 md:w-full" : "w-28 shrink-0"} cursor-pointer flex-col gap-1 rounded-md p-1.5 ${
         isActive ? "bg-blue-50 ring-2 ring-blue-500 dark:bg-blue-950/40" : "hover:bg-slate-100 dark:hover:bg-slate-800"
       } ${slide.hidden ? "opacity-50" : ""}`}
     >
@@ -62,7 +66,7 @@ export function SlideThumbnail({
           {index + 1}
           {slide.hidden && <EyeOff className="h-2.5 w-2.5" aria-label="Hidden in presentation" />}
         </span>
-        <button
+        {!readOnly && <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
@@ -73,8 +77,8 @@ export function SlideThumbnail({
           aria-label="Slide settings"
         >
           <MoreHorizontal className="h-3 w-3" />
-        </button>
-        {menuOpen && (
+        </button>}
+        {menuOpen && !readOnly && (
           <SmartPopover defaultH="left" className="!z-50" onClose={() => setMenuOpen(false)}>
             <SlideSettingsMenu
               slide={slide}
@@ -96,7 +100,7 @@ export function SlideThumbnail({
           </SmartPopover>
         )}
       </div>
-      <SlideMiniPreview html={slide.html} backgroundColor={slide.backgroundColor} theme={theme} aspectRatio={aspectRatio} />
+      <SlideMiniPreview html={slide.html} scene={slide.scene} backgroundColor={slide.backgroundColor} theme={theme} aspectRatio={aspectRatio} />
       <div className="truncate px-0.5 text-[10px] text-slate-500 dark:text-slate-400">{slide.name}</div>
     </div>
   );

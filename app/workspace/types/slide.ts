@@ -7,6 +7,7 @@
  *  already uses), edited via WorkspaceDocRichEditor. */
 
 import type { SlideAnimation, SlideTransition } from "../utils/slideMotion";
+import type { SlideScene } from "./slideScene";
 
 export type SlideStatus = "not_started" | "in_progress" | "done";
 
@@ -14,6 +15,8 @@ export interface SlideMeta {
   id: string;
   name: string;
   html: string;
+  /** Freeform scene; absent means legacy rich-text editing. */
+  scene?: SlideScene;
   /** CSS color for the slide's background in both the editor and Present mode. */
   backgroundColor?: string;
   /** Shown only in Present mode's notes panel, never in the audience-facing slide. */
